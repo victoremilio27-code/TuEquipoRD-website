@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Base de datos local (el esquema vive en db/schema.sql)
+db/*.db
+db/*.db-shm
+db/*.db-wal
+
+# Archivos temporales y de proceso
+.tmp/
+shots/
+correos/
+
+# Capturas de referencia
+*.png
+!brand_assets/*.png
+
+# Entorno
+.env
+.env.*
+
+# Sistema
+Thumbs.db
+.DS_Store

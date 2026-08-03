@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equipos publicados · TuEquipoRD</title>
+<meta name="description" content="Maquinaria y equipo pesado publicado en República Dominicana. Filtra por categoría, marca, año, horas de uso, precio y provincia.">
+<meta name="theme-color" content="#071A2B">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <header class="pagina">
+    <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Equipos publicados</span></nav>
+    <h1 class="pagina__titulo"><em>Equipos</em> publicados</h1>
+    <p class="pagina__sub">Catálogo completo de maquinaria disponible. Cada ficha incluye horas de uso, condición, ubicación y precio publicado.</p>
+  </header>
+
+  <div class="fila fila--resultados">
+
+    <section class="panel" aria-labelledby="t-filtros">
+      <h2 class="panel__titulo" id="t-filtros"><em>Filtros</em> de búsqueda</h2>
+
+      <form class="form" id="filtros" action="equipos.html" method="get">
+        <!-- Conserva el orden elegido al aplicar filtros. -->
+        <input type="hidden" name="orden" value="">
+        <div class="campo campo--buscar">
+          <label for="f-q">Buscar</label>
+          <input id="f-q" type="search" name="q" placeholder="Marca, modelo o provincia" autocomplete="off">
+        </div>
+        <div class="campo">
+          <label for="f-cat">Categoría</label>
+          <select id="f-cat" name="categoria" data-categorias><option value="">Todas las categorías</option></select>
+        </div>
+        <div class="campo" hidden>
+          <label for="f-sub">Tipo de equipo</label>
+          <select id="f-sub" name="subcategoria"><option value="">Todos los tipos</option></select>
+        </div>
+        <div class="campo">
+          <label for="f-marca">Marca</label>
+          <select id="f-marca" name="marca" data-marcas="activas"><option value="">Todas las marcas</option></select>
+        </div>
+        <div class="campo">
+          <label for="f-cond">Condición</label>
+          <select id="f-cond" name="condicion">
+            <option value="">Cualquier condición</option>
+            <option value="Nuevo">Nuevo</option>
+            <option value="Como nuevo">Como nuevo</option>
+            <option value="Muy bueno">Muy bueno</option>
+            <option value="Bueno">Bueno</option>
+            <option value="Regular">Regular</option>
+            <option value="Para reparar">Para reparar</option>
+          </select>
+        </div>
+        <div class="campo campo--rango">
+          <label for="f-anio1">Año</label>
+          <div class="rango">
+            <select id="f-anio1" name="anioMin"><option value="">Desde</option><option>2024</option><option>2022</option><option>2020</option><option>2018</option><option>2015</option><option>2012</option></select>
+            <span>hasta</span>
+            <select name="anioMax" aria-label="Año hasta"><option value="">Hasta</option><option>2026</option><option>2024</option><option>2022</option><option>2020</option></select>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="f-horas">Horas de uso</label>
+          <select id="f-horas" name="horasMax">
+            <option value="">Cualquiera</option>
+            <option value="1000">Menos de 1,000</option>
+            <option value="3000">Menos de 3,000</option>
+            <option value="6000">Menos de 6,000</option>
+            <option value="10000">Menos de 10,000</option>
+          </select>
+        </div>
+        <div class="campo campo--rango">
+          <label for="f-precio1">Precio RD$</label>
+          <div class="rango">
+            <select id="f-precio1" name="precioMin"><option value="">Desde</option><option value="1000000">1,000,000</option><option value="3000000">3,000,000</option><option value="6000000">6,000,000</option><option value="10000000">10,000,000</option></select>
+            <span>hasta</span>
+            <select name="precioMax" aria-label="Precio hasta"><option value="">Hasta</option><option value="3000000">3,000,000</option><option value="6000000">6,000,000</option><option value="12000000">12,000,000</option><option value="25000000">25,000,000</option></select>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="f-lugar">Provincia</label>
+          <select id="f-lugar" name="provincia" data-provincias><option value="">Todas las provincias</option></select>
+        </div>
+
+        <div class="form__pie">
+          <a class="btn btn--linea" href="equipos.html">Limpiar</a>
+          <button class="btn btn--ambar" type="submit">
+            <svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg> Aplicar filtros
+          </button>
+        </div>
+      </form>
+
+      <!-- Publicidad en la columna de filtros. Es el mejor espacio del
+           sitio: aquí el visitante ya declaró qué busca y con qué
+           presupuesto, y la columna quedaba vacía bajo el formulario en
+           todas las páginas largas. Acompaña el desplazamiento sin
+           taparle nada al comprador. -->
+      <aside class="anuncio anuncio--columna" aria-label="Espacio publicitario">
+        <span>Espacio publicitario<br>300 &times; 250</span>
+      </aside>
+    </section>
+
+    <section class="panel" aria-labelledby="t-res">
+      <h2 class="visualmente-oculto" id="t-res">Resultados</h2>
+
+      <div class="barra-resultados">
+        <p class="barra-resultados__cuenta" id="resumenBusqueda">&mdash;</p>
+        <div class="chips" id="chipsFiltros"></div>
+
+        <label class="orden">
+          <span>Ordenar por</span>
+          <select id="ordenResultados"></select>
+        </label>
+      </div>
+
+      <ul class="rejilla rejilla--panel" id="resultados" aria-busy="true"></ul>
+
+      <nav class="paginacion" id="paginacion" aria-label="Páginas de resultados"></nav>
+
+      <div class="vacio" id="sinResultados" hidden>
+        <h3 class="vacio__titulo" id="sinResultadosTitulo">Ningún equipo coincide con esos filtros</h3>
+        <p class="vacio__texto" id="sinResultadosTexto">Retire algún filtro o amplíe el rango de años y de precio.</p>
+        <div class="vacio__acciones">
+          <a class="btn btn--ambar" href="equipos.html">Ver todos los equipos</a>
+          <a class="btn btn--linea" href="publicar.html">Publicar un equipo</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+        <li><a href="categorias.html">Todas las categorías</a></li>
+      </ul>
+      <h3 class="pie__titulo">Síganos</h3>
+      <ul class="pie__lista">
+        <li><a href="https://instagram.com" rel="noopener">Instagram</a></li>
+        <li><a href="https://facebook.com" rel="noopener">Facebook</a></li>
+        <li><a href="mailto:hola@tuequipord.do">hola@tuequipord.do</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
+        <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 34">
+  <!-- Hexágono de marca. Único uso permitido del símbolo sin el texto,
+       junto con los avatares (Guía de Marca v1.0). -->
+  <path d="M16 1.5 29 9v16l-13 7.5L3 25V9z" fill="#F2A900" stroke="#F2A900" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M16 10.6 22.6 14.4v7.2L16 25.4l-6.6-3.8v-7.2z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/>
+</svg>

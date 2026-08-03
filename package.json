@@ -1,0 +1,23 @@
+{
+  "name": "tuequipord-landing",
+  "version": "1.0.0",
+  "description": "Página de aterrizaje de TuEquipoRD, marketplace de maquinaria y equipo pesado.",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node tools/serve.js --port 8080",
+    "start:v1": "node tools/serve.js --port 8081",
+    "shot": "node tools/screenshot.js --url http://localhost:8080/",
+    "shot:fold": "node tools/screenshot.js --url http://localhost:8080/ --width 1440 --clip",
+    "check": "node tools/check-links.js",
+    "check:encoding": "node tools/fix-encoding.js --check",
+    "check:motion": "node tools/check-motion.js",
+    "favicon": "node tools/make-favicon.js",
+    "db:reset": "node -e \"require('fs').readdirSync('db').filter(f=>f.startsWith('tuequipord.db')).forEach(f=>require('fs').rmSync('db/'+f))\"",
+    "db:demo": "node tools/seed.js",
+    "db:demo:limpiar": "node tools/seed.js --vaciar"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.4.0"
+  }
+}

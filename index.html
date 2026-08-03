@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TuEquipoRD · Maquinaria y equipo pesado en venta en República Dominicana</title>
+<meta name="description" content="Portal dominicano de maquinaria y equipo pesado. Compra, vende, alquila e importa excavadoras, cargadores, volteos y grúas con horas de uso y precio publicado.">
+<meta name="theme-color" content="#071A2B">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#recientes">Saltar a los anuncios</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ==== PORTADA ====
+     Antes esta página abría con un banner publicitario de 1200×110 y
+     no tenía un solo <h1>: quien llegaba no sabía qué era el sitio y
+     los buscadores tampoco. El héroe dice qué se hace aquí, ofrece la
+     búsqueda por texto —lo primero que intenta cualquiera— y respalda
+     la promesa con cifras que salen de la base, no escritas a mano. -->
+<section class="heroe">
+  <div class="envoltura heroe__inner">
+    <h1 class="heroe__titulo">Maquinaria y equipo pesado <em>en República Dominicana</em></h1>
+    <p class="heroe__sub">Compre, venda y alquile excavadoras, cargadores, volteos y grúas.
+      Cada anuncio publica horas de uso, condición, ubicación y precio, con contacto directo al dueño del equipo.</p>
+
+    <form class="heroe__buscar" action="equipos.html" method="get" role="search">
+      <label class="visualmente-oculto" for="h-q">Qué equipo busca</label>
+      <input id="h-q" type="search" name="q" placeholder="Excavadora, Caterpillar 320, volteo..." autocomplete="off">
+      <label class="visualmente-oculto" for="h-cat">Categoría</label>
+      <select id="h-cat" name="categoria" data-categorias><option value="">Todas las categorías</option></select>
+      <label class="visualmente-oculto" for="h-prov">Provincia</label>
+      <select id="h-prov" name="provincia" data-provincias><option value="">Todo el país</option></select>
+      <button class="btn btn--ambar" type="submit">
+        <svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg> Buscar
+      </button>
+    </form>
+
+    <ul class="heroe__cifras" id="heroeCifras" aria-label="Estado del catálogo"></ul>
+  </div>
+</section>
+
+<div class="envoltura">
+
+  <!-- ==== FILA 1: buscador · tipos · destacados ==== -->
+  <div class="fila fila--busqueda">
+
+    <section class="panel" aria-labelledby="t-buscar">
+      <h2 class="panel__titulo" id="t-buscar"><em>Búsqueda</em> avanzada</h2>
+
+      <form class="form" id="buscador" action="equipos.html" method="get">
+        <div class="campo">
+          <label for="f-cat">Categoría</label>
+          <select id="f-cat" name="categoria" data-categorias><option value="">Todas las categorías</option></select>
+        </div>
+        <div class="campo">
+          <label for="f-marca">Marca</label>
+          <select id="f-marca" name="marca" data-marcas="activas"><option value="">Todas las marcas</option></select>
+        </div>
+        <div class="campo campo--rango">
+          <label for="f-anio1">Año</label>
+          <div class="rango">
+            <select id="f-anio1" name="anioMin"><option value="">Desde</option><option>2024</option><option>2022</option><option>2020</option><option>2018</option><option>2015</option></select>
+            <span>hasta</span>
+            <select name="anioMax" aria-label="Año hasta"><option value="">Hasta</option><option>2026</option><option>2024</option><option>2022</option><option>2020</option></select>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="f-horas">Horas de uso</label>
+          <select id="f-horas" name="horasMax">
+            <option value="">Cualquiera</option>
+            <option value="1000">Menos de 1,000</option>
+            <option value="3000">Menos de 3,000</option>
+            <option value="6000">Menos de 6,000</option>
+            <option value="10000">Menos de 10,000</option>
+          </select>
+        </div>
+        <div class="campo campo--rango">
+          <label for="f-precio1">Precio RD$</label>
+          <div class="rango">
+            <select id="f-precio1" name="precioMin"><option value="">Desde</option><option value="1000000">1,000,000</option><option value="3000000">3,000,000</option><option value="6000000">6,000,000</option><option value="10000000">10,000,000</option></select>
+            <span>hasta</span>
+            <select name="precioMax" aria-label="Precio hasta"><option value="">Hasta</option><option value="3000000">3,000,000</option><option value="6000000">6,000,000</option><option value="12000000">12,000,000</option><option value="25000000">25,000,000</option></select>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="f-lugar">Provincia</label>
+          <select id="f-lugar" name="provincia" data-provincias><option value="">Todas las provincias</option></select>
+        </div>
+
+        <div class="form__pie form__pie--solo">
+          <button class="btn btn--ambar" type="submit">
+            <svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg> Buscar equipos
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" id="tipos" aria-labelledby="t-tipos">
+      <h2 class="panel__titulo" id="t-tipos">Tipos <span class="panel__apunte">con más equipos</span></h2>
+      <ul class="tipos" id="tiposLista" data-top="5"></ul>
+      <p class="tipos__pie"><a href="categorias.html" id="tiposResto">Ver todas las categorías &rarr;</a></p>
+    </section>
+
+    <section class="panel panel--destacados" aria-labelledby="t-dest">
+      <div class="panel__cabeza panel__cabeza--ajustada">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-dest"><em>Destacados</em></h2>
+        <p class="panel__meta"><span class="num" id="destacadosCuenta">0</span> equipos con plan destacado</p>
+      </div>
+      <ul class="destacados" id="destacadosLista"></ul>
+      <p class="panel__pie"><a class="enlace-mas" href="equipos.html">Ver todo el catálogo publicado &rarr;</a></p>
+    </section>
+  </div>
+
+  <!-- ==== FILA 2: financia · vende ==== -->
+  <div class="fila fila--dos">
+
+    <section class="panel" id="financia" aria-labelledby="t-fin">
+      <h2 class="panel__titulo" id="t-fin"><em>Financiamiento</em> de maquinaria</h2>
+      <p class="panel__texto">Calcule la cuota mensual antes de negociar. Indique el valor del equipo y el plazo para obtener un estimado con el que evaluar las ofertas de las entidades financieras.</p>
+
+      <form class="calc" id="calc">
+        <div class="calc__campo">
+          <span class="calc__prefijo">RD$</span>
+          <label class="visualmente-oculto" for="c-valor">Valor del equipo</label>
+          <input id="c-valor" type="text" inputmode="numeric" placeholder="Valor del equipo" value="8,750,000">
+        </div>
+        <label class="visualmente-oculto" for="c-plazo">Plazo</label>
+        <select id="c-plazo">
+          <option value="24">2 años / 24 meses</option>
+          <option value="36">3 años / 36 meses</option>
+          <option value="48">4 años / 48 meses</option>
+          <option value="60" selected>5 años / 60 meses</option>
+        </select>
+        <button class="btn btn--azul" type="submit">
+          <svg class="ico" aria-hidden="true"><use href="#i-calc"/></svg> Calcular cuota
+        </button>
+      </form>
+
+      <output class="calc__salida" for="c-valor c-plazo">
+        <span class="etiqueta">Cuota mensual estimada</span>
+        <strong class="num" id="calcCuota">&mdash;</strong>
+        <span class="calc__nota">Estimado a 14 % anual sobre el valor total. No es una oferta de crédito ni incluye seguro ni gastos de cierre.</span>
+      </output>
+
+      <a class="btn btn--ambar btn--bloque" href="financiamiento.html">
+        <svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg> Ver opciones de financiamiento
+      </a>
+      <p class="panel__nota">Entidades que financian maquinaria en el país, requisitos de cada una y datos de contacto.</p>
+    </section>
+
+    <section class="panel" id="vende" aria-labelledby="t-vende">
+      <h2 class="panel__titulo" id="t-vende"><em>Publicación</em> de equipos</h2>
+      <p class="panel__texto">Publique su maquinaria ante contratistas, constructoras y administradores de flota. Complete la ficha, seleccione el plan y el anuncio queda activo de inmediato.</p>
+
+      <p class="realce">
+        <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
+        <span>Publicación <b>sin costo y sin límite de anuncios</b> con el plan Estándar hasta <b data-promo-hasta>fecha por definir</b></span>
+      </p>
+
+      <p class="panel__nota">
+        Sin límite de equipos ni costo por anuncio mientras dure la promoción de lanzamiento. El plan Destacado,
+        que sitúa el equipo en la portada, mantiene su tarifa; con una vigencia de 60 días
+        <b id="ahorroPortada"></b> frente a renovar dos veces. Para empresas que publican de forma continua,
+        la <a href="dealers.html">membresía Dealer</a> sustituye el pago por anuncio por una cuota recurrente.
+      </p>
+
+      <p class="etiqueta etiqueta--bloque">Recomendaciones para vender antes</p>
+      <ul class="lista-punteada lista-punteada--pasos">
+        <li>Fotografíe el equipo desde todos los ángulos, incluido el horómetro.</li>
+        <li>Incluya un video corto con el equipo encendido y en movimiento.</li>
+        <li>Declare todas las características: año, horas, implementos y trabajos pendientes.</li>
+      </ul>
+
+      <a class="btn btn--ambar btn--bloque" href="publicar.html">Publicar un equipo</a>
+
+      <p class="nota-verificado">
+        <span class="pastilla pastilla--verde"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Anunciante verificado</span>
+        Sin costo, previa comprobación de cédula o RNC y de titularidad. Evaluación en menos de 24 horas hábiles.
+      </p>
+    </section>
+  </div>
+
+  <!-- ==== FILA 3: alquiler · transporte · importación ==== -->
+  <div class="fila fila--tres">
+
+    <section class="panel panel--servicio" id="alquiler" aria-labelledby="t-alq">
+      <h2 class="panel__titulo" id="t-alq"><em>Alquiler</em> de maquinaria</h2>
+      <p class="panel__texto">Alquilamos <b>flota propia</b>, no equipos de terceros. Por eso respondemos por el estado de la máquina, su mantenimiento y su reemplazo ante una falla en obra.</p>
+
+      <ul class="servicio__puntos">
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Con operador o sin operador, según su necesidad</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Por día, semana o mes, con transporte cotizado por separado</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Mantenimiento preventivo y averías a nuestro cargo</li>
+      </ul>
+
+      <a class="btn btn--ambar btn--bloque" href="alquiler.html">
+        <svg class="ico" aria-hidden="true"><use href="#i-llave"/></svg> Cotizar alquiler
+      </a>
+      <p class="panel__nota">Indique el equipo requerido, la ubicación de la obra y el plazo. Respondemos con precio y disponibilidad.</p>
+    </section>
+
+    <section class="panel panel--servicio" id="transporte" aria-labelledby="t-tra">
+      <h2 class="panel__titulo" id="t-tra"><em>Transporte</em> de maquinaria</h2>
+      <p class="panel__texto">Trasladamos maquinaria por todo el país con <b>flota propia de lowboys</b>, se haya adquirido o no en este portal. Reserve el viaje y coordinamos los detalles con usted.</p>
+
+      <ul class="servicio__puntos">
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Seguimiento por GPS en el mapa hasta la entrega</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Permisos de carga ancha y escolta cuando corresponde</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Carga, amarre y aseguramiento a cargo de nuestro personal</li>
+      </ul>
+
+      <a class="btn btn--ambar btn--bloque" href="transporte.html">
+        <svg class="ico" aria-hidden="true"><use href="#i-lowboy"/></svg> Cotizar transporte
+      </a>
+      <p class="panel__nota">Solicitar la reserva no tiene costo ni compromiso: primero recibe precio y fecha, después decide.</p>
+    </section>
+
+    <section class="panel panel--servicio" id="importacion" aria-labelledby="t-imp">
+      <h2 class="panel__titulo" id="t-imp"><em>Importación</em> de maquinaria</h2>
+      <p class="panel__texto">Si el equipo que busca no está publicado, lo importamos. Indique <b>presupuesto y aplicación prevista</b> y localizamos la máquina en el exterior con el costo puesto en puerto dominicano.</p>
+
+      <ul class="servicio__puntos">
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Búsqueda en subastas y dealers de Estados Unidos</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Flete, seguro y aranceles estimados por adelantado</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Inspección previa a la compra y gestión aduanal</li>
+      </ul>
+
+      <a class="btn btn--ambar btn--bloque" href="importar.html">
+        <svg class="ico" aria-hidden="true"><use href="#i-barco"/></svg> Cotizar importación
+      </a>
+      <p class="panel__nota">Trabajamos por presupuesto y necesidad operativa, no por catálogo cerrado.</p>
+    </section>
+  </div>
+
+  <!-- ==== PUBLICIDAD ====
+       Antes había cuatro huecos de 290×150 en fila aquí y un banner de
+       1200×110 como primer elemento de la página. Se cambió por un solo
+       espacio, y más abajo, por tres razones:
+
+       · El banner sobre el contenido es la posición con menos atención
+         medida (ceguera al banner) y empujaba el catálogo fuera de la
+         primera pantalla: costaba visitas sin ganar clics.
+       · Cuatro huecos seguidos sin vender se ven como una página rota, y
+         con anunciantes reales compiten entre sí y bajan el valor de
+         cada uno. Un solo espacio se vende más caro que cuatro baratos.
+       · Aquí llega quien ya recorrió los servicios y va camino del
+         catálogo: es tráfico calificado y el formato queda dentro del
+         flujo de lectura, no atravesado en él.
+
+       El inventario de mayor valor está en equipos.html, donde el
+       visitante busca con intención de compra declarada. -->
+  <aside class="anuncio anuncio--ancho" aria-label="Espacio publicitario">
+    <span>Espacio publicitario · 970 &times; 120</span>
+  </aside>
+
+  <!-- ==== MARCAS CON EQUIPOS PUBLICADOS ==== -->
+  <section class="panel panel--marcas" aria-labelledby="t-marcas">
+    <h2 class="marcas__titulo" id="t-marcas">Marcas</h2>
+    <ul class="marcas" id="marcasLista"></ul>
+    <p class="marcas__nota" id="marcasNota"></p>
+  </section>
+
+  <!-- ==== ANUNCIOS RECIENTES ==== -->
+  <section class="panel" id="recientes" aria-labelledby="t-rec">
+    <div class="panel__cabeza">
+      <h2 class="panel__titulo panel__titulo--limpio" id="t-rec"><em>Anuncios</em> recientes</h2>
+      <p class="panel__meta"><span class="num" id="totalEquipos">0</span> equipos publicados · actualizado hoy</p>
+    </div>
+    <ul class="rejilla" id="rejillaRecientes" data-tope="18"></ul>
+    <nav class="paginas" aria-label="Paginación de anuncios">
+      <a class="btn btn--linea" href="equipos.html">Ver todos los equipos</a>
+    </nav>
+  </section>
+
+  <!-- ==== DIRECTORIO ==== -->
+  <section class="panel" id="dealers" aria-labelledby="t-dealers">
+    <div class="panel__cabeza">
+      <h2 class="panel__titulo panel__titulo--limpio" id="t-dealers"><em>Directorio</em> de dealers</h2>
+      <p class="panel__meta"><a class="enlace-mas" href="dealers.html">Ver los <span id="dealersCuenta">0</span> dealers &rarr;</a></p>
+    </div>
+    <ul class="dealers" id="dealersLista"></ul>
+  </section>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+        <li><a href="categorias.html">Todas las categorías</a></li>
+      </ul>
+
+      <h3 class="pie__titulo">Síganos</h3>
+      <ul class="pie__lista">
+        <li><a href="https://instagram.com" rel="noopener">Instagram</a></li>
+        <li><a href="https://facebook.com" rel="noopener">Facebook</a></li>
+        <li><a href="mailto:hola@tuequipord.do">hola@tuequipord.do</a></li>
+      </ul>
+    </div>
+
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
+        <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

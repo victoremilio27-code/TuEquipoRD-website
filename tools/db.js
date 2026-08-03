@@ -1,0 +1,946 @@
+/**
+ * db.js — acceso a datos sobre node:sqlite. Sin dependencias.
+ *
+ * Aquí vive TODO el SQL del proyecto. La API (tools/api.js) llama a
+ * estas funciones y nunca escribe una consulta: si mañana se cambia
+ * SQLite por PostgreSQL, se reescribe este archivo y nada más.
+ *
+ * El archivo de base de datos se crea solo en db/tuequipord.db la
+ * primera vez que arranca el servidor.
+ */
+
+const { DatabaseSync } = require('node:sqlite');
+const crypto = require('node:crypto');
+const fs = require('fs');
+const path = require('path');
+
+const RAIZ = path.resolve(__dirname, '..');
+const CARPETA = path.join(RAIZ, 'db');
+const ARCHIVO = process.env.TUEQUIPO_DB || path.join(CARPETA, 'tuequipord.db');
+
+let db;
+
+function abrir() {
+  if (db) return db;
+  fs.mkdirSync(CARPETA, { recursive: true });
+  db = new DatabaseSync(ARCHIVO);
+  db.exec(fs.readFileSync(path.join(CARPETA, 'schema.sql'), 'utf8'));
+  migrar();
+  return db;
+}
+
+/* Migraciones para bases que ya existen. schema.sql crea lo que falta
+   con IF NOT EXISTS, pero no añade columnas a tablas ya creadas: eso
+   se hace aquí. Cada entrada se aplica una vez y queda anotada.
+
+   Añadir siempre al final y no reescribir las anteriores: una base en
+   producción ya las aplicó. */
+
+/* Fin de la promoción de lanzamiento del nivel Estándar. Cuando la
+   fecha pase, los planes vuelven solos a su tarifa sin tocar código:
+   el importe se calcula contra ella en cada cobro. */
+const PROMO_LANZAMIENTO = process.env.TUEQUIPO_PROMO_HASTA || '2026-12-31';
+
+const MIGRACIONES = [
+  ['2026-08-sucursales-contacto', [
+    'ALTER TABLE sucursales ADD COLUMN horario TEXT',
+    'ALTER TABLE sucursales ADD COLUMN whatsapp TEXT',
+  ]],
+  // La promoción de lanzamiento pasa a la base. Antes vivía en
+  // assets/data.js, de modo que el navegador anunciaba el plan
+  // Estándar sin costo y el servidor cobraba los RD$2,000 igual.
+  ['2026-08-promociones', [
+    'ALTER TABLE planes ADD COLUMN precio_promocional INTEGER',
+    'ALTER TABLE planes ADD COLUMN promo_hasta TEXT',
+    `UPDATE planes SET precio_promocional = 0, promo_hasta = '${PROMO_LANZAMIENTO}'
+       WHERE nivel = 'estandar'`,
+  ]],
+];
+
+function migrar() {
+  db.exec('CREATE TABLE IF NOT EXISTS migraciones (id TEXT PRIMARY KEY, aplicada TEXT NOT NULL)');
+  const yaEsta = db.prepare('SELECT 1 FROM migraciones WHERE id = ?');
+  const anotar = db.prepare('INSERT INTO migraciones (id, aplicada) VALUES (?, ?)');
+
+  for (const [nombre, sentencias] of MIGRACIONES) {
+    if (yaEsta.get(nombre)) continue;
+    for (const sql of sentencias) {
+      try {
+        db.exec(sql);
+      } catch (e) {
+        // Una columna que ya existe no es un error: pasa cuando la
+        // base se creó con un schema.sql que ya la incluía.
+        if (!/duplicate column/i.test(e.message)) throw e;
+      }
+    }
+    anotar.run(nombre, new Date().toISOString());
+  }
+}
+
+/* ── Utilidades ─────────────────────────────────────────── */
+
+const id = () => crypto.randomUUID();
+const ahora = () => new Date().toISOString();
+const hoy = () => new Date().toISOString().slice(0, 10);
+
+const sumarDias = (dias, desde = new Date()) => {
+  const d = new Date(desde);
+  d.setDate(d.getDate() + dias);
+  return d.toISOString();
+};
+
+const sumarMeses = (meses, desde = new Date()) => {
+  const d = new Date(desde);
+  d.setMonth(d.getMonth() + meses);
+  return d.toISOString();
+};
+
+/* Contraseñas con scrypt: lento a propósito, con sal por usuario.
+   Nunca se guarda ni se registra la contraseña en claro. */
+function cifrarClave(clave) {
+  const sal = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(clave, sal, 64).toString('hex');
+  return { hash, sal };
+}
+
+function claveCorrecta(clave, hash, sal) {
+  const intento = crypto.scryptSync(clave, sal, 64);
+  const guardado = Buffer.from(hash, 'hex');
+  // Comparación en tiempo constante: una comparación normal filtra
+  // cuántos caracteres coinciden por lo que tarda en fallar.
+  return guardado.length === intento.length && crypto.timingSafeEqual(guardado, intento);
+}
+
+/* Identificador legible y estable para la URL del perfil. */
+function aSlug(texto) {
+  return String(texto)
+    .normalize('NFD').replace(new RegExp('[\u0300-\u036f]', 'g'), '')   // quita las tildes
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'dealer';
+}
+
+function slugLibre(base) {
+  const d = abrir();
+  const existe = d.prepare('SELECT 1 FROM organizaciones WHERE slug = ?');
+  let intento = base;
+  let n = 2;
+  while (existe.get(intento)) intento = `${base}-${n++}`;
+  return intento;
+}
+
+/* La huella del visitante sirve para no contar diez veces la misma
+   visita. Es un hash con sal diaria: no permite reidentificar a nadie
+   ni reconstruir la IP, y caduca solo cada 24 horas. */
+const SAL_VISITANTE = crypto.randomBytes(32).toString('hex');
+const huella = (ip, agente) =>
+  crypto.createHash('sha256').update(`${SAL_VISITANTE}|${hoy()}|${ip}|${agente}`).digest('hex').slice(0, 32);
+
+/* ── Usuarios, organizaciones y sesiones ────────────────── */
+
+const usuarioPorCorreo = (correo) =>
+  abrir().prepare('SELECT * FROM usuarios WHERE correo = ?').get(String(correo).trim().toLowerCase());
+
+const usuarioPorId = (idUsuario) =>
+  abrir().prepare('SELECT * FROM usuarios WHERE id = ?').get(idUsuario);
+
+/* Alta completa: usuario, organización, sucursal principal y rol de
+   propietario. Va en una transacción porque una cuenta a medio crear
+   (usuario sin organización) no podría publicar nada y habría que
+   repararla a mano. */
+function crearCuenta({ correo, clave, nombre, telefono, tipo, empresa, rnc, direccion, provincia, municipio }) {
+  const d = abrir();
+  const { hash, sal } = cifrarClave(clave);
+  const idUsuario = id();
+  const idOrg = id();
+  const idSucursal = id();
+  const t = ahora();
+  const esDealer = tipo === 'dealer';
+
+  const nombreOrg = esDealer ? empresa : nombre;
+  const slug = esDealer ? slugLibre(aSlug(nombreOrg)) : null;
+
+  const tx = d.prepare('BEGIN');
+  tx.run();
+  try {
+    d.prepare(`INSERT INTO usuarios (id, correo, nombre, telefono, clave_hash, clave_sal, creado)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(idUsuario, String(correo).trim().toLowerCase(), nombre, telefono || null, hash, sal, t);
+
+    d.prepare(`INSERT INTO organizaciones (id, tipo, nombre, rnc, slug, correo, telefono, creada)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(idOrg, esDealer ? 'dealer' : 'particular', nombreOrg,
+        esDealer ? (rnc || null) : null, slug, String(correo).trim().toLowerCase(), telefono || null, t);
+
+    // La sucursal principal nace con la cuenta. En un dealer llega ya
+    // con dirección y teléfono, que son obligatorios; en un particular
+    // se completa sola con la provincia del primer anuncio.
+    d.prepare(`INSERT INTO sucursales
+               (id, organizacion_id, nombre, provincia, municipio, direccion, telefono, principal, creada)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`)
+      .run(idSucursal, idOrg, esDealer ? 'Oficina principal' : 'Principal',
+        esDealer ? (provincia || null) : null,
+        esDealer ? (municipio || null) : null,
+        esDealer ? (direccion || null) : null,
+        telefono || null, t);
+
+    d.prepare(`INSERT INTO miembros (id, organizacion_id, usuario_id, rol, creado)
+               VALUES (?, ?, ?, 'propietario', ?)`)
+      .run(id(), idOrg, idUsuario, t);
+
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+
+  return { idUsuario, idOrg };
+}
+
+/* Organización sobre la que trabaja el usuario. Hoy se toma la
+   primera; cuando haya que operar varias, este es el punto donde
+   entra el selector, sin tocar nada más. */
+function organizacionDe(idUsuario) {
+  return abrir().prepare(`
+    SELECT o.*, m.rol
+    FROM miembros m
+    JOIN organizaciones o ON o.id = m.organizacion_id
+    WHERE m.usuario_id = ?
+    ORDER BY m.creado
+    LIMIT 1`).get(idUsuario);
+}
+
+const sucursalPrincipal = (idOrg) =>
+  abrir().prepare('SELECT * FROM sucursales WHERE organizacion_id = ? ORDER BY principal DESC, creada LIMIT 1').get(idOrg);
+
+function abrirSesion(idUsuario) {
+  const testigo = crypto.randomBytes(32).toString('hex');
+  const d = abrir();
+  d.prepare('INSERT INTO sesiones (testigo, usuario_id, creada, expira) VALUES (?, ?, ?, ?)')
+    .run(testigo, idUsuario, ahora(), sumarDias(30));
+  d.prepare('UPDATE usuarios SET ultimo_acceso = ? WHERE id = ?').run(ahora(), idUsuario);
+  return testigo;
+}
+
+function sesion(testigo) {
+  if (!testigo) return null;
+  const fila = abrir().prepare(`
+    SELECT s.usuario_id, s.expira, u.correo, u.nombre
+    FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id
+    WHERE s.testigo = ?`).get(testigo);
+  if (!fila) return null;
+  if (fila.expira < ahora()) { cerrarSesion(testigo); return null; }
+  return fila;
+}
+
+const cerrarSesion = (testigo) =>
+  abrir().prepare('DELETE FROM sesiones WHERE testigo = ?').run(testigo);
+
+/* ── Códigos de verificación ────────────────────────────── */
+
+/* Secreto con el que se firman los códigos. En producción viene del
+   entorno y es el mismo en todos los procesos; si se genera al azar
+   en cada arranque, un reinicio invalida los códigos en vuelo. */
+const SECRETO = process.env.TUEQUIPO_SECRETO || crypto.randomBytes(32).toString('hex');
+
+if (!process.env.TUEQUIPO_SECRETO) {
+  console.warn('aviso: TUEQUIPO_SECRETO sin definir; los códigos en vuelo caducan al reiniciar.');
+}
+
+const firmarCodigo = (codigo, correo) =>
+  crypto.createHmac('sha256', SECRETO).update(`${correo}|${codigo}`).digest('hex');
+
+/* Seis dígitos, con generación uniforme. Math.random no sirve: es
+   predecible y aquí protege el acceso a una cuenta. */
+const generarCodigo = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+
+const MINUTOS_CODIGO = { verificacion: 15, acceso: 10, restablecer: 20 };
+const MAX_INTENTOS_CODIGO = 5;
+
+/* Emite un código y anula los anteriores del mismo tipo: si se piden
+   tres seguidos, solo vale el último. */
+function crearCodigo({ correo, tipo, idUsuario }) {
+  const d = abrir();
+  const normalizado = String(correo).trim().toLowerCase();
+
+  d.prepare('UPDATE codigos SET consumido = 1 WHERE correo = ? AND tipo = ? AND consumido = 0')
+    .run(normalizado, tipo);
+
+  const codigo = generarCodigo();
+  const minutos = MINUTOS_CODIGO[tipo] || 10;
+
+  d.prepare(`INSERT INTO codigos (id, usuario_id, correo, tipo, codigo_hash, expira, creado)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id(), idUsuario || null, normalizado, tipo, firmarCodigo(codigo, normalizado),
+      new Date(Date.now() + minutos * 60000).toISOString(), ahora());
+
+  return { codigo, minutos };
+}
+
+/* Comprueba y consume. Devuelve { ok, motivo, usuario_id }.
+
+   El código se marca consumido en cuanto acierta, dentro de la misma
+   sentencia condicional: dos peticiones simultáneas con el código
+   correcto no pueden pasar las dos. */
+function verificarCodigo({ correo, tipo, codigo }) {
+  const d = abrir();
+  const normalizado = String(correo).trim().toLowerCase();
+
+  const fila = d.prepare(`
+    SELECT * FROM codigos
+    WHERE correo = ? AND tipo = ? AND consumido = 0
+    ORDER BY creado DESC LIMIT 1`).get(normalizado, tipo);
+
+  if (!fila) return { ok: false, motivo: 'inexistente' };
+  if (fila.expira < ahora()) return { ok: false, motivo: 'vencido' };
+  if (fila.intentos >= MAX_INTENTOS_CODIGO) {
+    d.prepare('UPDATE codigos SET consumido = 1 WHERE id = ?').run(fila.id);
+    return { ok: false, motivo: 'agotado' };
+  }
+
+  const esperado = Buffer.from(fila.codigo_hash, 'hex');
+  const recibido = Buffer.from(firmarCodigo(String(codigo || '').trim(), normalizado), 'hex');
+  const coincide = esperado.length === recibido.length && crypto.timingSafeEqual(esperado, recibido);
+
+  if (!coincide) {
+    d.prepare('UPDATE codigos SET intentos = intentos + 1 WHERE id = ?').run(fila.id);
+    return { ok: false, motivo: 'incorrecto', restantes: MAX_INTENTOS_CODIGO - fila.intentos - 1 };
+  }
+
+  const r = d.prepare('UPDATE codigos SET consumido = 1 WHERE id = ? AND consumido = 0').run(fila.id);
+  if (!r.changes) return { ok: false, motivo: 'usado' };
+
+  return { ok: true, usuario_id: fila.usuario_id };
+}
+
+const marcarCorreoVerificado = (idUsuario) =>
+  abrir().prepare('UPDATE usuarios SET correo_verificado = 1 WHERE id = ?').run(idUsuario);
+
+/* ── Equipos de confianza ───────────────────────────────── */
+
+const DIAS_DISPOSITIVO = 60;
+
+function recordarDispositivo(idUsuario, descripcion) {
+  const testigo = crypto.randomBytes(32).toString('hex');
+  abrir().prepare(`INSERT INTO dispositivos (testigo, usuario_id, descripcion, creado, expira, ultimo_uso)
+                   VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(testigo, idUsuario, String(descripcion || '').slice(0, 200), ahora(),
+      sumarDias(DIAS_DISPOSITIVO), ahora());
+  return testigo;
+}
+
+/* ¿Este equipo ya verificó un código para esta cuenta? */
+function dispositivoDeConfianza(testigo, idUsuario) {
+  if (!testigo) return false;
+  const d = abrir();
+  const fila = d.prepare('SELECT * FROM dispositivos WHERE testigo = ? AND usuario_id = ?')
+    .get(testigo, idUsuario);
+  if (!fila || fila.expira < ahora()) return false;
+  d.prepare('UPDATE dispositivos SET ultimo_uso = ? WHERE testigo = ?').run(ahora(), testigo);
+  return true;
+}
+
+/* Al cambiar la contraseña se cierra todo: sesiones y equipos
+   recordados. Es el punto del sistema en el que se echa fuera a quien
+   hubiera entrado sin permiso. */
+function cerrarTodoDe(idUsuario) {
+  const d = abrir();
+  d.prepare('DELETE FROM sesiones WHERE usuario_id = ?').run(idUsuario);
+  d.prepare('DELETE FROM dispositivos WHERE usuario_id = ?').run(idUsuario);
+}
+
+/* ── Límite de intentos ─────────────────────────────────── */
+
+/* Ventana deslizante por clave (correo, IP o la combinación). Sirve
+   igual para "cuántos códigos ha pedido este correo" que para
+   "cuántas contraseñas ha probado esta IP".
+
+   Devuelve false cuando se pasó del tope. */
+function permitir(clave, tope, minutos) {
+  const d = abrir();
+  const t = ahora();
+
+  d.prepare('DELETE FROM intentos WHERE expira < ?').run(t);
+
+  const fila = d.prepare('SELECT * FROM intentos WHERE clave = ?').get(clave);
+  if (!fila) {
+    d.prepare('INSERT INTO intentos (clave, cuenta, expira) VALUES (?, 1, ?)')
+      .run(clave, new Date(Date.now() + minutos * 60000).toISOString());
+    return true;
+  }
+  if (fila.cuenta >= tope) return false;
+
+  d.prepare('UPDATE intentos SET cuenta = cuenta + 1 WHERE clave = ?').run(clave);
+  return true;
+}
+
+const limpiarIntentos = (clave) => abrir().prepare('DELETE FROM intentos WHERE clave = ?').run(clave);
+
+/* Purga lo caducado. Se llama de vez en cuando desde el servidor para
+   que estas tablas no crezcan sin fin. */
+function purgar() {
+  const d = abrir();
+  const t = ahora();
+  d.prepare('DELETE FROM sesiones WHERE expira < ?').run(t);
+  d.prepare('DELETE FROM dispositivos WHERE expira < ?').run(t);
+  d.prepare('DELETE FROM intentos WHERE expira < ?').run(t);
+  d.prepare('DELETE FROM codigos WHERE expira < ?').run(new Date(Date.now() - 86400000).toISOString());
+}
+
+/* ── Perfil de dealer ───────────────────────────────────── */
+
+/* Convierte una organización en dealer al registrar el RNC. Es
+   idempotente: si ya lo era, solo actualiza los datos. El slug se
+   calcula una vez y no se vuelve a tocar, porque es una URL que
+   puede estar compartida por ahí. */
+function registrarDealer(idOrg, { rnc, empresa, web, descripcion }) {
+  const d = abrir();
+  const org = d.prepare('SELECT * FROM organizaciones WHERE id = ?').get(idOrg);
+  if (!org) throw Object.assign(new Error('Organización inexistente'), { codigo: 404 });
+
+  const duenoDelRnc = d.prepare('SELECT id FROM organizaciones WHERE rnc = ? AND id <> ?').get(rnc, idOrg);
+  if (duenoDelRnc) throw Object.assign(new Error('Ese RNC ya está registrado por otra cuenta'), { codigo: 409 });
+
+  const nombre = empresa || org.nombre;
+  const slug = org.slug || slugLibre(aSlug(nombre));
+
+  d.prepare(`UPDATE organizaciones
+             SET tipo = 'dealer', rnc = ?, nombre = ?, slug = ?, web = COALESCE(?, web),
+                 descripcion = COALESCE(?, descripcion), actualizada = ?
+             WHERE id = ?`)
+    .run(rnc, nombre, slug, web || null, descripcion || null, ahora(), idOrg);
+
+  return d.prepare('SELECT * FROM organizaciones WHERE id = ?').get(idOrg);
+}
+
+/* Directorio público. Solo salen los dealers cuyo plan habilita el
+   perfil y que tienen al menos un anuncio activo: un directorio con
+   fichas vacías no le sirve a quien compra. */
+function dealersPublicos() {
+  return abrir().prepare(`
+    SELECT o.id, o.nombre, o.slug, o.rnc, o.verificada, o.descripcion, o.web,
+           (SELECT provincia FROM sucursales WHERE organizacion_id = o.id ORDER BY principal DESC LIMIT 1) AS provincia,
+           COUNT(a.id) AS equipos
+    FROM organizaciones o
+    LEFT JOIN anuncios a ON a.organizacion_id = o.id AND a.estado = 'activo'
+    WHERE o.tipo = 'dealer' AND o.perfil_publico = 1
+    GROUP BY o.id
+    ORDER BY equipos DESC, o.nombre`).all();
+}
+
+const dealerPorSlug = (slug) =>
+  abrir().prepare(`SELECT id, nombre, slug, rnc, verificada, descripcion, web, telefono, correo, creada
+                   FROM organizaciones WHERE slug = ? AND tipo = 'dealer'`).get(slug);
+
+const sucursalesDe = (idOrg) =>
+  abrir().prepare('SELECT * FROM sucursales WHERE organizacion_id = ? AND activa = 1 ORDER BY principal DESC, nombre').all(idOrg);
+
+const sucursal = (idSucursal, idOrg) =>
+  abrir().prepare('SELECT * FROM sucursales WHERE id = ? AND organizacion_id = ?').get(idSucursal, idOrg);
+
+function crearSucursal(idOrg, datos) {
+  const idSucursal = id();
+  abrir().prepare(`INSERT INTO sucursales
+    (id, organizacion_id, nombre, provincia, municipio, direccion, telefono, whatsapp, horario, principal, creada)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`)
+    .run(idSucursal, idOrg, datos.nombre, datos.provincia || null, datos.municipio || null,
+      datos.direccion || null, datos.telefono || null, datos.whatsapp || null,
+      datos.horario || null, ahora());
+  return idSucursal;
+}
+
+const actualizarSucursal = (idSucursal, idOrg, datos) =>
+  abrir().prepare(`UPDATE sucursales
+    SET nombre = ?, provincia = ?, municipio = ?, direccion = ?, telefono = ?, whatsapp = ?, horario = ?
+    WHERE id = ? AND organizacion_id = ?`)
+    .run(datos.nombre, datos.provincia || null, datos.municipio || null, datos.direccion || null,
+      datos.telefono || null, datos.whatsapp || null, datos.horario || null, idSucursal, idOrg);
+
+/* Las sucursales no se borran: se desactivan. Sus anuncios apuntan a
+   ellas y el historial de métricas sigue colgando de esos anuncios;
+   un DELETE dejaría el pasado sin contexto. La principal no se puede
+   desactivar, porque la organización se quedaría sin dirección. */
+function desactivarSucursal(idSucursal, idOrg) {
+  const s = sucursal(idSucursal, idOrg);
+  if (!s) return { ok: false, motivo: 'inexistente' };
+  if (s.principal) return { ok: false, motivo: 'principal' };
+  abrir().prepare('UPDATE sucursales SET activa = 0 WHERE id = ? AND organizacion_id = ?')
+    .run(idSucursal, idOrg);
+  return { ok: true };
+}
+
+/* Cambia cuál es la principal. Va en transacción porque entre quitar
+   la marca a una y ponérsela a otra no puede haber un instante sin
+   ninguna. */
+function marcarPrincipal(idSucursal, idOrg) {
+  const d = abrir();
+  if (!sucursal(idSucursal, idOrg)) return false;
+  d.prepare('BEGIN').run();
+  try {
+    d.prepare('UPDATE sucursales SET principal = 0 WHERE organizacion_id = ?').run(idOrg);
+    d.prepare('UPDATE sucursales SET principal = 1 WHERE id = ? AND organizacion_id = ?').run(idSucursal, idOrg);
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+  return true;
+}
+
+/* ── Planes y suscripciones ─────────────────────────────── */
+
+/* Precio que rige HOY para un plan. Es el único sitio del sistema que
+   decide cuánto vale un plan: lo usan el cobro del servidor y las
+   tarjetas que pinta el navegador, de modo que no pueden discrepar.
+
+   Una promoción sin fecha de término se ignora a propósito: sin fecha
+   no es una rebaja temporal, es el precio, y debe escribirse como tal
+   en la columna `precio`. */
+function conPrecioVigente(plan) {
+  if (!plan) return plan;
+  const enPromo = plan.precio_promocional != null
+    && plan.promo_hasta
+    && hoy() <= plan.promo_hasta;
+
+  return {
+    ...plan,
+    precio_vigente: enPromo ? plan.precio_promocional : plan.precio,
+    en_promo: !!enPromo,
+    promo_hasta: enPromo ? plan.promo_hasta : null,
+    // Lo que costará al terminar la promoción, para poder decirlo en
+    // la tarjeta en vez de que el precio suba un día sin avisar.
+    precio_normal: plan.precio,
+  };
+}
+
+const planes = () =>
+  abrir().prepare('SELECT * FROM planes WHERE activo = 1 ORDER BY orden').all()
+    .map(conPrecioVigente);
+
+const planPorId = (idPlan) =>
+  conPrecioVigente(abrir().prepare('SELECT * FROM planes WHERE id = ?').get(idPlan));
+
+function suscripcionActiva(idOrg) {
+  return abrir().prepare(`
+    SELECT s.*, p.nombre AS plan_nombre, p.perfil_publico, p.fotos_maximas, p.destacado
+    FROM suscripciones s JOIN planes p ON p.id = s.plan_id
+    WHERE s.organizacion_id = ? AND s.estado = 'activa'
+    ORDER BY s.creada DESC LIMIT 1`).get(idOrg);
+}
+
+/* Contrata un plan y, si ese plan trae perfil público, lo enciende en
+   la organización. Devuelve la suscripción y el pago. */
+function contratar({ idOrg, idPlan, dias, ciclo, cobro }) {
+  const d = abrir();
+  const plan = planPorId(idPlan);
+  if (!plan) throw Object.assign(new Error('Plan inexistente'), { codigo: 400 });
+
+  const membresia = plan.modalidad === 'membresia';
+  const meses = ciclo === 'anual' ? 12 : 1;
+  const idSusc = id();
+  const t = ahora();
+
+  d.prepare('BEGIN').run();
+  try {
+    d.prepare(`INSERT INTO suscripciones
+      (id, organizacion_id, plan_id, modalidad, ciclo, estado, precio_pactado,
+       anuncios_incluidos, inicio, fin, proximo_cargo, creada)
+      VALUES (?, ?, ?, ?, ?, 'activa', ?, ?, ?, ?, ?, ?)`)
+      .run(idSusc, idOrg, idPlan, plan.modalidad, membresia ? ciclo : null,
+        cobro.subtotal, plan.anuncios_incluidos,
+        t,
+        membresia ? null : sumarDias(dias || 30),
+        membresia ? sumarMeses(meses) : null,
+        t);
+
+    d.prepare(`INSERT INTO pagos
+      (id, organizacion_id, suscripcion_id, subtotal, itbis, total, estado, referencia, procesador, creado)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      // Un plan en promoción cobra cero. Se anota igualmente, y como
+      // aprobado: no hay nada que cobrar, y dejarlo 'pendiente' llenaría
+      // el historial del anunciante de facturas que nadie va a pagar.
+      .run(id(), idOrg, idSusc, cobro.subtotal, cobro.itbis, cobro.total,
+        'aprobado', cobro.referencia, cobro.total > 0 ? (cobro.procesador || 'demo') : 'promocion', t);
+
+    if (plan.perfil_publico) {
+      d.prepare('UPDATE organizaciones SET perfil_publico = 1, actualizada = ? WHERE id = ?').run(t, idOrg);
+    }
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+
+  return abrir().prepare('SELECT * FROM suscripciones WHERE id = ?').get(idSusc);
+}
+
+/* ── Anuncios ───────────────────────────────────────────── */
+
+function crearAnuncio(datos) {
+  const d = abrir();
+  const idAnuncio = id();
+  const t = ahora();
+
+  d.prepare('BEGIN').run();
+  try {
+    d.prepare(`INSERT INTO anuncios (
+      id, organizacion_id, sucursal_id, usuario_id, suscripcion_id, estado,
+      categoria, subcategoria, marca, modelo, anio, condicion, uso_valor, uso_unidad,
+      serie, potencia, peso, implementos, descripcion, provincia, municipio,
+      precio, moneda, modalidad_precio, precio_minimo, itbis_incluido, permuta,
+      financiamiento, video, destacado_hasta, publicado, vence, creado)
+      VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(idAnuncio, datos.idOrg, datos.idSucursal || null, datos.idUsuario || null,
+        datos.idSuscripcion || null,
+        datos.categoria, datos.subcategoria || null, datos.marca, datos.modelo,
+        datos.anio, datos.condicion || null, datos.usoValor || null, datos.usoUnidad || 'h',
+        datos.serie || null, datos.potencia || null, datos.peso || null,
+        datos.implementos || null, datos.descripcion || null,
+        datos.provincia || null, datos.municipio || null,
+        datos.precio ?? null, datos.moneda || 'DOP', datos.modalidadPrecio || 'fijo',
+        datos.precioMinimo || null, datos.itbisIncluido ? 1 : 0, datos.permuta ? 1 : 0,
+        datos.financiamiento ? 1 : 0, datos.video || null,
+        datos.destacadoHasta || null, t, datos.vence || null, t);
+
+    const foto = d.prepare('INSERT INTO anuncio_fotos (id, anuncio_id, url, orden, creada) VALUES (?, ?, ?, ?, ?)');
+    (datos.fotos || []).forEach((url, i) => foto.run(id(), idAnuncio, url, i, t));
+
+    const tel = d.prepare('INSERT INTO anuncio_contactos (id, anuncio_id, numero, tipo, nota, orden) VALUES (?, ?, ?, ?, ?, ?)');
+    (datos.telefonos || []).forEach((c, i) => tel.run(id(), idAnuncio, c.numero, c.tipo || 'ambos', c.nota || null, i));
+
+    // La sucursal se crea al abrir la cuenta, cuando todavía no se
+    // sabe dónde opera. El primer anuncio que se publique desde ella
+    // completa su ubicación, para que el perfil público no salga con
+    // la sucursal sin provincia.
+    if (datos.idSucursal && datos.provincia) {
+      d.prepare(`UPDATE sucursales SET provincia = ?, municipio = COALESCE(municipio, ?)
+                 WHERE id = ? AND provincia IS NULL`)
+        .run(datos.provincia, datos.municipio || null, datos.idSucursal);
+    }
+
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+
+  return idAnuncio;
+}
+
+/* Un anuncio con todo lo que cuelga de él. Se usa igual para la ficha
+   pública y para el panel. */
+function anuncio(idAnuncio) {
+  const d = abrir();
+  const a = d.prepare(`
+    SELECT a.*, o.nombre AS dealer, o.slug AS dealer_slug, o.tipo AS org_tipo, o.verificada
+    FROM anuncios a JOIN organizaciones o ON o.id = a.organizacion_id
+    WHERE a.id = ?`).get(idAnuncio);
+  if (!a) return null;
+  a.fotos = d.prepare('SELECT url FROM anuncio_fotos WHERE anuncio_id = ? ORDER BY orden').all(idAnuncio).map((f) => f.url);
+  a.telefonos = d.prepare('SELECT numero, tipo, nota FROM anuncio_contactos WHERE anuncio_id = ? ORDER BY orden').all(idAnuncio);
+  return a;
+}
+
+/* ── Catálogo público ───────────────────────────────────── */
+
+/* Órdenes admitidos. La cláusula va escrita aquí y se elige por clave:
+   nunca se interpola texto que venga de la petición, que es como se
+   cuela una inyección por el ORDER BY. `destacado` se compara contra
+   la hora actual porque un destacado caducado deja de serlo. */
+const ORDENES_SQL = {
+  destacados:    "(a.destacado_hasta IS NOT NULL AND a.destacado_hasta > :ahora) DESC, a.publicado DESC",
+  recientes:     'a.publicado DESC',
+  'precio-asc':  'a.precio ASC, a.publicado DESC',
+  'precio-desc': 'a.precio DESC, a.publicado DESC',
+  'anio-desc':   'a.anio DESC, a.publicado DESC',
+  'anio-asc':    'a.anio ASC, a.publicado DESC',
+  // Los camiones miden kilómetros y las máquinas horas: mezclarlos en
+  // un mismo orden compara unidades distintas, así que los que no
+  // llevan horómetro caen al final en los dos sentidos.
+  'uso-asc':     "(a.uso_unidad <> 'h') ASC, a.uso_valor ASC, a.publicado DESC",
+  'uso-desc':    "(a.uso_unidad <> 'h') ASC, a.uso_valor DESC, a.publicado DESC",
+};
+
+const ORDEN_POR_DEFECTO = 'destacados';
+const POR_PAGINA = 24;
+const POR_PAGINA_MAX = 60;
+
+/* Traduce los filtros a WHERE + parámetros. Se usa dos veces por
+   búsqueda —una para contar y otra para traer la página—, así que
+   vive aparte en lugar de duplicarse. */
+function filtrosCatalogo(f = {}) {
+  // `:ahora` se ata siempre, aunque el orden pedido no lo use: SQLite
+  // rechaza un parámetro con nombre que la sentencia no menciona, y
+  // esta cláusula la comparten la consulta de conteo y la de página.
+  // De paso deja fuera cualquier anuncio con fecha futura.
+  const donde = ["a.estado = 'activo'", 'a.publicado <= :ahora'];
+  const p = {};
+
+  const igual = (columna, clave, valor) => {
+    if (!valor) return;
+    donde.push(`a.${columna} = :${clave}`);
+    p[clave] = String(valor);
+  };
+
+  igual('organizacion_id', 'org', f.organizacion);
+  igual('categoria', 'categoria', f.categoria);
+  igual('subcategoria', 'subcategoria', f.subcategoria);
+  igual('marca', 'marca', f.marca);
+  igual('provincia', 'provincia', f.provincia);
+  igual('condicion', 'condicion', f.condicion);
+
+  const rango = (columna, clave, valor, signo) => {
+    const n = Number(valor);
+    if (!Number.isFinite(n) || !valor) return;
+    donde.push(`a.${columna} ${signo} :${clave}`);
+    p[clave] = n;
+  };
+
+  rango('precio', 'precioMin', f.precioMin, '>=');
+  rango('precio', 'precioMax', f.precioMax, '<=');
+  rango('anio', 'anioMin', f.anioMin, '>=');
+  rango('anio', 'anioMax', f.anioMax, '<=');
+
+  // El tope de horas solo aplica a lo que se mide en horas: si no,
+  // filtrar por "menos de 3.000" escondería todos los camiones.
+  if (Number(f.horasMax)) {
+    donde.push("(a.uso_unidad <> 'h' OR a.uso_valor <= :horasMax)");
+    p.horasMax = Number(f.horasMax);
+  }
+
+  if (f.soloDestacados) donde.push('a.destacado_hasta IS NOT NULL AND a.destacado_hasta > :ahora');
+
+  // Búsqueda por texto sobre los campos que el comprador escribe de
+  // memoria: marca, modelo, tipo y dónde está. Cada palabra debe
+  // aparecer en alguno, así "komatsu santiago" acota de verdad en vez
+  // de devolver todo lo que tenga una u otra.
+  const palabras = String(f.q || '').trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
+  palabras.forEach((palabra, i) => {
+    donde.push(`(LOWER(a.marca || ' ' || a.modelo || ' ' || a.categoria || ' ' ||
+                 COALESCE(a.subcategoria, '') || ' ' || COALESCE(a.provincia, '') || ' ' ||
+                 CAST(a.anio AS TEXT)) LIKE :q${i})`);
+    p[`q${i}`] = `%${palabra}%`;
+  });
+
+  return { donde: donde.join(' AND '), parametros: p };
+}
+
+/* Catálogo con filtros, orden y paginación resueltos en SQL. La foto
+   de portada sale de una subconsulta en vez de traer todas las fotos
+   de todos los anuncios.
+
+   Se pagina en el servidor a propósito: con miles de anuncios, mandar
+   el catálogo entero al navegador para que filtre allí deja de
+   funcionar mucho antes de que el negocio deje de crecer. */
+function buscarAnuncios(f = {}) {
+  const d = abrir();
+  const { donde, parametros } = filtrosCatalogo(f);
+  parametros.ahora = ahora();
+
+  const total = d.prepare(`SELECT COUNT(*) AS n FROM anuncios a WHERE ${donde}`)
+    .get(parametros).n;
+
+  const porPagina = Math.min(Number(f.porPagina) || POR_PAGINA, POR_PAGINA_MAX);
+  const paginas = Math.max(1, Math.ceil(total / porPagina));
+  const pagina = Math.min(Math.max(1, Number(f.pagina) || 1), paginas);
+  const orden = ORDENES_SQL[f.orden] || ORDENES_SQL[ORDEN_POR_DEFECTO];
+
+  const anuncios = d.prepare(`
+    SELECT a.id, a.categoria, a.subcategoria, a.marca, a.modelo, a.anio, a.condicion,
+           a.uso_valor, a.uso_unidad, a.precio, a.moneda, a.modalidad_precio,
+           a.provincia, a.municipio, a.publicado, a.vence, a.destacado_hasta,
+           o.nombre AS dealer, o.slug AS dealer_slug, o.tipo AS org_tipo, o.verificada,
+           (SELECT url FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
+           (SELECT COUNT(*) FROM anuncio_fotos f WHERE f.anuncio_id = a.id) AS fotos_total
+    FROM anuncios a JOIN organizaciones o ON o.id = a.organizacion_id
+    WHERE ${donde}
+    ORDER BY ${orden}
+    LIMIT :limite OFFSET :salto`)
+    .all({ ...parametros, limite: porPagina, salto: (pagina - 1) * porPagina });
+
+  return { anuncios, total, pagina, paginas, porPagina };
+}
+
+/* Atajo para quien solo quiere una lista corta (portada, perfil de
+   dealer, equipos similares). */
+const anunciosPublicos = (f = {}) => buscarAnuncios(f).anuncios;
+
+/* Cifras de la portada y del directorio. Todas salen de la base: si
+   no hay nada publicado, dicen cero y la interfaz lo dice también.
+   Una sola consulta por bloque, ninguna sobre la tabla de eventos. */
+function estadisticas() {
+  const d = abrir();
+  const t = ahora();
+
+  const totales = d.prepare(`
+    SELECT COUNT(*) AS anuncios,
+           COUNT(DISTINCT a.organizacion_id) AS anunciantes,
+           SUM(CASE WHEN a.destacado_hasta IS NOT NULL AND a.destacado_hasta > ? THEN 1 ELSE 0 END) AS destacados
+    FROM anuncios a WHERE a.estado = 'activo'`).get(t);
+
+  const categorias = d.prepare(`
+    SELECT categoria, COUNT(*) AS total FROM anuncios
+    WHERE estado = 'activo' GROUP BY categoria ORDER BY total DESC`).all();
+
+  const marcas = d.prepare(`
+    SELECT marca, COUNT(*) AS total FROM anuncios
+    WHERE estado = 'activo' GROUP BY marca ORDER BY total DESC, marca`).all();
+
+  const provincias = d.prepare(`
+    SELECT provincia, COUNT(*) AS total FROM anuncios
+    WHERE estado = 'activo' AND provincia IS NOT NULL
+    GROUP BY provincia ORDER BY total DESC, provincia`).all();
+
+  const dealers = d.prepare(`
+    SELECT COUNT(*) AS n FROM organizaciones
+    WHERE tipo = 'dealer' AND perfil_publico = 1`).get().n;
+
+  return {
+    anuncios: totales.anuncios || 0,
+    anunciantes: totales.anunciantes || 0,
+    destacados: totales.destacados || 0,
+    dealers,
+    categorias,
+    marcas,
+    provincias,
+    actualizado: t,
+  };
+}
+
+/* Los anuncios de una organización con sus métricas acumuladas. Esta
+   es la consulta del panel: una sola pasada, con los totales ya
+   sumados desde la tabla agregada. */
+function anunciosDeOrganizacion(idOrg) {
+  return abrir().prepare(`
+    SELECT a.id, a.marca, a.modelo, a.anio, a.categoria, a.estado, a.precio, a.moneda,
+           a.modalidad_precio, a.provincia, a.publicado, a.vence,
+           (SELECT url FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
+           COALESCE(SUM(m.vistas), 0)         AS vistas,
+           COALESCE(SUM(m.clics_telefono), 0) AS telefono,
+           COALESCE(SUM(m.clics_whatsapp), 0) AS whatsapp,
+           COALESCE(SUM(m.favoritos), 0)      AS favoritos
+    FROM anuncios a
+    LEFT JOIN metricas_diarias m ON m.anuncio_id = a.id
+    WHERE a.organizacion_id = ?
+    GROUP BY a.id
+    ORDER BY CASE a.estado WHEN 'activo' THEN 0 ELSE 1 END, a.publicado DESC`).all(idOrg);
+}
+
+const cambiarEstadoAnuncio = (idAnuncio, idOrg, estado) =>
+  abrir().prepare('UPDATE anuncios SET estado = ?, actualizado = ? WHERE id = ? AND organizacion_id = ?')
+    .run(estado, ahora(), idAnuncio, idOrg);
+
+/* Marca como vencidos los anuncios cuya vigencia pasó. Se llama al
+   arrancar y en cada consulta del panel: sale barato porque el índice
+   parcial sobre `vence` solo contiene los que pueden caducar. */
+const caducarAnuncios = () =>
+  abrir().prepare(`UPDATE anuncios SET estado = 'vencido', actualizado = ?
+                   WHERE estado = 'activo' AND vence IS NOT NULL AND vence < ?`)
+    .run(ahora(), ahora());
+
+/* ── Métricas ───────────────────────────────────────────── */
+
+const COLUMNA_EVENTO = {
+  vista: 'vistas',
+  telefono: 'clics_telefono',
+  whatsapp: 'clics_whatsapp',
+  correo: 'clics_correo',
+  favorito: 'favoritos',
+  compartir: 'compartidos',
+};
+
+/* Anota el evento crudo y suma en el agregado del día.
+
+   EL AGREGADO CUENTA PERSONAS, NO PULSACIONES: una vez por visitante,
+   tipo y día. Antes solo se deduplicaban las vistas, así que un mismo
+   visitante que pulsara tres veces WhatsApp dejaba tres contactos
+   contra una sola visita, y el panel llegaba a rotular "600 % de las
+   visitas". Contra el mismo criterio en los dos lados, la proporción
+   vuelve a significar algo: de cada cien personas que vieron la ficha,
+   cuántas pidieron el contacto.
+
+   El evento crudo sí se guarda siempre: sirve para auditar y para
+   recalcular el agregado si hiciera falta.
+
+   El UPSERT evita leer antes de escribir y aguanta escrituras
+   concurrentes sin condición de carrera. */
+function anotarEvento(idAnuncio, tipo, visitante) {
+  const columna = COLUMNA_EVENTO[tipo];
+  if (!columna) return false;
+  const d = abrir();
+  if (!d.prepare('SELECT 1 FROM anuncios WHERE id = ?').get(idAnuncio)) return false;
+
+  const dia = hoy();
+
+  const repetido = visitante && d.prepare(
+    'SELECT 1 FROM eventos WHERE anuncio_id = ? AND tipo = ? AND dia = ? AND visitante = ?')
+    .get(idAnuncio, tipo, dia, visitante);
+
+  d.prepare('INSERT INTO eventos (anuncio_id, tipo, dia, visitante, creado) VALUES (?, ?, ?, ?, ?)')
+    .run(idAnuncio, tipo, dia, visitante || null, ahora());
+
+  if (repetido) return true;
+
+  d.prepare(`INSERT INTO metricas_diarias (anuncio_id, dia, ${columna})
+             VALUES (?, ?, 1)
+             ON CONFLICT (anuncio_id, dia) DO UPDATE SET ${columna} = ${columna} + 1`)
+    .run(idAnuncio, dia);
+
+  return true;
+}
+
+/* Totales de la organización y serie de los últimos días, para el
+   panel. Dos consultas agregadas, ninguna sobre eventos crudos. */
+function resumenOrganizacion(idOrg, dias = 30) {
+  const d = abrir();
+  const desde = new Date();
+  desde.setDate(desde.getDate() - dias);
+  const desdeDia = desde.toISOString().slice(0, 10);
+
+  const totales = d.prepare(`
+    SELECT COALESCE(SUM(m.vistas), 0) AS vistas,
+           COALESCE(SUM(m.clics_telefono), 0) AS telefono,
+           COALESCE(SUM(m.clics_whatsapp), 0) AS whatsapp,
+           COALESCE(SUM(m.favoritos), 0) AS favoritos
+    FROM metricas_diarias m
+    JOIN anuncios a ON a.id = m.anuncio_id
+    WHERE a.organizacion_id = ? AND m.dia >= ?`).get(idOrg, desdeDia);
+
+  const serie = d.prepare(`
+    SELECT m.dia, SUM(m.vistas) AS vistas, SUM(m.clics_telefono + m.clics_whatsapp) AS contactos
+    FROM metricas_diarias m
+    JOIN anuncios a ON a.id = m.anuncio_id
+    WHERE a.organizacion_id = ? AND m.dia >= ?
+    GROUP BY m.dia ORDER BY m.dia`).all(idOrg, desdeDia);
+
+  const porEstado = d.prepare(`
+    SELECT estado, COUNT(*) AS n FROM anuncios WHERE organizacion_id = ? GROUP BY estado`).all(idOrg);
+
+  return { totales, serie, porEstado };
+}
+
+/* Cambio de contraseña. Rehace el hash con sal nueva; la anterior no
+   se conserva en ningún sitio. */
+const cambiarClave = (idUsuario, clave) => {
+  const { hash, sal } = cifrarClave(clave);
+  abrir().prepare('UPDATE usuarios SET clave_hash = ?, clave_sal = ? WHERE id = ?')
+    .run(hash, sal, idUsuario);
+};
+
+module.exports = {
+  abrir, id, ahora, hoy, sumarDias, sumarMeses, aSlug, huella, purgar,
+  cifrarClave, claveCorrecta, cambiarClave,
+  usuarioPorCorreo, usuarioPorId, crearCuenta, organizacionDe, sucursalPrincipal,
+  abrirSesion, sesion, cerrarSesion, cerrarTodoDe,
+  crearCodigo, verificarCodigo, marcarCorreoVerificado,
+  recordarDispositivo, dispositivoDeConfianza,
+  permitir, limpiarIntentos,
+  registrarDealer, dealersPublicos, dealerPorSlug,
+  sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,
+  planes, planPorId, suscripcionActiva, contratar,
+  crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,
+  cambiarEstadoAnuncio, caducarAnuncios,
+  anotarEvento, resumenOrganizacion,
+};

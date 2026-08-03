@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Todas las categorías · TuEquipoRD</title>
+<meta name="description" content="Excavadoras, retroexcavadoras, cargadores, camiones volteo, grúas, compactadoras, montacargas y generadores publicados en República Dominicana.">
+<meta name="theme-color" content="#071A2B">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <header class="pagina">
+    <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Categorías</span></nav>
+    <h1 class="pagina__titulo"><em>Todas</em> las categorías</h1>
+    <p class="pagina__sub">Las cinco categorías con mayor inventario aparecen en la portada. Aquí figuran las ocho, ordenadas por cantidad de equipos publicados. Las que hoy no registran inventario siguen abiertas a publicación.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="t-cats">
+    <h2 class="visualmente-oculto" id="t-cats">Categorías</h2>
+    <ul class="categorias-todas" id="categoriasTodas"></ul>
+  </section>
+
+  <section class="panel" aria-labelledby="t-nota">
+    <h2 class="panel__titulo" id="t-nota"><em>¿Su</em> categoría no aparece?</h2>
+    <p class="panel__texto">Si su equipo no corresponde a ninguna de las ocho categorías, escríbanos y la habilitamos. También gestionamos importación de maquinaria por encargo.</p>
+    <div class="acciones">
+      <a class="btn btn--ambar" href="contacto.html">Contactar</a>
+      <a class="btn btn--linea" href="importar.html">Cotizar importación</a>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+        <li><a href="categorias.html">Todas las categorías</a></li>
+      </ul>
+      <h3 class="pie__titulo">Síganos</h3>
+      <ul class="pie__lista">
+        <li><a href="https://instagram.com" rel="noopener">Instagram</a></li>
+        <li><a href="https://facebook.com" rel="noopener">Facebook</a></li>
+        <li><a href="mailto:hola@tuequipord.do">hola@tuequipord.do</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
+        <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

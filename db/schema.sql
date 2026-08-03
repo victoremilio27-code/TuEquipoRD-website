@@ -1,0 +1,391 @@
+-- ═══════════════════════════════════════════════════════════
+-- TuEquipoRD · Esquema de la base de datos
+--
+-- Escrito para SQLite (node:sqlite, sin dependencias) pero sin usar
+-- nada que no exista en PostgreSQL: los tipos son los mínimos comunes
+-- y las claves son TEXT para poder pasar a UUID sin tocar nada.
+--
+-- El esquema está pensado para no exigir migraciones grandes cuando
+-- el negocio crezca. Cuatro decisiones cargan con ese peso:
+--
+--  1. LA ORGANIZACIÓN ES EL INQUILINO, NO EL USUARIO. Todo lo que se
+--     posee (anuncios, suscripciones, pagos, sucursales) cuelga de
+--     `organizaciones`, nunca de `usuarios`. Un particular también
+--     tiene su organización, de tipo 'particular', con un solo
+--     miembro. El día que ese particular se convierta en dealer con
+--     seis empleados no hay que mover ni una fila de sitio: se cambia
+--     el tipo y se añaden miembros.
+--
+--  2. LA RELACIÓN USUARIO-ORGANIZACIÓN ES UNA TABLA APARTE, CON ROL.
+--     Desde el primer día admite varios administradores por empresa y
+--     que una misma persona opere dos organizaciones (un mecánico que
+--     vende lo suyo y además administra el dealer donde trabaja).
+--
+--  3. LAS SUCURSALES EXISTEN DESDE EL PRINCIPIO. Cada anuncio apunta a
+--     una. Un dealer de una sola oficina tiene una sucursal principal
+--     creada automáticamente y no se entera de que existe; cuando abra
+--     en Santiago, el modelo ya lo soporta.
+--
+--  4. LAS MÉTRICAS SE AGREGAN POR DÍA AL ESCRIBIRSE. `eventos` guarda
+--     el detalle crudo con retención corta y `metricas_diarias` el
+--     acumulado permanente. Con miles de anuncios, el panel lee filas
+--     agregadas y nunca hace COUNT sobre millones de eventos.
+--
+-- Dinero: enteros en pesos dominicanos. En este mercado no se cotiza
+-- maquinaria con centavos y evita por completo el punto flotante.
+-- ═══════════════════════════════════════════════════════════
+
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+
+-- ── Identidad ──────────────────────────────────────────────
+
+-- Persona que inicia sesión. No posee nada por sí misma: opera sobre
+-- organizaciones a través de `miembros`.
+CREATE TABLE IF NOT EXISTS usuarios (
+  id             TEXT PRIMARY KEY,
+  -- Se guarda siempre en minúsculas desde el código, en vez de usar
+  -- una colación propia de SQLite que luego no existiría igual en
+  -- PostgreSQL.
+  correo         TEXT NOT NULL UNIQUE,
+  nombre         TEXT NOT NULL,
+  telefono       TEXT,
+  clave_hash     TEXT NOT NULL,
+  clave_sal      TEXT NOT NULL,
+  correo_verificado INTEGER NOT NULL DEFAULT 0,
+  creado         TEXT NOT NULL,
+  ultimo_acceso  TEXT
+);
+
+-- Quien vende. `tipo` distingue al particular del dealer establecido;
+-- es lo único que separa una cuenta normal de una con perfil público.
+--
+-- `rnc` es único cuando existe: dos organizaciones no pueden reclamar
+-- el mismo registro nacional. En SQLite y en PostgreSQL, UNIQUE deja
+-- pasar varios NULL, que es justo lo que hace falta para que los
+-- particulares no choquen entre sí.
+CREATE TABLE IF NOT EXISTS organizaciones (
+  id             TEXT PRIMARY KEY,
+  tipo           TEXT NOT NULL CHECK (tipo IN ('particular', 'dealer')),
+  nombre         TEXT NOT NULL,
+  rnc            TEXT UNIQUE,
+  slug           TEXT UNIQUE,               -- URL del perfil público
+  correo         TEXT,
+  telefono       TEXT,
+  web            TEXT,
+  descripcion    TEXT,
+  logo           TEXT,
+  verificada     INTEGER NOT NULL DEFAULT 0, -- sello, se otorga a mano
+  perfil_publico INTEGER NOT NULL DEFAULT 0, -- el plan lo habilita
+  creada         TEXT NOT NULL,
+  actualizada    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_org_tipo ON organizaciones (tipo);
+
+-- Rol de cada persona dentro de cada organización.
+--   propietario    — factura, contrata y puede eliminar la organización
+--   administrador  — publica, edita y ve métricas de toda la empresa
+--   vendedor       — publica y edita solo sus propios anuncios
+CREATE TABLE IF NOT EXISTS miembros (
+  id              TEXT PRIMARY KEY,
+  organizacion_id TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  usuario_id      TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  rol             TEXT NOT NULL CHECK (rol IN ('propietario', 'administrador', 'vendedor')),
+  sucursal_id     TEXT,                      -- si se limita a una sucursal
+  creado          TEXT NOT NULL,
+  UNIQUE (organizacion_id, usuario_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_miembros_usuario ON miembros (usuario_id);
+
+-- Puntos físicos. Cada organización tiene al menos una, marcada
+-- `principal`, creada junto con ella.
+CREATE TABLE IF NOT EXISTS sucursales (
+  id              TEXT PRIMARY KEY,
+  organizacion_id TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  nombre          TEXT NOT NULL,
+  provincia       TEXT,
+  municipio       TEXT,
+  direccion       TEXT,
+  telefono        TEXT,
+  principal       INTEGER NOT NULL DEFAULT 0,
+  activa          INTEGER NOT NULL DEFAULT 1,
+  creada          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_sucursales_org ON sucursales (organizacion_id);
+
+-- Sesiones. Cookie con un testigo aleatorio; nada de estado en memoria
+-- para que el día que corran dos procesos no haya que cambiar nada.
+CREATE TABLE IF NOT EXISTS sesiones (
+  testigo    TEXT PRIMARY KEY,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  creada     TEXT NOT NULL,
+  expira     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_sesiones_usuario ON sesiones (usuario_id);
+
+-- ── Verificación por correo ────────────────────────────────
+
+-- Códigos de un solo uso para tres cosas distintas: confirmar el
+-- correo al registrarse, autorizar un inicio de sesión desde un
+-- equipo nuevo y restablecer la contraseña.
+--
+-- NO se guarda el código: se guarda su HMAC con el secreto del
+-- servidor. Quien lea la base no puede entrar con lo que ve, igual
+-- que pasa con las contraseñas.
+--
+-- `intentos` corta el barrido a fuerza bruta: seis dígitos son un
+-- millón de combinaciones, que sin límite se agotan en minutos.
+CREATE TABLE IF NOT EXISTS codigos (
+  id          TEXT PRIMARY KEY,
+  usuario_id  TEXT REFERENCES usuarios(id) ON DELETE CASCADE,
+  correo      TEXT NOT NULL,
+  tipo        TEXT NOT NULL CHECK (tipo IN ('verificacion', 'acceso', 'restablecer')),
+  codigo_hash TEXT NOT NULL,
+  intentos    INTEGER NOT NULL DEFAULT 0,
+  consumido   INTEGER NOT NULL DEFAULT 0,
+  expira      TEXT NOT NULL,
+  creado      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_codigos_vigentes ON codigos (correo, tipo, consumido, expira);
+
+-- Equipos en los que ya se verificó un código. Evita pedirlo en cada
+-- inicio de sesión: si no existiera, la verificación por correo sería
+-- tan molesta que el primer instinto sería quitarla.
+CREATE TABLE IF NOT EXISTS dispositivos (
+  testigo     TEXT PRIMARY KEY,
+  usuario_id  TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  descripcion TEXT,
+  creado      TEXT NOT NULL,
+  expira      TEXT NOT NULL,
+  ultimo_uso  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_dispositivos_usuario ON dispositivos (usuario_id);
+
+-- Contador de intentos por ventana de tiempo. En la base y no en
+-- memoria: así el límite se respeta aunque corran varios procesos y
+-- no se reinicia con cada despliegue.
+CREATE TABLE IF NOT EXISTS intentos (
+  clave   TEXT PRIMARY KEY,
+  cuenta  INTEGER NOT NULL DEFAULT 0,
+  expira  TEXT NOT NULL
+);
+
+-- ── Comercial ──────────────────────────────────────────────
+
+-- Catálogo de planes. Es una tabla y no una constante del código
+-- porque los precios cambian y las suscripciones ya vendidas tienen
+-- que seguir apuntando a las condiciones con las que se firmaron.
+--
+--   modalidad 'vigencia'  — se compra un periodo y el anuncio caduca
+--   modalidad 'membresia' — cuota recurrente; los anuncios no caducan
+--   anuncios_incluidos NULL — sin límite
+CREATE TABLE IF NOT EXISTS planes (
+  id                 TEXT PRIMARY KEY,
+  nombre             TEXT NOT NULL,
+  nivel              TEXT NOT NULL,
+  modalidad          TEXT NOT NULL CHECK (modalidad IN ('vigencia', 'membresia')),
+  precio             INTEGER NOT NULL,     -- vigencia: 30 días · membresía: mes
+  -- PROMOCIONES. Viven aquí, junto al precio que se cobra, y no en la
+  -- interfaz: la promoción de lanzamiento estaba escrita solo en el
+  -- JavaScript del navegador, así que la página anunciaba el plan
+  -- Estándar gratis mientras el servidor seguía cobrándolo. El importe
+  -- lo decide siempre esta tabla.
+  --
+  -- `promo_hasta` es obligatorio para que la promoción exista: una
+  -- rebaja sin fecha de término no es una promoción, es el precio.
+  precio_promocional INTEGER,
+  promo_hasta        TEXT,
+  anuncios_incluidos INTEGER,
+  fotos_maximas      INTEGER NOT NULL DEFAULT 20,
+  destacado          INTEGER NOT NULL DEFAULT 0,
+  perfil_publico     INTEGER NOT NULL DEFAULT 0,
+  solo_dealer        INTEGER NOT NULL DEFAULT 0,
+  orden              INTEGER NOT NULL DEFAULT 0,
+  activo             INTEGER NOT NULL DEFAULT 1
+);
+
+-- Lo contratado. Una organización puede acumular varias: cinco
+-- compras por vigencia conviviendo, o una membresía viva más una
+-- compra suelta de Destacado para un equipo concreto.
+CREATE TABLE IF NOT EXISTS suscripciones (
+  id              TEXT PRIMARY KEY,
+  organizacion_id TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  plan_id         TEXT NOT NULL REFERENCES planes(id),
+  modalidad       TEXT NOT NULL,
+  ciclo           TEXT,                    -- 'mensual' | 'anual' | NULL
+  estado          TEXT NOT NULL CHECK (estado IN ('activa', 'vencida', 'cancelada', 'impaga')),
+  -- Condiciones congeladas al contratar: si mañana sube el precio del
+  -- plan, esta suscripción sigue facturando lo que se pactó.
+  precio_pactado     INTEGER NOT NULL,
+  anuncios_incluidos INTEGER,
+  inicio          TEXT NOT NULL,
+  fin             TEXT,                    -- NULL en membresía viva
+  proximo_cargo   TEXT,
+  cancelada       TEXT,
+  creada          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_susc_org ON suscripciones (organizacion_id, estado);
+
+-- Medios de pago tokenizados. NUNCA se guarda el número de tarjeta:
+-- solo el testigo que devuelve el procesador y lo imprescindible para
+-- que el anunciante reconozca cuál es.
+CREATE TABLE IF NOT EXISTS metodos_pago (
+  id              TEXT PRIMARY KEY,
+  organizacion_id TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  procesador      TEXT NOT NULL,
+  token           TEXT NOT NULL,
+  marca           TEXT,
+  ultimos4        TEXT,
+  vence_mes       INTEGER,
+  vence_anio      INTEGER,
+  predeterminado  INTEGER NOT NULL DEFAULT 0,
+  creado          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_metodos_org ON metodos_pago (organizacion_id);
+
+CREATE TABLE IF NOT EXISTS pagos (
+  id              TEXT PRIMARY KEY,
+  organizacion_id TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  suscripcion_id  TEXT REFERENCES suscripciones(id) ON DELETE SET NULL,
+  metodo_pago_id  TEXT REFERENCES metodos_pago(id) ON DELETE SET NULL,
+  subtotal        INTEGER NOT NULL,
+  itbis           INTEGER NOT NULL,
+  total           INTEGER NOT NULL,
+  moneda          TEXT NOT NULL DEFAULT 'DOP',
+  estado          TEXT NOT NULL CHECK (estado IN ('aprobado', 'rechazado', 'pendiente', 'devuelto')),
+  referencia      TEXT,
+  procesador      TEXT,
+  creado          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_pagos_org ON pagos (organizacion_id, creado);
+
+-- ── Inventario ─────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS anuncios (
+  id              TEXT PRIMARY KEY,
+  organizacion_id TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  sucursal_id     TEXT REFERENCES sucursales(id) ON DELETE SET NULL,
+  usuario_id      TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
+  suscripcion_id  TEXT REFERENCES suscripciones(id) ON DELETE SET NULL,
+
+  estado          TEXT NOT NULL DEFAULT 'activo'
+                  CHECK (estado IN ('borrador', 'activo', 'pausado', 'vencido', 'vendido', 'retirado')),
+
+  categoria       TEXT NOT NULL,
+  subcategoria    TEXT,
+  marca           TEXT NOT NULL,
+  modelo          TEXT NOT NULL,
+  anio            INTEGER NOT NULL,
+  condicion       TEXT,
+  uso_valor       INTEGER,
+  uso_unidad      TEXT DEFAULT 'h',
+  serie           TEXT,
+  potencia        TEXT,
+  peso            TEXT,
+  implementos     TEXT,
+  descripcion     TEXT,
+
+  provincia       TEXT,
+  municipio       TEXT,
+
+  precio          INTEGER,
+  moneda          TEXT NOT NULL DEFAULT 'DOP',
+  modalidad_precio TEXT NOT NULL DEFAULT 'fijo'
+                  CHECK (modalidad_precio IN ('fijo', 'ofertas')),
+  precio_minimo   INTEGER,                 -- privado, filtra ofertas
+  itbis_incluido  INTEGER NOT NULL DEFAULT 0,
+  permuta         INTEGER NOT NULL DEFAULT 0,
+  financiamiento  INTEGER NOT NULL DEFAULT 0,
+  video           TEXT,
+
+  destacado_hasta TEXT,
+  publicado       TEXT,
+  vence           TEXT,                    -- NULL si lo sostiene una membresía
+  creado          TEXT NOT NULL,
+  actualizado     TEXT
+);
+
+-- Los tres accesos que de verdad se usan: el catálogo público filtra
+-- por estado y categoría, el panel filtra por organización, y el
+-- proceso de caducidad busca por fecha de vencimiento.
+CREATE INDEX IF NOT EXISTS ix_anuncios_publico ON anuncios (estado, categoria, publicado);
+CREATE INDEX IF NOT EXISTS ix_anuncios_org ON anuncios (organizacion_id, estado);
+CREATE INDEX IF NOT EXISTS ix_anuncios_vence ON anuncios (vence) WHERE vence IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_anuncios_marca ON anuncios (marca);
+
+CREATE TABLE IF NOT EXISTS anuncio_fotos (
+  id         TEXT PRIMARY KEY,
+  anuncio_id TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
+  url        TEXT NOT NULL,
+  orden      INTEGER NOT NULL DEFAULT 0,
+  creada     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_fotos_anuncio ON anuncio_fotos (anuncio_id, orden);
+
+-- Los teléfonos cuelgan del anuncio y no de la organización porque un
+-- dealer puede querer que el volteo lo atienda un vendedor y la
+-- excavadora otro.
+CREATE TABLE IF NOT EXISTS anuncio_contactos (
+  id         TEXT PRIMARY KEY,
+  anuncio_id TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
+  numero     TEXT NOT NULL,
+  tipo       TEXT NOT NULL DEFAULT 'ambos',
+  nota       TEXT,
+  orden      INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS ix_contactos_anuncio ON anuncio_contactos (anuncio_id, orden);
+
+-- ── Métricas ───────────────────────────────────────────────
+
+-- Detalle crudo. Sirve para depurar y para detectar fraude de clics;
+-- se purga pasados unos meses. El panel NO lee de aquí.
+CREATE TABLE IF NOT EXISTS eventos (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  anuncio_id TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
+  tipo       TEXT NOT NULL CHECK (tipo IN ('vista', 'telefono', 'whatsapp', 'correo', 'favorito', 'compartir')),
+  dia        TEXT NOT NULL,
+  visitante  TEXT,                         -- huella anónima, no IP en claro
+  creado     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_eventos_anuncio ON eventos (anuncio_id, dia);
+
+-- Acumulado por anuncio y día. Se actualiza con UPSERT en el mismo
+-- momento en que entra el evento: el panel siempre lee filas ya
+-- sumadas, sin importar cuántos millones de eventos haya detrás.
+CREATE TABLE IF NOT EXISTS metricas_diarias (
+  anuncio_id      TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
+  dia             TEXT NOT NULL,
+  vistas          INTEGER NOT NULL DEFAULT 0,
+  clics_telefono  INTEGER NOT NULL DEFAULT 0,
+  clics_whatsapp  INTEGER NOT NULL DEFAULT 0,
+  clics_correo    INTEGER NOT NULL DEFAULT 0,
+  favoritos       INTEGER NOT NULL DEFAULT 0,
+  compartidos     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (anuncio_id, dia)
+);
+
+CREATE INDEX IF NOT EXISTS ix_metricas_dia ON metricas_diarias (dia);
+
+-- ── Catálogo inicial de planes ─────────────────────────────
+-- Precios de 30 días para 'vigencia' y cuota mensual para 'membresia'.
+
+INSERT OR IGNORE INTO planes
+  (id, nombre, nivel, modalidad, precio, anuncios_incluidos, fotos_maximas, destacado, perfil_publico, solo_dealer, orden) VALUES
+  ('estandar',        'Estándar',            'estandar',  'vigencia',   2000,    1,  8, 0, 0, 0, 1),
+  ('multi-estandar',  'Múltiple Estándar',   'estandar',  'vigencia',   8000,    5,  8, 0, 0, 0, 2),
+  ('destacado',       'Destacado',           'destacado', 'vigencia',   3500,    1, 20, 1, 0, 0, 3),
+  ('multi-destacado', 'Múltiple Destacados', 'destacado', 'vigencia',  14000,    5, 20, 1, 0, 0, 4),
+  ('dealer',          'Dealer',              'dealer',    'membresia', 40000,   20, 20, 1, 1, 1, 5),
+  ('dealer-premium',  'Dealer Premium',      'dealer',    'membresia', 60000, NULL, 30, 1, 1, 1, 6);

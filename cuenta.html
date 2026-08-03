@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acceso a su cuenta · TuEquipoRD</title>
+<meta name="description" content="Acceda a su cuenta de TuEquipoRD para publicar equipos, consultar estadísticas de sus anuncios y administrar el perfil de su empresa.">
+<meta name="theme-color" content="#071A2B">
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <div class="acceso">
+
+    <section class="panel acceso__panel" aria-labelledby="t-acceso">
+      <h1 class="panel__titulo" id="t-acceso"><em>Acceso</em> a su cuenta</h1>
+
+      <div class="pestanas" role="tablist" aria-label="Entrar o crear cuenta">
+        <button type="button" class="pestanas__op pestanas__op--activa" id="tabEntrar" role="tab" aria-selected="true" aria-controls="formEntrar">Ya tengo cuenta</button>
+        <button type="button" class="pestanas__op" id="tabCrear" role="tab" aria-selected="false" aria-controls="formCrear">Crear una cuenta</button>
+      </div>
+
+      <p class="acceso__aviso" id="avisoAcceso" role="alert" hidden></p>
+
+      <!-- Entrar -->
+      <form id="formEntrar" role="tabpanel" aria-labelledby="tabEntrar" novalidate>
+        <div class="campos campos--uno">
+          <label class="campo-v"><span>Correo electrónico</span>
+            <input type="email" id="ent-correo" autocomplete="email" required>
+          </label>
+          <label class="campo-v"><span>Contraseña</span>
+            <input type="password" id="ent-clave" autocomplete="current-password" required>
+          </label>
+        </div>
+        <button class="btn btn--ambar btn--bloque btn--grande" type="submit">Entrar</button>
+        <p class="acceso__enlace"><button type="button" class="enlace-plano" id="irRecuperar">Olvidé mi contraseña</button></p>
+      </form>
+
+      <!-- Crear cuenta -->
+      <form id="formCrear" role="tabpanel" aria-labelledby="tabCrear" novalidate hidden>
+        <fieldset class="campo-grupo" id="tipoCuenta">
+          <legend class="etiqueta etiqueta--bloque">Tipo de cuenta</legend>
+          <label class="opcion">
+            <input type="radio" name="tipoCuenta" value="particular" checked>
+            <span class="opcion__cuerpo">
+              <b class="opcion__nombre">Particular</b>
+              <span class="opcion__detalle">Vendo equipos propios de forma ocasional</span>
+            </span>
+          </label>
+          <label class="opcion">
+            <input type="radio" name="tipoCuenta" value="dealer">
+            <span class="opcion__cuerpo">
+              <b class="opcion__nombre">Empresa o dealer</b>
+              <span class="opcion__detalle">Comercializo maquinaria de forma habitual · incluye página pública y perfil en el directorio</span>
+            </span>
+          </label>
+        </fieldset>
+
+        <div class="campos">
+          <label class="campo-v"><span>Nombre y apellido *</span>
+            <input type="text" id="new-nombre" autocomplete="name" required>
+          </label>
+          <label class="campo-v"><span>Teléfono</span>
+            <input type="tel" id="new-telefono" autocomplete="tel" placeholder="(809) 000-0000">
+          </label>
+
+          <label class="campo-v campo-v--empresa"><span>Razón social *</span>
+            <input type="text" id="new-empresa" autocomplete="organization" placeholder="Ej. Sur Maquinarias, SRL">
+          </label>
+          <label class="campo-v campo-v--empresa"><span>RNC *</span>
+            <input type="text" id="new-rnc" inputmode="numeric" placeholder="9 dígitos (RNC) u 11 (cédula)">
+          </label>
+
+          <label class="campo-v campo-v--empresa campo-v--ancho"><span>Dirección de la oficina principal *</span>
+            <input type="text" id="new-direccion" autocomplete="street-address" placeholder="Ej. Av. Luperón km 12, nave 4, Zona Industrial">
+          </label>
+          <label class="campo-v campo-v--empresa"><span>Provincia *</span>
+            <select id="new-provincia" data-provincias><option value="">Elija una provincia</option></select>
+          </label>
+          <label class="campo-v campo-v--empresa"><span>Municipio o sector</span>
+            <input type="text" id="new-municipio" placeholder="Ej. Herrera">
+          </label>
+
+          <label class="campo-v"><span>Correo electrónico *</span>
+            <input type="email" id="new-correo" autocomplete="email" required>
+          </label>
+          <label class="campo-v"><span>Contraseña *</span>
+            <input type="password" id="new-clave" autocomplete="new-password" placeholder="Mínimo 10 caracteres" required>
+          </label>
+        </div>
+
+        <p class="nota-rnc" id="notaRnc" hidden>
+          <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
+          <span>El RNC queda asociado de forma permanente a la cuenta y no puede reclamarlo otra empresa. La dirección y el teléfono forman su oficina principal; después puede añadir todas las sucursales que necesite desde el panel.</span>
+        </p>
+
+        <button class="btn btn--ambar btn--bloque btn--grande" type="submit">Crear cuenta</button>
+        <p class="acceso__legal">Al crear la cuenta acepta las <a href="legal.html">condiciones de uso</a> y la política de privacidad.</p>
+      </form>
+
+      <!-- Código de 6 dígitos: verificación de correo o acceso -->
+      <form id="formCodigo" novalidate hidden>
+        <p class="codigo__intro" id="codigoIntro"></p>
+        <label class="campo-v campo-v--codigo"><span>Código de 6 dígitos</span>
+          <input type="text" id="cod-codigo" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" placeholder="000000" aria-describedby="codigoIntro">
+        </label>
+        <button class="btn btn--ambar btn--bloque btn--grande" type="submit">Confirmar</button>
+        <p class="acceso__enlace">
+          <button type="button" class="enlace-plano" id="btnReenviar">Enviar otro código</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" class="enlace-plano" id="btnVolverAcceso">Usar otro correo</button>
+        </p>
+      </form>
+
+      <!-- Recuperar: pedir el código -->
+      <form id="formRecuperar" novalidate hidden>
+        <p class="codigo__intro">Escriba el correo de su cuenta y le enviamos un código para establecer una contraseña nueva.</p>
+        <div class="campos campos--uno">
+          <label class="campo-v"><span>Correo electrónico</span>
+            <input type="email" id="rec-correo" autocomplete="email" required>
+          </label>
+        </div>
+        <button class="btn btn--ambar btn--bloque btn--grande" type="submit">Enviar código</button>
+        <p class="acceso__enlace"><button type="button" class="enlace-plano" id="btnCancelarRec">Volver</button></p>
+      </form>
+
+      <!-- Recuperar: código + contraseña nueva -->
+      <form id="formNuevaClave" novalidate hidden>
+        <p class="codigo__intro" id="nuevaIntro"></p>
+        <div class="campos campos--uno">
+          <label class="campo-v campo-v--codigo"><span>Código de 6 dígitos</span>
+            <input type="text" id="nue-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+          </label>
+          <label class="campo-v"><span>Contraseña nueva</span>
+            <input type="password" id="nue-clave" autocomplete="new-password" placeholder="Mínimo 10 caracteres">
+          </label>
+        </div>
+        <p class="nota-rnc">
+          <svg class="ico" aria-hidden="true"><use href="#i-candado"/></svg>
+          <span>Al cambiar la contraseña se cierran todas las sesiones abiertas y se olvidan los equipos recordados.</span>
+        </p>
+        <button class="btn btn--ambar btn--bloque btn--grande" type="submit">Cambiar la contraseña</button>
+        <p class="acceso__enlace"><button type="button" class="enlace-plano" id="btnReenviarRec">Enviar otro código</button></p>
+      </form>
+    </section>
+
+    <aside class="panel acceso__lado">
+      <h2 class="panel__titulo"><em>Con</em> su cuenta puede</h2>
+      <ul class="ventajas">
+        <li><svg class="ico" aria-hidden="true"><use href="#i-grafico"/></svg>
+          <span><b>Medir cada anuncio.</b> Visualizaciones, clics en el teléfono y contactos por WhatsApp, día a día.</span></li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-reloj"/></svg>
+          <span><b>Controlar la vigencia.</b> Cuántos días le quedan a cada publicación y renovar antes de que caduque.</span></li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-pausa"/></svg>
+          <span><b>Pausar y reactivar.</b> Marque un equipo como vendido sin perder el historial ni el cupo del plan.</span></li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
+          <span><b>Representar a su empresa.</b> Página pública con todo su inventario, sucursales y varios usuarios sobre la misma cuenta.</span></li>
+      </ul>
+      <p class="panel__nota">Publicar un equipo requiere una cuenta: es lo que permite editarlo después, medirlo y renovarlo sin depender de nadie.</p>
+    </aside>
+  </div>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/cuenta.js"></script>
+</body>
+</html>

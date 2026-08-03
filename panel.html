@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel del anunciante · TuEquipoRD</title>
+<meta name="description" content="Estadísticas de sus anuncios, vigencia de las publicaciones y administración del perfil de su empresa en TuEquipoRD.">
+<meta name="theme-color" content="#071A2B">
+<meta name="robots" content="noindex">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <div class="panel-vacio" id="panelSinSesion" hidden>
+    <h1 class="vacio__titulo">Necesita iniciar sesión</h1>
+    <p class="vacio__texto">El panel muestra las estadísticas y la vigencia de sus anuncios.</p>
+    <div class="vacio__acciones">
+      <a class="btn btn--ambar" href="cuenta.html">Entrar</a>
+      <a class="btn btn--linea" href="cuenta.html?crear=1">Crear una cuenta</a>
+    </div>
+  </div>
+
+  <div id="panelCargando" class="panel-cargando">Cargando su panel...</div>
+
+  <div id="panelContenido" hidden>
+
+    <header class="pagina pagina--panel">
+      <div>
+        <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Panel</span></nav>
+        <h1 class="pagina__titulo" id="panelTitulo"></h1>
+        <p class="pagina__sub" id="panelSub"></p>
+      </div>
+      <div class="pagina__acciones">
+        <a class="btn btn--ambar" href="publicar.html">Publicar un equipo</a>
+        <button class="btn btn--linea" type="button" id="btnSalir">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <section class="panel" id="panelPlan" aria-labelledby="t-plan"></section>
+
+    <h2 class="visualmente-oculto" id="t-metricas">Métricas</h2>
+    <ul class="tarjetas-metrica" id="metricas" aria-labelledby="t-metricas"></ul>
+
+    <section class="panel" aria-labelledby="t-anuncios">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-anuncios"><em>Sus</em> anuncios</h2>
+        <div class="filtros-panel" id="filtrosPanel" role="group" aria-label="Filtrar por estado"></div>
+      </div>
+      <div class="tabla-envoltura">
+        <table class="tabla-anuncios">
+          <thead>
+            <tr>
+              <th scope="col">Equipo</th>
+              <th scope="col">Estado</th>
+              <th scope="col" class="col-num">Vistas</th>
+              <th scope="col" class="col-num">Contactos</th>
+              <th scope="col">Vigencia</th>
+              <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
+            </tr>
+          </thead>
+          <tbody id="filasAnuncios"></tbody>
+        </table>
+      </div>
+      <p class="tabla-vacia" id="tablaVacia" hidden></p>
+    </section>
+
+    <section class="panel" id="panelEmpresa" aria-labelledby="t-empresa" hidden></section>
+
+    <section class="panel" id="panelSucursales" aria-labelledby="t-sucursales" hidden>
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-sucursales"><em>Sucursales</em></h2>
+        <button type="button" class="btn btn--linea btn--chico" id="btnNuevaSucursal">
+          <svg class="ico" aria-hidden="true"><use href="#i-mas"/></svg> Añadir sucursal
+        </button>
+      </div>
+      <p class="panel__texto">Cada sucursal tiene su dirección y su teléfono, y al publicar un equipo se elige desde cuál se ofrece. La oficina principal es la que aparece como dirección de la empresa.</p>
+
+      <ul class="sucursales-admin" id="listaSucursalesAdmin"></ul>
+
+      <form class="form-sucursal" id="formSucursal" hidden novalidate>
+        <h3 class="form-sucursal__titulo" id="tituloSucursal">Nueva sucursal</h3>
+        <div class="campos">
+          <label class="campo-v"><span>Nombre *</span>
+            <input type="text" id="suc-nombre" placeholder="Ej. Sucursal Santiago">
+          </label>
+          <label class="campo-v"><span>Teléfono *</span>
+            <input type="tel" id="suc-telefono" placeholder="(809) 000-0000" inputmode="numeric">
+          </label>
+          <label class="campo-v campo-v--ancho"><span>Dirección *</span>
+            <input type="text" id="suc-direccion" placeholder="Ej. Autopista Duarte km 5, plaza Norte, local 3">
+          </label>
+          <label class="campo-v"><span>Provincia *</span>
+            <select id="suc-provincia" data-provincias><option value="">Elija una provincia</option></select>
+          </label>
+          <label class="campo-v"><span>Municipio o sector</span>
+            <input type="text" id="suc-municipio" placeholder="Ej. Villa González">
+          </label>
+          <label class="campo-v"><span>WhatsApp</span>
+            <input type="tel" id="suc-whatsapp" placeholder="(809) 000-0000" inputmode="numeric">
+          </label>
+          <label class="campo-v"><span>Horario</span>
+            <select id="suc-horario">
+              <option value="">Sin horario definido</option>
+              <option>Lunes a viernes, 8:00 a 5:00</option>
+              <option>Lunes a sábado, 8:00 a 5:00</option>
+              <option>Lunes a sábado, 7:00 a 6:00</option>
+              <option>Todos los días, cualquier hora</option>
+            </select>
+          </label>
+        </div>
+        <p class="acceso__aviso" id="avisoSucursal" role="alert" hidden></p>
+        <div class="acciones">
+          <button class="btn btn--ambar" type="submit" id="btnGuardarSucursal">Guardar sucursal</button>
+          <button class="btn btn--linea" type="button" id="btnCancelarSucursal">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+  </div>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/panel.js"></script>
+</body>
+</html>

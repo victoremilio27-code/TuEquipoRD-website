@@ -1,0 +1,454 @@
+﻿<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TuEquipoRD Â· Marketplace de maquinaria y equipo pesado en RepÃºblica Dominicana</title>
+<meta name="description" content="Compra y vende excavadoras, cargadores, camiones y equipo pesado en RepÃºblica Dominicana. Cada ficha trae horas, condiciÃ³n y precio publicado. Vendedores verificados.">
+<meta name="theme-color" content="#071A2B">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<!-- â•â• NAV â•â• -->
+<header class="nav" id="nav">
+  <div class="nav__inner">
+    <a class="nav__logo" href="#" aria-label="TuEquipoRD, inicio">
+      <img src="../../brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+    </a>
+
+    <nav class="nav__links" id="menu" aria-label="Principal">
+      <a href="#categorias">CategorÃ­as</a>
+      <a href="#destacados">Equipos destacados</a>
+      <a href="#vender">CÃ³mo vender</a>
+      <a href="#verificacion">VerificaciÃ³n</a>
+      <a class="nav__cta-movil btn btn--primario" href="#vender">Publicar equipo</a>
+    </nav>
+
+    <div class="nav__acciones">
+      <a class="btn btn--primario btn--sm" href="#vender">Publicar equipo</a>
+      <button class="nav__toggle" id="navToggle" aria-expanded="false" aria-controls="menu" aria-label="Abrir menÃº">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+
+<!-- â•â• HERO â•â• -->
+<section class="hero">
+  <svg class="hero__lattice" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="hexgrid" width="34.64" height="60" patternUnits="userSpaceOnUse" patternTransform="scale(1.25)">
+        <g fill="none" stroke="#FFFFFF" stroke-width="0.5">
+          <polygon points="17.32,-20 34.64,-10 34.64,10 17.32,20 0,10 0,-10"/>
+          <polygon points="17.32,40 34.64,50 34.64,70 17.32,80 0,70 0,50"/>
+          <polygon points="0,10 17.32,20 17.32,40 0,50 -17.32,40 -17.32,20"/>
+          <polygon points="34.64,10 51.96,20 51.96,40 34.64,50 17.32,40 17.32,20"/>
+        </g>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#hexgrid)"/>
+  </svg>
+
+  <div class="contenedor hero__inner">
+    <div class="hero__texto">
+      <p class="eyebrow eyebrow--dark">
+        <svg class="hexmark" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/></svg>
+        Maquinaria pesada Â· RepÃºblica Dominicana
+      </p>
+
+      <h1 class="display">Maquinaria pesada<br>con las horas<br><span class="display__acento">a la vista</span></h1>
+
+      <p class="hero__sub">Excavadoras, cargadores, volteos y grÃºas de vendedores verificados en todo el paÃ­s. Cada ficha publica horas de uso, condiciÃ³n y precio. Sin llamar para preguntar cuÃ¡nto es.</p>
+
+      <form class="buscador" role="search" onsubmit="return false;">
+        <label class="visualmente-oculto" for="q">Buscar equipo</label>
+        <svg class="buscador__icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+        <input id="q" type="search" placeholder="Marca, modelo o tipo â€” ej. Caterpillar 320" autocomplete="off">
+        <button class="btn btn--primario" type="submit">Buscar</button>
+      </form>
+    </div>
+
+    <!-- ficha de equipo destacada -->
+    <div class="hero__ficha">
+      <article class="ficha ficha--hero">
+        <div class="ficha__foto">
+          <span class="pill pill--oferta">Acepta ofertas</span>
+          <svg class="ficha__fantasma" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/><path d="M12 8.2 17.2 11v6L12 19.8 6.8 17v-6z"/></svg>
+        </div>
+        <div class="ficha__cuerpo">
+          <p class="ficha__meta">Excavadoras Â· De orugas Â· Santo Domingo</p>
+          <h3 class="ficha__titulo">2021 Caterpillar 320</h3>
+          <p class="ficha__specs"><span class="num">3,842</span> horas Â· Usado Â· Muy bueno</p>
+          <p class="etiqueta etiqueta--precio">Precio</p>
+          <p class="precio">RD$8,750,000</p>
+          <span class="pill pill--verificado">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+            Vendedor verificado
+          </span>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <!-- placa de datos -->
+  <div class="contenedor">
+    <div class="placa">
+      <div class="placa__campo">
+        <p class="etiqueta">Equipos publicados</p>
+        <p class="placa__valor num">1,240</p>
+      </div>
+      <div class="placa__campo">
+        <p class="etiqueta">Vendedores verificados</p>
+        <p class="placa__valor num">318</p>
+      </div>
+      <div class="placa__campo">
+        <p class="etiqueta">Provincias activas</p>
+        <p class="placa__valor num">28</p>
+      </div>
+      <div class="placa__campo">
+        <p class="etiqueta">ComisiÃ³n sobre la venta</p>
+        <p class="placa__valor num">0%</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- cinta de publicaciones -->
+  <div class="cinta">
+    <p class="cinta__label">Publicado hoy</p>
+    <div class="cinta__viewport">
+      <div class="cinta__track">
+        <div class="cinta__grupo">
+          <span class="cinta__item">Excavadora <b>CAT 320</b> Â· 2021 Â· <span class="num">3,842 h</span> Â· <span class="num precio-inline">RD$8,750,000</span> Â· Santo Domingo</span>
+          <span class="cinta__item">Retroexcavadora <b>John Deere 310SL</b> Â· 2019 Â· <span class="num">5,120 h</span> Â· <span class="num precio-inline">RD$4,290,000</span> Â· Santiago</span>
+          <span class="cinta__item">Cargador <b>Komatsu WA200</b> Â· 2022 Â· <span class="num">1,760 h</span> Â· <span class="num precio-inline">RD$6,950,000</span> Â· La Romana</span>
+          <span class="cinta__item">Volteo <b>Mack Granite</b> Â· 2018 Â· <span class="num">148,000 km</span> Â· <span class="num precio-inline">RD$3,150,000</span> Â· San Pedro</span>
+          <span class="cinta__item">Rodillo <b>Bomag BW211</b> Â· 2020 Â· <span class="num">2,410 h</span> Â· <span class="num precio-inline">RD$2,880,000</span> Â· HigÃ¼ey</span>
+        </div>
+        <div class="cinta__grupo" aria-hidden="true">
+          <span class="cinta__item">Excavadora <b>CAT 320</b> Â· 2021 Â· <span class="num">3,842 h</span> Â· <span class="num precio-inline">RD$8,750,000</span> Â· Santo Domingo</span>
+          <span class="cinta__item">Retroexcavadora <b>John Deere 310SL</b> Â· 2019 Â· <span class="num">5,120 h</span> Â· <span class="num precio-inline">RD$4,290,000</span> Â· Santiago</span>
+          <span class="cinta__item">Cargador <b>Komatsu WA200</b> Â· 2022 Â· <span class="num">1,760 h</span> Â· <span class="num precio-inline">RD$6,950,000</span> Â· La Romana</span>
+          <span class="cinta__item">Volteo <b>Mack Granite</b> Â· 2018 Â· <span class="num">148,000 km</span> Â· <span class="num precio-inline">RD$3,150,000</span> Â· San Pedro</span>
+          <span class="cinta__item">Rodillo <b>Bomag BW211</b> Â· 2020 Â· <span class="num">2,410 h</span> Â· <span class="num precio-inline">RD$2,880,000</span> Â· HigÃ¼ey</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- â•â• CATEGORÃAS â•â• -->
+<section class="seccion seccion--hueso" id="categorias">
+  <div class="contenedor">
+    <header class="seccion__cabeza">
+      <p class="eyebrow">
+        <svg class="hexmark" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/></svg>
+        CategorÃ­as
+      </p>
+      <h2 class="titular">Busca por tipo de equipo</h2>
+      <p class="seccion__sub">Ocho familias cubren casi todo lo que se mueve en obra dominicana. Cada una con ficha tÃ©cnica estandarizada.</p>
+    </header>
+
+    <ul class="categorias">
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19.5h11"/><path d="M4 13h6.5v3.8H4z"/><path d="m10.5 14 4.4-5.6 3.8 1.8"/><path d="M17.4 12.6 21 11.2l-.9 4.6h-3.4z"/></svg>
+        </span>
+        <span class="categoria__nombre">Excavadoras</span>
+        <span class="categoria__conteo num">214 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="17.5" r="2.6"/><circle cx="17.5" cy="17.5" r="2.6"/><path d="M4.5 14V9.5h7V14"/><path d="m11.5 11 4-4.5 3.5 2"/><path d="M18.5 9.5 22 8.2v4.3"/></svg>
+        </span>
+        <span class="categoria__nombre">Retroexcavadoras</span>
+        <span class="categoria__conteo num">176 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="17.5" r="2.6"/><circle cx="17" cy="17.5" r="2.6"/><path d="M6 14V9h8v5"/><path d="m6 11-3 1.5v3.2h1.6"/><path d="M2 12.5 1.5 16h3"/></svg>
+        </span>
+        <span class="categoria__nombre">Cargadores frontales</span>
+        <span class="categoria__conteo num">143 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="17.5" r="2.4"/><circle cx="16.5" cy="17.5" r="2.4"/><path d="M3.5 15V9.5h5V15"/><path d="m9 15 1.5-7.5h9L21 15z"/></svg>
+        </span>
+        <span class="categoria__nombre">Camiones volteo</span>
+        <span class="categoria__conteo num">198 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V4"/><path d="M6 4h13"/><path d="M16 4v5"/><path d="M14.2 9h3.6l-1 3h-1.6z"/><path d="M3.5 20h5"/><path d="M6 7.5 12 4"/></svg>
+        </span>
+        <span class="categoria__nombre">GrÃºas</span>
+        <span class="categoria__conteo num">64 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15" r="5"/><circle cx="18" cy="17" r="3"/><path d="M11 10.5h5.5V14"/><path d="M12.5 10.5V7.5h4"/></svg>
+        </span>
+        <span class="categoria__nombre">Compactadoras</span>
+        <span class="categoria__conteo num">89 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="18" r="2.2"/><path d="M4 15.5V9h6.5v6.5"/><path d="M14 4v13"/><path d="M14 17h6.5"/><path d="M17 17V9"/></svg>
+        </span>
+        <span class="categoria__nombre">Montacargas</span>
+        <span class="categoria__conteo num">121 equipos</span>
+      </a></li>
+
+      <li><a class="categoria" href="#destacados">
+        <span class="categoria__icono">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7.5" width="18" height="10.5" rx="2"/><path d="M12.8 10.2 10 13.8h3.2L11.8 16.5"/><path d="M6.5 5.5v2"/><path d="M17.5 5.5v2"/></svg>
+        </span>
+        <span class="categoria__nombre">Generadores</span>
+        <span class="categoria__conteo num">135 equipos</span>
+      </a></li>
+    </ul>
+  </div>
+</section>
+
+<!-- â•â• DESTACADOS â•â• -->
+<section class="seccion seccion--blanco" id="destacados">
+  <div class="contenedor">
+    <header class="seccion__cabeza seccion__cabeza--fila">
+      <div>
+        <p class="eyebrow">
+          <svg class="hexmark" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/></svg>
+          SelecciÃ³n destacada
+        </p>
+        <h2 class="titular">Equipos destacados</h2>
+        <p class="seccion__sub">Elegidos esta semana por condiciÃ³n, horas reales y precio publicado.</p>
+      </div>
+      <a class="enlace-flecha" href="#">Ver los 1,240 equipos
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>
+      </a>
+    </header>
+
+    <div class="rejilla-fichas">
+      <article class="ficha">
+        <div class="ficha__foto">
+          <span class="pill pill--oferta">Acepta ofertas</span>
+          <svg class="ficha__fantasma" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/><path d="M12 8.2 17.2 11v6L12 19.8 6.8 17v-6z"/></svg>
+        </div>
+        <div class="ficha__cuerpo">
+          <p class="ficha__meta">Excavadoras Â· De orugas Â· Santo Domingo</p>
+          <h3 class="ficha__titulo">2021 Caterpillar 320</h3>
+          <p class="ficha__specs"><span class="num">3,842</span> horas Â· Usado Â· Muy bueno</p>
+          <p class="etiqueta etiqueta--precio">Precio</p>
+          <p class="precio">RD$8,750,000</p>
+          <span class="pill pill--verificado">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+            Vendedor verificado
+          </span>
+        </div>
+      </article>
+
+      <article class="ficha">
+        <div class="ficha__foto">
+          <span class="pill pill--destacado">Destacado</span>
+          <svg class="ficha__fantasma" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/><path d="M12 8.2 17.2 11v6L12 19.8 6.8 17v-6z"/></svg>
+        </div>
+        <div class="ficha__cuerpo">
+          <p class="ficha__meta">Cargadores frontales Â· La Romana</p>
+          <h3 class="ficha__titulo">2022 Komatsu WA200</h3>
+          <p class="ficha__specs"><span class="num">1,760</span> horas Â· Usado Â· Como nuevo</p>
+          <p class="etiqueta etiqueta--precio">Precio</p>
+          <p class="precio">RD$6,950,000</p>
+          <span class="pill pill--verificado">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+            Vendedor verificado
+          </span>
+        </div>
+      </article>
+
+      <article class="ficha">
+        <div class="ficha__foto">
+          <span class="pill pill--publicado">Precio publicado</span>
+          <svg class="ficha__fantasma" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/><path d="M12 8.2 17.2 11v6L12 19.8 6.8 17v-6z"/></svg>
+        </div>
+        <div class="ficha__cuerpo">
+          <p class="ficha__meta">Retroexcavadoras Â· Santiago</p>
+          <h3 class="ficha__titulo">2019 John Deere 310SL</h3>
+          <p class="ficha__specs"><span class="num">5,120</span> horas Â· Usado Â· Bueno</p>
+          <p class="etiqueta etiqueta--precio">Precio</p>
+          <p class="precio">RD$4,290,000</p>
+          <span class="pill pill--verificado">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+            Vendedor verificado
+          </span>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- â•â• CÃ“MO VENDER + VERIFICACIÃ“N â•â• -->
+<section class="seccion seccion--azul" id="vender">
+  <svg class="seccion__lattice" aria-hidden="true" focusable="false">
+    <rect width="100%" height="100%" fill="url(#hexgrid)"/>
+  </svg>
+
+  <div class="contenedor">
+    <header class="seccion__cabeza">
+      <p class="eyebrow eyebrow--dark">
+        <svg class="hexmark" viewBox="0 0 24 26" aria-hidden="true"><path d="M12 1 22.4 7v12L12 25 1.6 19V7z"/></svg>
+        CÃ³mo vender
+      </p>
+      <h2 class="titular titular--claro">Publicar toma tres pasos</h2>
+      <p class="seccion__sub seccion__sub--claro">La publicaciÃ³n es gratis y no cobramos comisiÃ³n cuando el equipo se vende.</p>
+    </header>
+
+    <ol class="pasos">
+      <li class="paso">
+        <p class="paso__num"><span class="etiqueta">Paso</span> 01</p>
+        <h3 class="paso__titulo">Arma la ficha</h3>
+        <p class="paso__texto">Fotos, aÃ±o, horas de uso y condiciÃ³n. Si tienes la factura o el certificado de importaciÃ³n, sÃºbelos: las fichas con documento se venden mÃ¡s rÃ¡pido.</p>
+      </li>
+      <li class="paso">
+        <p class="paso__num"><span class="etiqueta">Paso</span> 02</p>
+        <h3 class="paso__titulo">Verificamos quiÃ©n vende</h3>
+        <p class="paso__texto">Revisamos cÃ©dula o RNC y la titularidad del equipo antes de que la ficha salga al aire. Toma menos de 24 horas hÃ¡biles.</p>
+      </li>
+      <li class="paso">
+        <p class="paso__num"><span class="etiqueta">Paso</span> 03</p>
+        <h3 class="paso__titulo">Cierras directo</h3>
+        <p class="paso__texto">El comprador te escribe por WhatsApp o telÃ©fono. Negocias tÃº, acuerdas la entrega tÃº, y el dinero no pasa por nosotros.</p>
+      </li>
+    </ol>
+
+    <div class="verificacion" id="verificacion">
+      <div class="verificacion__texto">
+        <span class="pill pill--verificado pill--lg">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          Vendedor verificado
+        </span>
+        <h3 class="verificacion__titulo">El sello no se compra</h3>
+        <p class="verificacion__texto-p">Solo lo lleva quien comprobÃ³ identidad y titularidad del equipo. No se paga, no se destaca por publicidad y se retira si aparece una reclamaciÃ³n sin resolver. Es la Ãºnica razÃ³n por la que usamos verde en toda la pÃ¡gina.</p>
+      </div>
+      <dl class="verificacion__datos">
+        <div>
+          <dt class="etiqueta">Verificados al mes</dt>
+          <dd class="num">124</dd>
+        </div>
+        <div>
+          <dt class="etiqueta">Tiempo de revisiÃ³n</dt>
+          <dd class="num">&lt; 24 h</dd>
+        </div>
+        <div>
+          <dt class="etiqueta">Fichas rechazadas</dt>
+          <dd class="num">7%</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- â•â• CTA ÃMBAR â•â• -->
+<section class="cta">
+  <div class="contenedor cta__inner">
+    <div>
+      <h2 class="cta__titulo">Â¿Tienes un equipo parado?</h2>
+      <p class="cta__sub">PublÃ­calo gratis hoy. Lo ven compradores en 28 provincias y no pagas comisiÃ³n cuando se venda.</p>
+    </div>
+    <div class="cta__acciones">
+      <a class="btn btn--sobre-ambar" href="#">Publicar equipo</a>
+      <a class="cta__enlace" href="#">Hablar con un asesor</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- â•â• FOOTER â•â• -->
+<footer class="pie">
+  <div class="contenedor pie__inner">
+    <div class="pie__marca">
+      <img class="pie__logo" src="../../brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__desc">Marketplace dominicano de maquinaria y equipo pesado.</p>
+      <p class="pie__contacto">
+        Av. 27 de Febrero, Santo Domingo Â· RD<br>
+        <a href="mailto:hola@tuequipord.do">hola@tuequipord.do</a><br>
+        <a href="tel:+18090000000" class="num">(809) 000-0000</a>
+      </p>
+    </div>
+
+    <nav class="pie__cols" aria-label="Pie de pÃ¡gina">
+      <div>
+        <p class="etiqueta">Comprar</p>
+        <ul>
+          <li><a href="#categorias">Excavadoras</a></li>
+          <li><a href="#categorias">Cargadores frontales</a></li>
+          <li><a href="#categorias">Camiones volteo</a></li>
+          <li><a href="#categorias">Todas las categorÃ­as</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="etiqueta">Vender</p>
+        <ul>
+          <li><a href="#vender">Publicar equipo</a></li>
+          <li><a href="#verificacion">VerificaciÃ³n de vendedor</a></li>
+          <li><a href="#">GuÃ­a de precios</a></li>
+          <li><a href="#">Preguntas frecuentes</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="etiqueta">CompaÃ±Ã­a</p>
+        <ul>
+          <li><a href="#">Sobre nosotros</a></li>
+          <li><a href="#">Contacto</a></li>
+          <li><a href="#">TÃ©rminos de uso</a></li>
+          <li><a href="#">Privacidad</a></li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+
+  <div class="contenedor pie__legal">
+    <p>Â© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+    <p>Santo Domingo Â· RepÃºblica Dominicana</p>
+  </div>
+</footer>
+
+<script>
+  // MenÃº mÃ³vil
+  var toggle = document.getElementById('navToggle');
+  var menu = document.getElementById('menu');
+  toggle.addEventListener('click', function () {
+    var abierto = menu.classList.toggle('is-abierto');
+    toggle.setAttribute('aria-expanded', String(abierto));
+    toggle.setAttribute('aria-label', abierto ? 'Cerrar menÃº' : 'Abrir menÃº');
+  });
+  menu.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A') {
+      menu.classList.remove('is-abierto');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Sombra del nav al desplazar
+  var nav = document.getElementById('nav');
+  var marcar = function () { nav.classList.toggle('is-desplazado', window.scrollY > 8); };
+  marcar();
+  window.addEventListener('scroll', marcar, { passive: true });
+</script>
+
+</body>
+</html>
+

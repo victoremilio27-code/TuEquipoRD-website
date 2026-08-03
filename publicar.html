@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publicar un equipo · TuEquipoRD</title>
+<meta name="description" content="Publique su maquinaria en TuEquipoRD. Complete la ficha técnica, cargue las fotografías, seleccione el plan de publicación y active el anuncio en minutos.">
+<meta name="theme-color" content="#071A2B">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <header class="pagina">
+    <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Publicar un equipo</span></nav>
+    <h1 class="pagina__titulo"><em>Publicar</em> un equipo</h1>
+    <p class="pagina__sub">Complete la ficha, cargue las fotografías y seleccione el plan. El anuncio queda activo en el catálogo al confirmarse la contratación, sin revisión previa ni intermediarios.</p>
+    <p class="realce">
+      <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
+      <span>Publicación <b>sin costo y sin límite de anuncios</b> con el plan Estándar hasta <b data-promo-hasta>fecha por definir</b></span>
+    </p>
+  </header>
+
+  <p class="aviso-borrador" id="avisoBorrador" hidden>
+    <svg class="ico" aria-hidden="true"><use href="#i-reloj"/></svg>
+    <span>Recuperamos el borrador que dejó sin terminar. Continúe donde quedó o descártelo para empezar de nuevo.</span>
+    <button type="button" class="btn btn--linea" id="btnDescartar">Descartar borrador</button>
+  </p>
+
+  <div class="publicar" id="publicar">
+
+    <div class="publicar__principal">
+
+      <nav class="panel panel--pasos" aria-label="Progreso de la publicación">
+        <ol class="pasos" id="pasosNav"></ol>
+        <p class="progreso">
+          <span class="progreso__barra" id="progresoBarra" aria-hidden="true"></span>
+          <span class="progreso__texto" id="progresoTexto">Paso 1 de 6</span>
+        </p>
+      </nav>
+
+      <form class="panel panel--formulario" id="formPublicar" novalidate>
+
+        <!-- Paso 1 · Equipo -->
+        <section class="paso" data-paso="equipo" aria-labelledby="t-p1">
+          <h2 class="panel__titulo" id="t-p1"><em>Ficha</em> técnica del equipo</h2>
+          <p class="panel__texto">Los datos técnicos determinan en qué búsquedas aparece el anuncio. Complete todo lo que aplique: las fichas incompletas reciben menos contactos calificados.</p>
+
+          <div class="campos">
+            <label class="campo-v"><span>Categoría *</span>
+              <select id="e-categoria" data-categorias><option value="">Elija una categoría</option></select>
+            </label>
+            <label class="campo-v"><span>Tipo de equipo (subcategoría) *</span>
+              <select id="e-subcategoria" disabled><option value="">Elija primero la categoría</option></select>
+            </label>
+            <label class="campo-v"><span>Marca *</span>
+              <select id="e-marca" data-marcas="todas"><option value="">Elija una marca</option></select>
+            </label>
+            <label class="campo-v"><span>Modelo *</span>
+              <input type="text" id="e-modelo" placeholder="Ej. 320D L" autocomplete="off">
+            </label>
+            <label class="campo-v"><span>Año de fabricación *</span>
+              <input type="number" id="e-anio" min="1970" max="2027" placeholder="Ej. 2019" inputmode="numeric">
+            </label>
+            <label class="campo-v"><span>Condición *</span>
+              <select id="e-condicion"><option value="">Elija la condición</option></select>
+            </label>
+
+            <div class="campo-v"><span>Uso acumulado *</span>
+              <div class="campo-doble">
+                <input type="text" id="e-uso" placeholder="Ej. 3,842" inputmode="numeric" aria-label="Cantidad de uso acumulado">
+                <select id="e-unidad" aria-label="Unidad de uso">
+                  <option value="h">Horas de horómetro</option>
+                  <option value="km">Kilómetros</option>
+                </select>
+              </div>
+            </div>
+
+            <label class="campo-v"><span>Número de serie o VIN</span>
+              <input type="text" id="e-serie" placeholder="Opcional, solo visible para el equipo de verificación" autocomplete="off">
+            </label>
+            <label class="campo-v"><span>Potencia</span>
+              <input type="text" id="e-potencia" placeholder="Ej. 148 hp">
+            </label>
+            <label class="campo-v"><span>Peso operativo</span>
+              <input type="text" id="e-peso" placeholder="Ej. 21,500 kg">
+            </label>
+            <label class="campo-v"><span>Provincia donde se encuentra *</span>
+              <select id="e-provincia" data-provincias><option value="">Elija una provincia</option></select>
+            </label>
+            <label class="campo-v"><span>Municipio o sector</span>
+              <input type="text" id="e-ciudad" placeholder="Ej. Villa Mella">
+            </label>
+
+            <label class="campo-v campo-v--ancho"><span>Implementos y accesorios incluidos</span>
+              <input type="text" id="e-implementos" placeholder="Ej. Cucharón de 1.2 m³, martillo hidráulico, zapatas nuevas">
+            </label>
+
+            <label class="campo-v campo-v--ancho"><span>Descripción del estado *</span>
+              <textarea id="e-descripcion" placeholder="Mantenimientos realizados, uso que se le dio, trabajos pendientes y componentes reemplazados. Declarar los defectos evita visitas que no cierran."></textarea>
+            </label>
+          </div>
+        </section>
+
+        <!-- Paso 2 · Fotografías -->
+        <section class="paso" data-paso="fotos" aria-labelledby="t-p2" hidden>
+          <h2 class="panel__titulo" id="t-p2"><em>Fotografías</em> y video</h2>
+          <p class="panel__texto">Cargue imágenes de todos los ángulos: frente, laterales, parte trasera, cabina, motor, tren de rodaje y horómetro. La primera fotografía es la portada del anuncio y se puede reordenar.</p>
+
+          <div class="zona-fotos" id="zonaFotos">
+            <svg class="zona-fotos__ico" aria-hidden="true"><use href="#i-subir"/></svg>
+            <p class="zona-fotos__titulo">Arrastre las fotografías o selecciónelas desde su equipo</p>
+            <p class="zona-fotos__nota">JPG o PNG · se optimizan automáticamente al cargarlas</p>
+            <label class="btn btn--ambar zona-fotos__btn">
+              Seleccionar fotografías
+              <input type="file" id="inputFotos" accept="image/*" multiple class="visualmente-oculto">
+            </label>
+          </div>
+
+          <p class="contador-fotos" id="contadorFotos"></p>
+          <ul class="fotos" id="listaFotos"></ul>
+
+          <div class="campos campos--uno">
+            <label class="campo-v"><span>Enlace de video (YouTube o Drive)</span>
+              <input type="url" id="e-video" placeholder="https://youtube.com/watch?v=">
+            </label>
+          </div>
+          <p class="panel__nota">Un video corto con el equipo encendido y en movimiento multiplica los contactos. Disponible desde el plan Destacado.</p>
+        </section>
+
+        <!-- Paso 3 · Precio -->
+        <section class="paso" data-paso="precio" aria-labelledby="t-p3" hidden>
+          <h2 class="panel__titulo" id="t-p3"><em>Precio</em> y modalidad de negociación</h2>
+          <p class="panel__texto">Defina cómo quiere negociar. La modalidad se muestra al comprador en el anuncio y determina si se habilita el botón de oferta.</p>
+
+          <fieldset class="campo-grupo" id="modalidadPrecio">
+            <legend class="etiqueta etiqueta--bloque">Modalidad de precio</legend>
+          </fieldset>
+
+          <div class="campos" id="bloqueMonto">
+            <label class="campo-v"><span>Precio solicitado *</span>
+              <input type="text" id="p-monto" inputmode="numeric" placeholder="Ej. 4,500,000">
+            </label>
+            <label class="campo-v"><span>Moneda</span>
+              <select id="p-moneda"></select>
+            </label>
+          </div>
+
+          <div class="campos" id="bloqueMinimo" hidden>
+            <label class="campo-v"><span>Mínimo aceptable (privado)</span>
+              <input type="text" id="p-minimo" inputmode="numeric" placeholder="No se publica: filtra las ofertas que le llegan">
+            </label>
+          </div>
+
+          <fieldset class="campo-grupo">
+            <legend class="etiqueta etiqueta--bloque">Condiciones adicionales</legend>
+            <div class="casillas">
+              <label class="casilla"><input type="checkbox" id="p-itbis"><span>El precio publicado incluye ITBIS</span></label>
+              <label class="casilla"><input type="checkbox" id="p-permuta"><span>Acepto permuta por otro equipo</span></label>
+              <label class="casilla"><input type="checkbox" id="p-financiamiento"><span>Ofrezco facilidades de pago o financiamiento directo</span></label>
+            </div>
+          </fieldset>
+        </section>
+
+        <!-- Paso 4 · Contacto -->
+        <section class="paso" data-paso="contacto" aria-labelledby="t-p4" hidden>
+          <h2 class="panel__titulo" id="t-p4"><em>Datos</em> de contacto</h2>
+          <p class="panel__texto">Los teléfonos se muestran en el anuncio. Puede registrar hasta cinco números y asignar a cada uno el uso que le corresponde.</p>
+
+          <!-- Quién publica sale de la cuenta, no de un desplegable: el
+               RNC y la razón social son datos de la organización, ya
+               verificados, y no algo que se reescriba en cada anuncio. -->
+          <div class="identidad" id="identidadAnunciante"></div>
+
+          <div class="campos campos--uno" id="bloqueSucursal" hidden>
+            <label class="campo-v"><span>Sucursal desde la que se ofrece *</span>
+              <select id="c-sucursal"></select>
+            </label>
+          </div>
+
+          <div class="campos">
+            <label class="campo-v"><span>Persona de contacto *</span>
+              <input type="text" id="c-nombre" placeholder="Nombre de quien atiende las llamadas" autocomplete="name">
+            </label>
+            <label class="campo-v"><span>Correo electrónico *</span>
+              <input type="email" id="c-correo" placeholder="Ahí llegan la factura y los avisos del anuncio" autocomplete="email">
+            </label>
+          </div>
+
+          <p class="etiqueta etiqueta--bloque">Teléfonos</p>
+          <ul class="telefonos" id="listaTelefonos"></ul>
+          <button type="button" class="btn btn--linea btn--chico" id="btnAgregarTelefono">
+            <svg class="ico" aria-hidden="true"><use href="#i-mas"/></svg> Agregar otro número
+          </button>
+
+          <div class="campos">
+            <label class="campo-v"><span>Sitio web</span>
+              <input type="url" id="c-web" placeholder="https://">
+            </label>
+            <label class="campo-v"><span>Horario de atención</span>
+              <select id="c-horario">
+                <option value="">Sin horario definido</option>
+                <option>Lunes a viernes, 8:00 a 5:00</option>
+                <option>Lunes a sábado, 8:00 a 5:00</option>
+                <option>Lunes a sábado, 7:00 a 6:00</option>
+                <option>Todos los días, cualquier hora</option>
+              </select>
+            </label>
+            <label class="campo-v"><span>Vía preferida de contacto</span>
+              <select id="c-preferencia">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="llamada">Llamada telefónica</option>
+                <option value="correo">Correo electrónico</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <!-- Paso 5 · Plan -->
+        <section class="paso" data-paso="plan" aria-labelledby="t-p5" hidden>
+          <div class="panel__cabeza">
+            <h2 class="panel__titulo panel__titulo--limpio" id="t-p5"><em>Plan</em> de publicación</h2>
+            <fieldset class="duracion" id="duracionPublicacion">
+              <legend class="visualmente-oculto">Vigencia del plan</legend>
+              <label class="duracion__op"><input type="radio" name="duracion" value="30" checked><span>30 días</span></label>
+              <label class="duracion__op"><input type="radio" name="duracion" value="60"><span>60 días <b id="ahorro60Plan"></b></span></label>
+            </fieldset>
+
+            <fieldset class="duracion" id="cicloMembresia" hidden>
+              <legend class="visualmente-oculto">Ciclo de facturación de la membresía</legend>
+              <label class="duracion__op"><input type="radio" name="ciclo" value="mensual" checked><span>Mensual</span></label>
+              <label class="duracion__op"><input type="radio" name="ciclo" value="anual"><span>Anual <b id="ahorroAnualPlan"></b></span></label>
+            </fieldset>
+          </div>
+
+          <p class="panel__texto">El plan define cuántos anuncios puede mantener activos, cuántas fotografías admite cada ficha y qué posición ocupa en los resultados y en la portada.</p>
+
+          <ul class="planes-op" id="planesSeleccion"></ul>
+
+          <p class="invitacion-dealer" id="invitacionDealer" hidden>
+            <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
+            <span>
+              <b>¿Comercializa maquinaria de forma habitual?</b>
+              Las membresías Dealer —hasta 20 anuncios, o sin límite con Dealer Premium— incluyen página
+              pública de la empresa y perfil en el directorio. Están disponibles para cuentas de empresa:
+              <a href="panel.html">registre el RNC</a> y aparecen aquí.
+            </span>
+          </p>
+
+          <p class="panel__nota" id="notaMembresiaPlan" hidden>
+            La membresía Dealer no se compra por vigencia: es una cuota recurrente que mantiene sus
+            anuncios publicados mientras esté al día. Puede cambiar de ciclo o cancelar en cualquier
+            momento; al cancelar, los anuncios siguen activos hasta el final del ciclo ya pagado.
+          </p>
+
+          <p class="panel__nota">Los planes múltiples cuestan menos que contratar las publicaciones por separado, y una vigencia de 60 días cuesta menos que renovar dos veces. Puede cambiar a un plan superior en cualquier momento pagando la diferencia.</p>
+        </section>
+
+        <!-- Paso 6 · Pago -->
+        <section class="paso" data-paso="pago" aria-labelledby="t-p6" hidden>
+          <h2 class="panel__titulo" id="t-p6"><em>Confirmación</em> y pago</h2>
+
+          <div class="pedido pedido--destacado" id="resumenPago"></div>
+
+          <div id="bloqueGratis" hidden>
+            <p class="realce">
+              <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
+              <span>El plan Estándar no tiene costo durante la promoción de lanzamiento. Confirme para activar el anuncio.</span>
+            </p>
+          </div>
+
+          <div id="bloquePago">
+            <fieldset class="campo-grupo" id="formaPago">
+              <legend class="etiqueta etiqueta--bloque">Forma de pago</legend>
+              <label class="opcion">
+                <input type="radio" name="forma" value="tarjeta" checked>
+                <span class="opcion__cuerpo">
+                  <b class="opcion__nombre">Tarjeta de crédito o débito</b>
+                  <span class="opcion__detalle">Activación inmediata del anuncio</span>
+                </span>
+              </label>
+              <label class="opcion" id="opcionTransferencia">
+                <input type="radio" name="forma" value="transferencia">
+                <span class="opcion__cuerpo">
+                  <b class="opcion__nombre">Transferencia bancaria</b>
+                  <span class="opcion__detalle">Activación al confirmarse el crédito, hasta 24 horas hábiles</span>
+                </span>
+              </label>
+            </fieldset>
+
+            <p class="nota-membresia" id="notaMembresiaPago" hidden>
+              <svg class="ico" aria-hidden="true"><use href="#i-reloj"/></svg>
+              <span>
+                <b>La membresía se cobra de forma recurrente.</b>
+                <span id="renovacionTexto"></span>
+                La tarjeta queda registrada como medio de pago de la membresía para poder renovarla
+                sin que tenga que volver a introducirla. Puede cambiarla o cancelar la renovación
+                en cualquier momento desde su panel. Por eso la transferencia bancaria no está
+                disponible en esta modalidad: no permite un cobro automático.
+              </span>
+            </p>
+
+            <div id="bloqueTarjeta">
+              <div class="campos">
+                <label class="campo-v campo-v--ancho"><span>Nombre en la tarjeta *</span>
+                  <input type="text" id="t-nombre" autocomplete="cc-name" placeholder="Tal como aparece impreso">
+                </label>
+                <label class="campo-v campo-v--ancho"><span>Número de tarjeta * <b class="marca-tarjeta" id="marcaTarjeta"></b></span>
+                  <input type="text" id="t-numero" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000">
+                </label>
+                <label class="campo-v"><span>Vencimiento *</span>
+                  <input type="text" id="t-exp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5">
+                </label>
+                <label class="campo-v"><span>Código de seguridad *</span>
+                  <input type="text" id="t-cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="CVV" maxlength="3">
+                </label>
+              </div>
+
+              <div class="casillas casillas--pago" id="casillasCompra">
+                <label class="casilla"><input type="checkbox" id="t-guardar" checked><span>Guardar esta tarjeta para renovaciones y futuras contrataciones</span></label>
+                <label class="casilla"><input type="checkbox" id="t-autorenovar"><span>Renovar automáticamente al vencer la vigencia</span></label>
+              </div>
+
+              <p class="nota-segura">
+                <svg class="ico" aria-hidden="true"><use href="#i-candado"/></svg>
+                Los datos de la tarjeta se transmiten cifrados directamente al procesador de pagos. TuEquipoRD no almacena el número completo: conserva únicamente el token, la marca y los últimos cuatro dígitos.
+              </p>
+            </div>
+
+            <div id="bloqueTransferencia" hidden>
+              <div class="datos-banco">
+                <p class="etiqueta etiqueta--bloque">Cuenta receptora</p>
+                <dl class="pedido__lista">
+                  <div><dt>Beneficiario</dt><dd>TuEquipoRD, SRL</dd></div>
+                  <div><dt>RNC</dt><dd class="num">1-31-00000-0</dd></div>
+                  <div><dt>Cuenta corriente</dt><dd class="num">000-000000-0</dd></div>
+                </dl>
+              </div>
+              <div class="campos campos--uno">
+                <label class="campo-v"><span>Número de referencia de la transferencia *</span>
+                  <input type="text" id="tr-referencia" placeholder="Comprobante emitido por su banco">
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <label class="casilla casilla--condiciones">
+            <input type="checkbox" id="aceptaCondiciones">
+            <span>Declaro que soy el propietario del equipo o cuento con autorización para venderlo, que la información publicada es veraz, y acepto las <a href="legal.html#anuncios">condiciones de publicación</a>.</span>
+          </label>
+        </section>
+
+        <div class="botonera">
+          <button type="button" class="btn btn--linea btn--grande" id="btnAtras" hidden>
+            Volver
+          </button>
+          <button type="button" class="btn btn--ambar btn--grande" id="btnSiguiente">
+            Continuar <svg class="ico" aria-hidden="true"><use href="#i-flecha"/></svg>
+          </button>
+          <button type="button" class="btn btn--ambar btn--grande" id="btnPublicar" hidden>Publicar anuncio</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="publicar__lado" aria-label="Vista previa y resumen">
+      <div class="panel panel--previa" id="vistaPrevia"></div>
+      <div class="panel pedido" id="resumenPedido"></div>
+
+      <div class="panel">
+        <h2 class="panel__titulo"><em>Sello</em> de anunciante verificado</h2>
+        <p class="panel__texto">El sello no se contrata ni se incluye en ningún plan. Se otorga tras comprobar identidad y titularidad, y se retira ante una reclamación sin resolver.</p>
+        <ul class="lista-punteada lista-punteada--pasos">
+          <li>Cédula para personas físicas o RNC para empresas.</li>
+          <li>Factura, matrícula o certificado de importación del equipo.</li>
+          <li>Un número de teléfono operativo.</li>
+        </ul>
+        <p class="nota-verificado">
+          <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
+          Sin costo. Evaluación en menos de 24 horas hábiles.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel publicado" id="publicado" hidden aria-live="polite"></section>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+        <li><a href="categorias.html">Todas las categorías</a></li>
+      </ul>
+      <h3 class="pie__titulo">Síganos</h3>
+      <ul class="pie__lista">
+        <li><a href="https://instagram.com" rel="noopener">Instagram</a></li>
+        <li><a href="https://facebook.com" rel="noopener">Facebook</a></li>
+        <li><a href="mailto:hola@tuequipord.do">hola@tuequipord.do</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
+        <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/publicar.js"></script>
+</body>
+</html>
