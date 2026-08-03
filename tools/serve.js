@@ -17,6 +17,8 @@ const path = require('path');
 
 const RAIZ_PROYECTO = path.resolve(__dirname, '..');
 
+const PRODUCCION = process.env.NODE_ENV === 'production';
+
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -33,6 +35,18 @@ const TIPOS = {
   '.woff': 'font/woff',
   '.pdf': 'application/pdf',
 };
+
+/* En desarrollo, nunca cachear: siempre quieres el archivo recién
+   guardado. En producción sí, pero con cuidado: los nombres no llevan
+   hash, así que un caché largo en styles.css o app.js dejaría a la
+   gente con la versión vieja después de un despliegue. El HTML
+   revalida siempre y el resto dura lo justo. */
+function cacheDe(ext) {
+  if (!PRODUCCION) return 'no-store';
+  if (ext === '.html') return 'no-cache';
+  if (ext === '.css' || ext === '.js') return 'public, max-age=3600';
+  return 'public, max-age=604800';
+}
 
 function leerArgs(argv) {
   const args = { port: Number(process.env.PORT) || 8080, root: '.', api: true };
@@ -61,6 +75,13 @@ if (args.api) {
     db.purgar();
     setInterval(() => db.purgar(), 3600 * 1000).unref();
   } catch (e) {
+    /* En producción esto no es recuperable: sin API no hay cuentas ni
+       publicaciones, y un sitio a medias es peor que uno caído porque
+       systemd no lo reinicia y nadie se entera. */
+    if (PRODUCCION) {
+      console.error('API no disponible:', e.message);
+      process.exit(1);
+    }
     console.warn('API no disponible, se sirve solo el sitio estático:', e.message);
     api = null;
   }
@@ -103,8 +124,7 @@ const servidor = http.createServer((req, res) => {
     }
     res.writeHead(200, {
       'Content-Type': TIPOS[path.extname(archivo).toLowerCase()] || 'application/octet-stream',
-      // Sin caché: en desarrollo siempre quieres el archivo recién guardado.
-      'Cache-Control': 'no-store',
+      'Cache-Control': cacheDe(path.extname(archivo).toLowerCase()),
     });
     res.end(datos);
     console.log(`200  ${ruta}`);

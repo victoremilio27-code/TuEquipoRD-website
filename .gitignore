@@ -18,6 +18,7 @@ correos/
 # Entorno
 .env
 .env.*
+!.env.example
 
 # Sistema
 Thumbs.db

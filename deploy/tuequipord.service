@@ -1,0 +1,36 @@
+# systemd unit para TuEquipoRD.
+# Instalar en /etc/systemd/system/tuequipord.service
+
+[Unit]
+Description=TuEquipoRD — sitio y API
+After=network.target
+
+[Service]
+Type=simple
+User=tuequipord
+Group=tuequipord
+WorkingDirectory=/var/www/tuequipord
+
+# El servidor escucha solo en local; nginx publica hacia fuera.
+Environment=NODE_ENV=production
+Environment=PORT=8080
+Environment=TUEQUIPO_HTTPS=1
+Environment=TUEQUIPO_DB=/var/lib/tuequipord/tuequipord.db
+
+# Secretos: NO ponerlos aquí. Van en /etc/tuequipord.env, con
+# permisos 600 y propietario root. Ver deploy/README.md.
+EnvironmentFile=/etc/tuequipord.env
+
+ExecStart=/usr/bin/node tools/serve.js
+Restart=always
+RestartSec=3
+
+# Endurecimiento: el proceso solo escribe donde guarda la base.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tuequipord
+
+[Install]
+WantedBy=multi-user.target
