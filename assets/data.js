@@ -14,93 +14,15 @@
      el plan Estándar sin costo mientras el servidor lo cobraba.
    ═══════════════════════════════════════════════════════════ */
 
-/* Registro completo de marcas. Es lo que ve QUIEN VENDE al publicar.
-   Quien COMPRA solo ve las marcas con equipos activos: eso se calcula
-   del inventario en marcasConEquipos(), nunca se escribe a mano. */
-const MARCAS_REGISTRADAS = [
-  'Bobcat', 'Bomag', 'CASE', 'Caterpillar', 'Doosan', 'Dynapac', 'Genie',
-  'Hitachi', 'Hyundai CE', 'International', 'JCB', 'John Deere', 'Kobelco',
-  'Komatsu', 'Kubota', 'Liebherr', 'Mack', 'Manitou', 'SANY', 'Volvo CE',
-  'Wacker Neuson', 'XCMG',
-];
+/* La taxonomía —categorías, subcategorías, marcas y modelos— vive
+   ahora en assets/taxonomia.js, que cargan tanto el navegador como el
+   servidor. Aquí había una copia con una sola lista global de 22
+   marcas que se ofrecía en todas las categorías: se podía publicar una
+   excavadora marca Genie o un generador marca Mack.
 
-/* Categorías del catálogo. `portada` espera la ruta de una foto real
-   de un equipo publicado; en null cae al marcador con el hexágono. */
-const CATEGORIAS = [
-  { id: 'excavadoras',      nombre: 'Excavadoras',          icono: 'i-excavadora',  portada: null },
-  { id: 'retroexcavadoras', nombre: 'Retroexcavadoras',     icono: 'i-retro',       portada: null },
-  { id: 'cargadores',       nombre: 'Cargadores frontales', icono: 'i-cargador',    portada: null },
-  { id: 'volteos',          nombre: 'Camiones volteo',      icono: 'i-volteo',      portada: null },
-  { id: 'gruas',            nombre: 'Grúas',                icono: 'i-grua',        portada: null },
-  { id: 'compactadoras',    nombre: 'Compactadoras',        icono: 'i-rodillo',     portada: null },
-  { id: 'montacargas',      nombre: 'Montacargas',          icono: 'i-montacargas', portada: null },
-  { id: 'generadores',      nombre: 'Generadores',          icono: 'i-generador',   portada: null },
-];
+   Se dejan aquí las listas que no forman parte de esa jerarquía:
+   condiciones, provincias, planes y el resto del catálogo editorial. */
 
-/* Subcategorías por categoría. Es el segundo nivel de clasificación del
-   catálogo: define el tipo exacto de máquina dentro de su familia y es
-   obligatorio al publicar. El comprador filtra por categoría; la
-   subcategoría ordena la ficha y alimenta las búsquedas por tipo. */
-const SUBCATEGORIAS = {
-  excavadoras: [
-    'Miniexcavadora (hasta 6 t)',
-    'Excavadora mediana (6 a 25 t)',
-    'Excavadora pesada (más de 25 t)',
-    'Excavadora de ruedas',
-    'Excavadora de demolición',
-    'Excavadora anfibia',
-  ],
-  retroexcavadoras: [
-    'Retroexcavadora 4x2',
-    'Retroexcavadora 4x4',
-    'Retroexcavadora con martillo hidráulico',
-    'Retroexcavadora con brazo extensible',
-  ],
-  cargadores: [
-    'Cargador frontal de ruedas',
-    'Minicargador (skid steer)',
-    'Cargador de oruga',
-    'Manipulador telescópico',
-  ],
-  volteos: [
-    'Camión volteo hasta 12 m³',
-    'Camión volteo de 12 a 16 m³',
-    'Camión volteo de más de 16 m³',
-    'Volteo articulado (dumper)',
-    'Volteo rígido de obra',
-    'Cabezote y patana',
-  ],
-  gruas: [
-    'Grúa telescópica sobre camión',
-    'Grúa todo terreno',
-    'Grúa sobre oruga',
-    'Grúa articulada (hidrogrúa)',
-    'Torre grúa',
-    'Canasto elevador',
-  ],
-  compactadoras: [
-    'Rodillo vibratorio liso',
-    'Rodillo pata de cabra',
-    'Rodillo neumático',
-    'Compactadora de asfalto',
-    'Compactadora manual (bailarina)',
-  ],
-  montacargas: [
-    'Montacargas de combustión',
-    'Montacargas eléctrico',
-    'Montacargas todo terreno',
-    'Apilador y transpaleta',
-  ],
-  generadores: [
-    'Planta eléctrica diésel',
-    'Planta eléctrica de gas',
-    'Planta insonorizada',
-    'Torre de iluminación',
-    'Compresor de aire',
-  ],
-};
-
-const subcategoriasDe = (idCategoria) => SUBCATEGORIAS[idCategoria] || [];
 
 /* Escala de condición del equipo. El orden va de mejor a peor y así
    se muestra en el formulario y en la ficha. */

@@ -12,6 +12,7 @@
 const { DatabaseSync } = require('node:sqlite');
 const crypto = require('node:crypto');
 const fs = require('fs');
+const taxonomia = require('../assets/taxonomia.js');
 const path = require('path');
 
 const RAIZ = path.resolve(__dirname, '..');
@@ -108,6 +109,60 @@ const MIGRACIONES = [
      planes y métodos de pago son datos de referencia que no se
      eliminan, y un índice que nunca se usa solo encarece cada
      escritura. */
+  /* Taxonomía jerárquica: categoría → subcategoría → marca → modelo.
+     `subcategoria` pasa de guardar el nombre visible a guardar el id,
+     que es lo que permite renombrar «Camión volteo» sin tocar los
+     anuncios ya publicados. La categoría `volteos` se reparte: los
+     camiones de carretera pasan a `camiones` y las subcategorías se
+     remapean una a una.
+
+     Tren motriz solo para vehículos de carretera. */
+  ['2026-08-taxonomia-jerarquica', [
+    'ALTER TABLE anuncios ADD COLUMN motor_marca TEXT',
+    'ALTER TABLE anuncios ADD COLUMN motor_modelo TEXT',
+    'ALTER TABLE anuncios ADD COLUMN transmision_marca TEXT',
+    'ALTER TABLE anuncios ADD COLUMN transmision_modelo TEXT',
+
+    "UPDATE anuncios SET categoria = 'camiones' WHERE categoria = 'volteos'",
+
+    // Nombres antiguos → ids nuevos.
+    "UPDATE anuncios SET subcategoria = 'exc-mini' WHERE subcategoria LIKE 'Miniexcavadora%'",
+    "UPDATE anuncios SET subcategoria = 'exc-mediana' WHERE subcategoria LIKE 'Excavadora mediana%'",
+    "UPDATE anuncios SET subcategoria = 'exc-pesada' WHERE subcategoria LIKE 'Excavadora pesada%'",
+    "UPDATE anuncios SET subcategoria = 'exc-ruedas' WHERE subcategoria LIKE 'Excavadora de ruedas%'",
+    "UPDATE anuncios SET subcategoria = 'exc-demolicion' WHERE subcategoria LIKE 'Excavadora de demolici%'",
+    "UPDATE anuncios SET subcategoria = 'exc-anfibia' WHERE subcategoria LIKE 'Excavadora anfibia%'",
+    "UPDATE anuncios SET subcategoria = 'retro-4x2' WHERE subcategoria LIKE 'Retroexcavadora 4x2%'",
+    "UPDATE anuncios SET subcategoria = 'retro-4x4' WHERE subcategoria LIKE 'Retroexcavadora 4x4%'",
+    "UPDATE anuncios SET subcategoria = 'retro-extensible' WHERE subcategoria LIKE 'Retroexcavadora con brazo%'",
+    "UPDATE anuncios SET subcategoria = 'retro-4x4' WHERE subcategoria LIKE 'Retroexcavadora con martillo%'",
+    "UPDATE anuncios SET subcategoria = 'car-ruedas' WHERE subcategoria LIKE 'Cargador frontal%'",
+    "UPDATE anuncios SET subcategoria = 'car-mini' WHERE subcategoria LIKE 'Minicargador%'",
+    "UPDATE anuncios SET subcategoria = 'car-oruga' WHERE subcategoria LIKE 'Cargador de oruga%'",
+    "UPDATE anuncios SET subcategoria = 'car-telescopico' WHERE subcategoria LIKE 'Manipulador telesc%'",
+    "UPDATE anuncios SET subcategoria = 'cam-volteo' WHERE subcategoria LIKE 'Camión volteo%'",
+    "UPDATE anuncios SET subcategoria = 'cam-articulado' WHERE subcategoria LIKE 'Volteo articulado%'",
+    "UPDATE anuncios SET subcategoria = 'cam-rigido' WHERE subcategoria LIKE 'Volteo rígido%'",
+    "UPDATE anuncios SET subcategoria = 'cam-cabezote' WHERE subcategoria LIKE 'Cabezote%'",
+    "UPDATE anuncios SET subcategoria = 'grua-camion' WHERE subcategoria LIKE 'Grúa telesc%'",
+    "UPDATE anuncios SET subcategoria = 'grua-todoterreno' WHERE subcategoria LIKE 'Grúa todo terreno%'",
+    "UPDATE anuncios SET subcategoria = 'grua-oruga' WHERE subcategoria LIKE 'Grúa sobre oruga%'",
+    "UPDATE anuncios SET subcategoria = 'grua-articulada' WHERE subcategoria LIKE 'Grúa articulada%'",
+    "UPDATE anuncios SET subcategoria = 'grua-torre' WHERE subcategoria LIKE 'Torre grúa%'",
+    "UPDATE anuncios SET subcategoria = 'elev-canasto', categoria = 'elevacion' WHERE subcategoria LIKE 'Canasto elevador%'",
+    "UPDATE anuncios SET subcategoria = 'comp-liso' WHERE subcategoria LIKE 'Rodillo vibratorio%'",
+    "UPDATE anuncios SET subcategoria = 'comp-pata' WHERE subcategoria LIKE 'Rodillo pata%'",
+    "UPDATE anuncios SET subcategoria = 'comp-neumatico' WHERE subcategoria LIKE 'Rodillo neum%'",
+    "UPDATE anuncios SET subcategoria = 'comp-asfalto' WHERE subcategoria LIKE 'Compactadora de asfalto%'",
+    "UPDATE anuncios SET subcategoria = 'comp-manual' WHERE subcategoria LIKE 'Compactadora manual%'",
+    "UPDATE anuncios SET subcategoria = 'mont-combustion' WHERE subcategoria LIKE 'Montacargas de combusti%'",
+    "UPDATE anuncios SET subcategoria = 'mont-electrico' WHERE subcategoria LIKE 'Montacargas el%'",
+    "UPDATE anuncios SET subcategoria = 'mont-todoterreno' WHERE subcategoria LIKE 'Montacargas todo terreno%'",
+    "UPDATE anuncios SET subcategoria = 'gen-diesel' WHERE subcategoria LIKE 'Planta el%di%'",
+    "UPDATE anuncios SET subcategoria = 'gen-portatil' WHERE subcategoria LIKE 'Generador port%'",
+    "UPDATE anuncios SET subcategoria = 'gen-compresor' WHERE subcategoria LIKE 'Compresor%'",
+  ]],
+
   /* Cuentas internas que publican sin pagar: las de los socios.
      Va en la organización y no en el usuario porque quien contrata y
      factura es la empresa, no la persona que pulsa el botón.
@@ -860,9 +915,11 @@ function crearAnuncio(datos) {
       categoria, subcategoria, marca, modelo, anio, condicion, uso_valor, uso_unidad,
       serie, potencia, peso, implementos, descripcion, provincia, municipio,
       precio, moneda, modalidad_precio, precio_minimo, itbis_incluido, permuta,
-      financiamiento, video, destacado_hasta, publicado, vence, creado)
+      financiamiento, video,
+      motor_marca, motor_modelo, transmision_marca, transmision_modelo,
+      destacado_hasta, publicado, vence, creado)
       VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(idAnuncio, datos.idOrg, datos.idSucursal || null, datos.idUsuario || null,
         datos.idSuscripcion || null,
         datos.categoria, datos.subcategoria || null, datos.marca, datos.modelo,
@@ -873,6 +930,8 @@ function crearAnuncio(datos) {
         datos.precio ?? null, datos.moneda || 'DOP', datos.modalidadPrecio || 'fijo',
         datos.precioMinimo || null, datos.itbisIncluido ? 1 : 0, datos.permuta ? 1 : 0,
         datos.financiamiento ? 1 : 0, datos.video || null,
+        datos.motorMarca || null, datos.motorModelo || null,
+        datos.transmisionMarca || null, datos.transmisionModelo || null,
         datos.destacadoHasta || null, t, datos.vence || null, t);
 
     /* Cada foto llega como {url, miniatura}, ya subidas a disco por
@@ -907,6 +966,25 @@ function crearAnuncio(datos) {
   return idAnuncio;
 }
 
+/* Los anuncios guardan ids —`caterpillar`, `exc-mediana`— porque un id
+   no cambia cuando se corrige un nombre. Las pantallas necesitan el
+   nombre visible, así que se añade aquí, en el único punto por el que
+   pasan todas las consultas de anuncios. Hacerlo en cada pantalla
+   obligaría a que todas cargaran la taxonomía.
+
+   Se conserva el id en `marca` para que los enlaces de filtro sigan
+   funcionando; el nombre viaja aparte. */
+function conNombres(a) {
+  if (!a) return a;
+  a.marca_nombre = taxonomia.nombreMarca(a.marca);
+  a.subcategoria_nombre = taxonomia.nombreSubcategoria(a.subcategoria);
+  if (a.motor_marca) a.motor_marca_nombre = (taxonomia.MOTORES[a.motor_marca] || {}).nombre || a.motor_marca;
+  if (a.transmision_marca) {
+    a.transmision_marca_nombre = (taxonomia.TRANSMISIONES[a.transmision_marca] || {}).nombre || a.transmision_marca;
+  }
+  return a;
+}
+
 /* Un anuncio con todo lo que cuelga de él. Se usa igual para la ficha
    pública y para el panel. */
 function anuncio(idAnuncio) {
@@ -921,7 +999,7 @@ function anuncio(idAnuncio) {
   a.fotos = d.prepare('SELECT url, miniatura FROM anuncio_fotos WHERE anuncio_id = ? ORDER BY orden')
     .all(idAnuncio).map((f) => f.url);
   a.telefonos = d.prepare('SELECT numero, tipo, nota FROM anuncio_contactos WHERE anuncio_id = ? ORDER BY orden').all(idAnuncio);
-  return a;
+  return conNombres(a);
 }
 
 /* ── Catálogo público ───────────────────────────────────── */
@@ -1041,7 +1119,7 @@ function buscarAnuncios(f = {}) {
     LIMIT :limite OFFSET :salto`)
     .all({ ...parametros, limite: porPagina, salto: (pagina - 1) * porPagina });
 
-  return { anuncios, total, pagina, paginas, porPagina };
+  return { anuncios: anuncios.map(conNombres), total, pagina, paginas, porPagina };
 }
 
 /* Atajo para quien solo quiere una lista corta (portada, perfil de
@@ -1065,9 +1143,13 @@ function estadisticas() {
     SELECT categoria, COUNT(*) AS total FROM anuncios
     WHERE estado = 'activo' GROUP BY categoria ORDER BY total DESC`).all();
 
+  // El filtro del catálogo necesita el id para la URL y el nombre para
+  // el selector, así que viajan los dos.
   const marcas = d.prepare(`
     SELECT marca, COUNT(*) AS total FROM anuncios
-    WHERE estado = 'activo' GROUP BY marca ORDER BY total DESC, marca`).all();
+    WHERE estado = 'activo' GROUP BY marca ORDER BY total DESC, marca`)
+    .all()
+    .map((m) => ({ ...m, marca_nombre: taxonomia.nombreMarca(m.marca) }));
 
   const provincias = d.prepare(`
     SELECT provincia, COUNT(*) AS total FROM anuncios
@@ -1108,7 +1190,8 @@ function anunciosDeOrganizacion(idOrg) {
     LEFT JOIN metricas_diarias m ON m.anuncio_id = a.id
     WHERE a.organizacion_id = ?
     GROUP BY a.id
-    ORDER BY CASE a.estado WHEN 'activo' THEN 0 ELSE 1 END, a.publicado DESC`).all(idOrg);
+    ORDER BY CASE a.estado WHEN 'activo' THEN 0 ELSE 1 END, a.publicado DESC`)
+    .all(idOrg).map(conNombres);
 }
 
 const cambiarEstadoAnuncio = (idAnuncio, idOrg, estado) =>

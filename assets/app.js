@@ -83,7 +83,10 @@ function precioTexto(e) {
   return simbolo + miles(Math.round(e.precio));
 }
 
-const nombreEquipo = (e) => `${e.anio} ${e.marca} ${e.modelo}`;
+/* El anuncio guarda el id de la marca; el servidor añade el nombre
+   visible en `marca_nombre`. Se cae al id por si llega un anuncio
+   antiguo sin decorar. */
+const nombreEquipo = (e) => `${e.anio} ${e.marca_nombre || e.marca} ${e.modelo}`;
 
 const nombreCategoria = (id) =>
   (CATEGORIAS.find((c) => c.id === id) || {}).nombre || id;
@@ -124,8 +127,16 @@ async function cargarEstadisticas() {
 
 /* Quien compra solo ve marcas con al menos un equipo publicado: una
    marca sin inventario que devuelve cero resultados es una vía muerta.
-   Quien vende ve el registro completo (MARCAS_REGISTRADAS). */
+   Quien vende ve, en cambio, las que fabrican el tipo de equipo que
+   está publicando; de eso se encarga publicar.js con la taxonomía. */
 const marcasConEquipos = () => ESTADISTICAS.marcas;
+
+/* Nombre visible de una marca que el catálogo conoce, o null si no
+   hay ningún equipo publicado de ella. */
+const nombreMarcaCatalogo = (id) => {
+  const m = ESTADISTICAS.marcas.find((x) => x.marca === id);
+  return m ? (m.marca_nombre || m.marca) : null;
+};
 
 function conteoCategorias() {
   const cuenta = new Map(ESTADISTICAS.categorias.map((c) => [c.categoria, c.total]));
@@ -388,12 +399,14 @@ function montarPromo() {
 }
 
 /* Rellena los <select> de marca, categoría y provincia.
-   data-marcas="activas" para compradores, "todas" para vendedores. */
+   El selector de marca de quien PUBLICA no se arma aquí: lo encadena
+   publicar.js a la subcategoría elegida. */
 function montarSelects() {
+  /* El filtro del catálogo solo ofrece marcas CON equipos publicados:
+     una lista con las 146 del registro haría que casi toda elección
+     devolviera cero resultados. */
   $$('select[data-marcas]').forEach((sel) => {
-    const activas = sel.dataset.marcas === 'activas';
-    const lista = activas ? marcasConEquipos().map((m) => m.marca) : MARCAS_REGISTRADAS;
-    lista.forEach((m) => sel.add(new Option(m, m)));
+    marcasConEquipos().forEach((m) => sel.add(new Option(m.marca_nombre || m.marca, m.marca)));
   });
   $$('select[data-categorias]').forEach((sel) => {
     CATEGORIAS.forEach((c) => sel.add(new Option(c.nombre, c.id)));
@@ -573,7 +586,7 @@ async function montarResultados() {
 
   // Caso explícito: la marca existe en el registro pero nadie tiene
   // equipos de ella. Decirlo evita que se lea como un fallo del sitio.
-  const registrada = filtros.marca && MARCAS_REGISTRADAS.includes(filtros.marca);
+  const registrada = filtros.marca && !!nombreMarcaCatalogo(filtros.marca);
   titulo.textContent = registrada
     ? `No hay equipos ${filtros.marca} publicados ahora mismo`
     : 'No encontramos equipos con esos criterios';
@@ -589,10 +602,11 @@ function sincronizarSubcategorias(form, elegida) {
   const sel = form.elements.subcategoria;
   if (!sel) return;
   const categoria = form.elements.categoria ? form.elements.categoria.value : '';
-  const lista = subcategoriasDe(categoria);
+  const cat = CATEGORIAS.find((c) => c.id === categoria);
+  const lista = cat ? cat.subcategorias : [];
 
   sel.length = 1;
-  lista.forEach((s) => sel.add(new Option(s, s)));
+  lista.forEach((s) => sel.add(new Option(s.nombre, s.id)));
   sel.disabled = !lista.length;
   sel.value = elegida && lista.includes(elegida) ? elegida : '';
 
@@ -666,9 +680,11 @@ function fichaTecnicaHTML(e) {
     ['Año', e.anio, 'num'],
     [e.uso.unidad === 'h' ? 'Horas de uso' : 'Kilometraje', e.uso.valor ? fmtUso(e.uso) : null, 'num'],
     ['Condición', e.condicion],
-    ['Marca', `<a href="equipos.html?marca=${encodeURIComponent(e.marca)}">${esc(e.marca)}</a>`, '', true],
+    ['Marca', `<a href="equipos.html?marca=${encodeURIComponent(e.marca)}">${esc(e.marca_nombre || e.marca)}</a>`, '', true],
     ['Modelo', e.modelo],
-    ['Tipo', e.subcategoria],
+    ['Tipo', e.subcategoria_nombre || e.subcategoria],
+    ['Motor', e.motor_marca ? `${e.motor_marca_nombre || e.motor_marca}${e.motor_modelo ? ` ${e.motor_modelo}` : ''}` : ''],
+    ['Transmisión', e.transmision_marca ? `${e.transmision_marca_nombre || e.transmision_marca}${e.transmision_modelo ? ` ${e.transmision_modelo}` : ''}` : ''],
     ['Potencia', e.potencia, 'num'],
     ['Peso operativo', e.peso, 'num'],
     ['Ubicación', [e.municipio, e.provincia].filter(Boolean).join(', ')],
@@ -736,7 +752,7 @@ async function montarDetalle() {
       </div>
 
       <aside class="detalle__panel">
-        <p class="detalle__cat">${esc(nombreCategoria(e.categoria))}${e.subcategoria ? ` · ${esc(e.subcategoria)}` : ''}</p>
+        <p class="detalle__cat">${esc(nombreCategoria(e.categoria))}${e.subcategoria ? ` · ${esc(e.subcategoria_nombre || e.subcategoria)}` : ''}</p>
         <h1 class="detalle__titulo">${esc(nombreEquipo(e))}</h1>
         <p class="detalle__sitio">${icono('i-pin')} ${esc([e.municipio, e.provincia].filter(Boolean).join(', ') || 'República Dominicana')}</p>
 

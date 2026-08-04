@@ -239,32 +239,141 @@ function avisoPaso(seccion, texto) {
 
 /* ── Paso 1 · Equipo ────────────────────────────────────── */
 
-function montarPasoEquipo() {
+/* Taxonomía traída del servidor. Vive aquí, en una sola variable, para
+   que los cuatro selectores encadenados lean todos de lo mismo. */
+let TAXONOMIA = null;
+
+const OTRO_MODELO = '__otro__';
+
+/* ── Paso 1 · Equipo: cadena categoría → subcategoría → marca → modelo
+ *
+ * Antes había una sola lista global de 22 marcas que se ofrecía en
+ * todas las categorías: se podía publicar una excavadora marca Genie o
+ * un generador marca Mack. Ahora cada nivel filtra al siguiente, y lo
+ * mismo valida el servidor.
+ *
+ * Cambiar un nivel superior limpia los inferiores. Dejar una marca de
+ * excavadora colgando tras cambiar a camiones es justo el estado
+ * incoherente que se quería eliminar. */
+async function montarPasoEquipo() {
   const cat = $('#e-categoria');
   const sub = $('#e-subcategoria');
+  const marca = $('#e-marca');
+  const modelo = $('#e-modelo');
+  const modeloOtro = $('#e-modelo-otro');
   if (!cat || !sub) return;
 
-  // Las condiciones salen del catálogo: la escala se cambia en data.js.
   const cond = $('#e-condicion');
-  CONDICIONES.forEach((c) => cond.add(new Option(`${c.nombre} — ${c.detalle}`, c.nombre)));
-
-  function pintarSub() {
-    const lista = subcategoriasDe(cat.value);
-    sub.innerHTML = '<option value="">Seleccione el tipo</option>';
-    lista.forEach((s) => sub.add(new Option(s, s)));
-    sub.disabled = lista.length === 0;
-    sub.closest('.campo-v').classList.toggle('campo-v--inactivo', lista.length === 0);
-    if (estado.equipo.subcategoria && lista.includes(estado.equipo.subcategoria)) {
-      sub.value = estado.equipo.subcategoria;
-    }
+  if (cond && !cond.options.length > 1) { /* ya montado */ }
+  if (cond && cond.options.length <= 1) {
+    CONDICIONES.forEach((c) => cond.add(new Option(`${c.nombre} — ${c.detalle}`, c.nombre)));
   }
 
-  cat.addEventListener('change', () => {
-    estado.equipo.subcategoria = '';
-    pintarSub();
-  });
+  TAXONOMIA = await api('/taxonomia', { silencioso: true });
+  if (!TAXONOMIA) return;                 // sin servidor no hay jerarquía
+
+  // Categorías
+  cat.innerHTML = '<option value="">Elija una categoría</option>';
+  TAXONOMIA.categorias.forEach((c) => cat.add(new Option(c.nombre, c.id)));
+
+  const inactivo = (sel, si) => {
+    sel.disabled = si;
+    const campo = sel.closest('.campo-v');
+    if (campo) campo.classList.toggle('campo-v--inactivo', si);
+  };
+
+  function pintarSub() {
+    const c = TAXONOMIA.categorias.find((x) => x.id === cat.value);
+    const lista = c ? c.subcategorias : [];
+    sub.innerHTML = `<option value="">${lista.length ? 'Elija el tipo de equipo' : 'Elija primero la categoría'}</option>`;
+    lista.forEach((s) => sub.add(new Option(s.nombre, s.id)));
+    inactivo(sub, !lista.length);
+  }
+
+  function pintarMarcas() {
+    const ids = TAXONOMIA.marcasPorSub[sub.value] || [];
+    marca.innerHTML = `<option value="">${ids.length ? 'Elija una marca' : 'Elija primero el tipo de equipo'}</option>`;
+
+    // Alfabético, con «Otra marca» al final: es la salida, no una
+    // opción más entre iguales.
+    ids.filter((id) => id !== 'otra')
+      .map((id) => ({ id, nombre: TAXONOMIA.marcas[id] || id }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      .forEach((m) => marca.add(new Option(m.nombre, m.id)));
+    if (ids.includes('otra')) marca.add(new Option(TAXONOMIA.marcas.otra, 'otra'));
+
+    inactivo(marca, !ids.length);
+  }
+
+  function pintarModelos() {
+    const lista = (TAXONOMIA.modelos[sub.value] || {})[marca.value] || [];
+    modelo.innerHTML = `<option value="">${marca.value ? 'Elija un modelo' : 'Elija primero la marca'}</option>`;
+    lista.forEach((m) => modelo.add(new Option(m, m)));
+
+    /* Ninguna lista de modelos puede ser exhaustiva: hay máquinas de
+       los ochenta y series regionales que no van a estar. Bloquear una
+       publicación legítima por eso sería peor que aceptar un texto
+       escrito a mano. */
+    if (marca.value) modelo.add(new Option('Otro modelo…', OTRO_MODELO));
+    inactivo(modelo, !marca.value);
+    pintarOtroModelo();
+  }
+
+  function pintarOtroModelo() {
+    const otro = modelo.value === OTRO_MODELO;
+    modeloOtro.hidden = !otro;
+    if (otro) modeloOtro.focus();
+    else modeloOtro.value = '';
+  }
+
+  /* Motor y transmisión: solo en vehículos de carretera. */
+  function pintarTrenMotriz() {
+    const bloque = $('#bloqueTrenMotriz');
+    if (!bloque) return;
+    const aplica = TAXONOMIA.subsConTrenMotriz.includes(sub.value);
+    bloque.hidden = !aplica;
+    if (!aplica) {
+      ['#e-motor-marca', '#e-motor-modelo', '#e-trans-marca', '#e-trans-modelo']
+        .forEach((s) => { if ($(s)) $(s).value = ''; });
+      return;
+    }
+
+    const llenar = (selMarca, selModelo, fuente) => {
+      const sm = $(selMarca);
+      const smod = $(selModelo);
+      if (!sm.dataset.listo) {
+        Object.entries(fuente).forEach(([id, m]) => sm.add(new Option(m.nombre, id)));
+        sm.dataset.listo = '1';
+        sm.addEventListener('change', () => {
+          const modelos = (fuente[sm.value] || {}).modelos || [];
+          smod.innerHTML = `<option value="">${modelos.length ? 'Sin especificar' : 'No aplica'}</option>`;
+          modelos.forEach((m) => smod.add(new Option(m, m)));
+          smod.disabled = !modelos.length;
+        });
+      }
+    };
+    llenar('#e-motor-marca', '#e-motor-modelo', TAXONOMIA.motores);
+    llenar('#e-trans-marca', '#e-trans-modelo', TAXONOMIA.transmisiones);
+  }
+
+  // Cada nivel limpia los de abajo.
+  cat.addEventListener('change', () => { pintarSub(); pintarMarcas(); pintarModelos(); pintarTrenMotriz(); });
+  sub.addEventListener('change', () => { pintarMarcas(); pintarModelos(); pintarTrenMotriz(); });
+  marca.addEventListener('change', pintarModelos);
+  modelo.addEventListener('change', pintarOtroModelo);
 
   pintarSub();
+  pintarMarcas();
+  pintarModelos();
+  pintarTrenMotriz();
+}
+
+/* El modelo que se guarda: el de la lista, o el escrito a mano cuando
+   se eligió «Otro modelo…». */
+function modeloElegido() {
+  const sel = $('#e-modelo');
+  if (!sel) return '';
+  return sel.value === OTRO_MODELO ? $('#e-modelo-otro').value.trim() : sel.value;
 }
 
 function validarEquipo(seccion) {
@@ -276,7 +385,10 @@ function validarEquipo(seccion) {
   ok = exigir($('#e-categoria'), !!$('#e-categoria').value, 'Seleccione la categoría del equipo.') && ok;
   ok = exigir($('#e-subcategoria'), !!$('#e-subcategoria').value, 'Seleccione el tipo dentro de la categoría.') && ok;
   ok = exigir($('#e-marca'), !!$('#e-marca').value, 'Seleccione la marca.') && ok;
-  ok = exigir($('#e-modelo'), $('#e-modelo').value.trim().length >= 2, 'Indique el modelo tal como aparece en la placa del equipo.') && ok;
+  ok = exigir($('#e-modelo'), modeloElegido().length >= 2,
+    $('#e-modelo').value === OTRO_MODELO
+      ? 'Escriba el modelo tal como aparece en la placa del equipo.'
+      : 'Seleccione el modelo.') && ok;
   ok = exigir($('#e-anio'), anio >= 1970 && anio <= limite, `Año entre 1970 y ${limite}.`) && ok;
   ok = exigir($('#e-condicion'), !!$('#e-condicion').value, 'Seleccione la condición del equipo.') && ok;
   ok = exigir($('#e-uso'), soloDigitos($('#e-uso').value).length > 0, 'Indique las horas de horómetro o el kilometraje acumulado.') && ok;
@@ -1288,7 +1400,11 @@ function leerPaso(id) {
       categoria: $('#e-categoria').value,
       subcategoria: $('#e-subcategoria').value,
       marca: $('#e-marca').value,
-      modelo: $('#e-modelo').value.trim(),
+      modelo: modeloElegido(),
+      motorMarca: ($('#e-motor-marca') || {}).value || '',
+      motorModelo: ($('#e-motor-modelo') || {}).value || '',
+      transmisionMarca: ($('#e-trans-marca') || {}).value || '',
+      transmisionModelo: ($('#e-trans-modelo') || {}).value || '',
       anio: $('#e-anio').value,
       condicion: $('#e-condicion').value,
       uso: $('#e-uso').value,

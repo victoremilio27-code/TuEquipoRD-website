@@ -411,6 +411,15 @@ CREATE TABLE IF NOT EXISTS anuncios (
   financiamiento  INTEGER NOT NULL DEFAULT 0,
   video           TEXT,
 
+  -- Tren motriz. Solo lo llevan los vehículos de carretera —camiones,
+  -- cabezotes y autobuses—, donde es lo primero que pregunta el
+  -- comprador. En una excavadora el motor es parte de la máquina y no
+  -- se elige, así que estas columnas quedan NULL.
+  motor_marca     TEXT,
+  motor_modelo    TEXT,
+  transmision_marca  TEXT,
+  transmision_modelo TEXT,
+
   destacado_hasta TEXT,
   publicado       TEXT,
   vence           TEXT,                    -- NULL si lo sostiene una membresía

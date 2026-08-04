@@ -2545,3 +2545,20 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 .flota-alta__abrir::before { content: '+ '; }
 .flota-alta[open] .flota-alta__abrir::before { content: '− '; }
 .flota-alta form { margin-top: 14px; }
+
+/* Tren motriz: solo aparece en camiones y autobuses, así que se
+   presenta como un bloque aparte para que no se lea como un campo
+   más de la ficha técnica. */
+.tren-motriz {
+  padding: 14px 16px;
+  background: var(--hueso);
+  border: 1px solid var(--linea);
+  border-left: 3px solid var(--ambar);
+  border-radius: var(--r);
+}
+.tren-motriz__titulo {
+  display: block; margin-bottom: 10px;
+  font-family: var(--display); font-size: 12px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ambar-hondo);
+}

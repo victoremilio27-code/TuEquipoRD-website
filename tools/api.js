@@ -530,6 +530,25 @@ const subirFoto = conSesion(async (req, res, ctx) => {
   }
 });
 
+/* ── Rutas: taxonomía ───────────────────────────────────── */
+
+/* La jerarquía completa, para que la pantalla de publicación arme sus
+   selectores. Se sirve desde el servidor —en vez de que el navegador
+   cargue assets/taxonomia.js directamente— para que haya una sola
+   respuesta cacheable y para poder recortar en el futuro lo que no
+   necesite el cliente sin tocar las pantallas. */
+function verTaxonomia(req, res) {
+  return responder(res, 200, {
+    categorias: taxonomia.CATEGORIAS,
+    marcas: taxonomia.MARCAS,
+    marcasPorSub: taxonomia.MARCAS_POR_SUB,
+    modelos: taxonomia.MODELOS,
+    motores: taxonomia.MOTORES,
+    transmisiones: taxonomia.TRANSMISIONES,
+    subsConTrenMotriz: taxonomia.SUBS_CON_TREN_MOTRIZ,
+  });
+}
+
 /* ── Rutas: flota propia ────────────────────────────────── */
 
 const SERVICIOS = ['alquiler', 'transporte'];
@@ -789,8 +808,11 @@ function calcularCobro(plan, { dias, ciclo }) {
 
 /* ── Rutas: anuncios ────────────────────────────────────── */
 
-const CATEGORIAS = ['excavadoras', 'retroexcavadoras', 'cargadores', 'volteos',
-  'gruas', 'compactadoras', 'montacargas', 'generadores'];
+/* La taxonomía es la MISMA que carga el navegador. Antes había aquí
+   una lista de ocho categorías escrita a mano que ya no coincidía con
+   la de assets/data.js: el servidor aceptaba unas y la pantalla
+   ofrecía otras. */
+const taxonomia = require('../assets/taxonomia.js');
 
 /* Publicar: valida, cobra el plan y crea el anuncio, en ese orden. El
    anuncio no existe hasta que el cobro está aprobado. */
@@ -804,8 +826,17 @@ const publicar = conSesion(async (req, res, ctx) => {
     return fallo(res, 403, 'Los planes Dealer requieren una cuenta de empresa con RNC registrado');
   }
 
-  if (!CATEGORIAS.includes(String(c.categoria))) return fallo(res, 400, 'Categoría inválida');
-  if (!texto(c.marca, 60)) return fallo(res, 400, 'Indique la marca');
+  /* La cadena completa: categoría → subcategoría → marca. Se valida
+     aquí y no solo en la pantalla porque el navegador puede mandar
+     cualquier cosa, y una jerarquía que solo se respeta en el
+     formulario no impide nada. */
+  const errorCadena = taxonomia.validarCadena({
+    categoria: String(c.categoria || ''),
+    subcategoria: String(c.subcategoria || ''),
+    marca: String(c.marca || ''),
+  });
+  if (errorCadena) return fallo(res, 400, errorCadena);
+
   if (!texto(c.modelo, 60)) return fallo(res, 400, 'Indique el modelo');
 
   const anio = entero(c.anio);
@@ -815,6 +846,34 @@ const publicar = conSesion(async (req, res, ctx) => {
   const modalidadPrecio = c.modalidadPrecio === 'ofertas' ? 'ofertas' : 'fijo';
   const precio = entero(c.precio);
   if (!precio || precio <= 0) return fallo(res, 400, 'Indique el precio solicitado');
+
+  /* Tren motriz: solo se acepta en las subcategorías que lo piden, y
+     solo de las listas. Guardarlo en una excavadora ensuciaría la
+     ficha con campos que no significan nada ahí. */
+  let tren = {};
+  if (taxonomia.pideTrenMotriz(String(c.subcategoria))) {
+    const motor = taxonomia.MOTORES[String(c.motorMarca || '')];
+    const trans = taxonomia.TRANSMISIONES[String(c.transmisionMarca || '')];
+
+    if (c.motorMarca && !motor) return fallo(res, 400, 'Marca de motor no reconocida');
+    if (c.transmisionMarca && !trans) return fallo(res, 400, 'Marca de transmisión no reconocida');
+
+    // El modelo es opcional, pero si viene tiene que ser de esa marca.
+    if (c.motorModelo && motor && motor.modelos.length && !motor.modelos.includes(String(c.motorModelo))) {
+      return fallo(res, 400, 'Ese modelo de motor no es de esa marca');
+    }
+    if (c.transmisionModelo && trans && trans.modelos.length
+      && !trans.modelos.includes(String(c.transmisionModelo))) {
+      return fallo(res, 400, 'Ese modelo de transmisión no es de esa marca');
+    }
+
+    tren = {
+      motorMarca: motor ? String(c.motorMarca) : null,
+      motorModelo: texto(c.motorModelo, 60),
+      transmisionMarca: trans ? String(c.transmisionMarca) : null,
+      transmisionModelo: texto(c.transmisionModelo, 60),
+    };
+  }
 
   const fotos = Array.isArray(c.fotos) ? c.fotos.slice(0, plan.fotos_maximas) : [];
   if (fotos.length < 3) return fallo(res, 400, 'Cargue al menos 3 fotografías');
@@ -891,6 +950,7 @@ const publicar = conSesion(async (req, res, ctx) => {
     permuta: !!c.permuta,
     financiamiento: !!c.financiamiento,
     video: texto(c.video, 300),
+    ...tren,
     // La membresía sostiene el anuncio: no se le pone caducidad.
     vence: membresia ? null : db.sumarDias(Number(c.dias) === 60 ? 60 : 30),
     destacadoHasta: plan.destacado ? db.sumarDias(membresia ? 7 : 15) : null,
@@ -1056,6 +1116,7 @@ const RUTAS = [
 
   // Flota propia de alquiler y transporte. La lectura es pública;
   // todo lo que la modifica exige sesión con es_admin.
+  ['GET',  /^\/api\/taxonomia$/,                        verTaxonomia],
   ['GET',  /^\/api\/flota\/(\w+)$/,                     listarFlota],
   ['GET',  /^\/api\/admin\/flota\/(\w+)$/,              listarFlotaAdmin],
   ['POST', /^\/api\/admin\/flota\/(\w+)$/,              crearFlota],

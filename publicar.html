@@ -83,11 +83,15 @@
             <label class="campo-v"><span>Tipo de equipo (subcategoría) *</span>
               <select id="e-subcategoria" disabled><option value="">Elija primero la categoría</option></select>
             </label>
+            <!-- Marca y modelo se llenan según lo elegido arriba: cada
+                 subcategoría muestra solo los fabricantes que hacen ese
+                 equipo, y cada marca solo sus modelos. -->
             <label class="campo-v"><span>Marca *</span>
-              <select id="e-marca" data-marcas="todas"><option value="">Elija una marca</option></select>
+              <select id="e-marca" disabled><option value="">Elija primero el tipo de equipo</option></select>
             </label>
             <label class="campo-v"><span>Modelo *</span>
-              <input type="text" id="e-modelo" placeholder="Ej. 320D L" autocomplete="off">
+              <select id="e-modelo" disabled><option value="">Elija primero la marca</option></select>
+              <input type="text" id="e-modelo-otro" placeholder="Escriba el modelo" autocomplete="off" hidden>
             </label>
             <label class="campo-v"><span>Año de fabricación *</span>
               <input type="number" id="e-anio" min="1970" max="2027" placeholder="Ej. 2019" inputmode="numeric">
@@ -103,6 +107,27 @@
                   <option value="h">Horas de horómetro</option>
                   <option value="km">Kilómetros</option>
                 </select>
+              </div>
+            </div>
+
+            <!-- Tren motriz. Aparece solo en camiones, cabezotes y
+                 autobuses: ahí es lo primero que pregunta el
+                 comprador. En una excavadora no se elige. -->
+            <div class="campo-v campo-v--ancho tren-motriz" id="bloqueTrenMotriz" hidden>
+              <span class="tren-motriz__titulo">Tren motriz</span>
+              <div class="campos">
+                <label class="campo-v"><span>Marca del motor</span>
+                  <select id="e-motor-marca"><option value="">Sin especificar</option></select>
+                </label>
+                <label class="campo-v"><span>Modelo del motor</span>
+                  <select id="e-motor-modelo" disabled><option value="">Elija primero la marca</option></select>
+                </label>
+                <label class="campo-v"><span>Marca de la transmisión</span>
+                  <select id="e-trans-marca"><option value="">Sin especificar</option></select>
+                </label>
+                <label class="campo-v"><span>Modelo de la transmisión</span>
+                  <select id="e-trans-modelo" disabled><option value="">Elija primero la marca</option></select>
+                </label>
               </div>
             </div>
 
@@ -461,6 +486,7 @@
 </footer>
 
 <script src="assets/sesion.js"></script>
+<script src="assets/taxonomia.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/publicar.js"></script>
