@@ -15,9 +15,10 @@
  * queda anotado en la base.
  */
 
+require('./entorno');
+
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 
 const db = require('./db');
 const correo = require('./correo');

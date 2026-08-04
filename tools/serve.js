@@ -11,6 +11,10 @@
  * SQLite de db/. El resto son archivos del proyecto.
  */
 
+// Lo primero: el .env debe estar cargado antes de que nadie lea
+// process.env, incluidos db y correo al importarse.
+require('./entorno');
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
