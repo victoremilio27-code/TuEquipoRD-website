@@ -75,6 +75,63 @@
       <ul class="solicitudes" id="listaSolicitudes"></ul>
       <p class="revision__vacio" id="colaVacia" hidden></p>
     </section>
+
+    <!-- Flota propia: los equipos que alquila TuEquipoRD y las camas
+         con las que transporta. Antes vivían escritos en el código. -->
+    <section class="panel" aria-labelledby="t-flota">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-flota"><em>Flota</em> propia</h2>
+        <p class="panel__meta">Lo que aparece en Alquiler y en Transporte</p>
+      </div>
+
+      <div class="revision__filtros" role="tablist" aria-label="Servicio">
+        <button type="button" class="btn btn--ambar btn--chico" data-servicio="alquiler" role="tab" aria-selected="true">Alquiler</button>
+        <button type="button" class="btn btn--linea btn--chico" data-servicio="transporte" role="tab" aria-selected="false">Transporte</button>
+      </div>
+
+      <p class="acceso__aviso" id="avisoFlota" role="alert" hidden></p>
+
+      <ul class="solicitudes" id="listaFlota"></ul>
+
+      <details class="flota-alta" id="altaFlota">
+        <summary class="flota-alta__abrir">Añadir a la flota</summary>
+        <form id="formFlota" novalidate>
+          <div class="campos">
+            <label class="campo-v"><span>Nombre *</span>
+              <input type="text" id="fl-nombre" placeholder="Ej. Excavadora 20 t">
+            </label>
+            <label class="campo-v" id="campoUnidad"><span>Se cobra por *</span>
+              <select id="fl-unidad">
+                <option value="día">día</option>
+                <option value="semana">semana</option>
+                <option value="mes">mes</option>
+                <option value="hora">hora</option>
+                <option value="viaje">viaje</option>
+              </select>
+            </label>
+            <label class="campo-v" id="campoCapacidad" hidden><span>Capacidad en toneladas *</span>
+              <input type="number" id="fl-capacidad" inputmode="numeric" min="1" placeholder="Ej. 40">
+            </label>
+            <label class="campo-v campo-v--ancho"><span>Detalle</span>
+              <input type="text" id="fl-detalle" placeholder="Qué equipo admite o qué incluye">
+            </label>
+            <label class="campo-v"><span>Icono</span>
+              <select id="fl-icono">
+                <option value="i-excavadora">Excavadora</option>
+                <option value="i-retro">Retroexcavadora</option>
+                <option value="i-cargador">Cargador</option>
+                <option value="i-volteo">Camión volteo</option>
+                <option value="i-rodillo">Rodillo</option>
+                <option value="i-generador">Planta eléctrica</option>
+                <option value="i-lowboy">Lowboy / cama</option>
+                <option value="i-hex">Genérico</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn btn--ambar" type="submit">Añadir</button>
+        </form>
+      </details>
+    </section>
   </div>
 
 </div>

@@ -114,6 +114,19 @@ const conSesion = (manejador) => (req, res, ctx, ...resto) => {
   return manejador(req, res, ctx, ...resto);
 };
 
+/* Solo el personal de TuEquipoRD. La marca `es_admin` no se concede
+   desde ninguna pantalla: se pone con tools/admin.js. Se comprueba
+   contra la base en cada petición y no contra la cookie, para que
+   quitar el permiso tenga efecto inmediato.
+
+   Responde 404 y no 403: quien no es administrador no debe enterarse
+   siquiera de que estas rutas existen. */
+const conAdmin = (manejador) => conSesion((req, res, ctx, ...resto) => {
+  const u = db.usuarioPorId(ctx.usuario.id);
+  if (!u || !u.es_admin) return fallo(res, 404, 'No existe');
+  return manejador(req, res, ctx, ...resto);
+});
+
 /* ── Validación ─────────────────────────────────────────── */
 
 const texto = (v, max = 500) => (v == null ? null : String(v).trim().slice(0, max) || null);
@@ -433,6 +446,7 @@ function sesionPublica(idUsuario) {
       id: org.id, tipo: org.tipo, nombre: org.nombre, rncMascara: rncEnmascarado(org.rnc), slug: org.slug,
       verificada: !!org.verificada, perfilPublico: !!org.perfil_publico, rol: org.rol,
       estadoRevision: org.estado_revision, descripcion: org.descripcion, web: org.web,
+      exentaPago: !!org.exenta_pago,
     },
     suscripcion: susc && {
       id: susc.id, plan: susc.plan_id, planNombre: susc.plan_nombre, modalidad: susc.modalidad,
@@ -516,6 +530,91 @@ const subirFoto = conSesion(async (req, res, ctx) => {
   }
 });
 
+/* ── Rutas: flota propia ────────────────────────────────── */
+
+const SERVICIOS = ['alquiler', 'transporte'];
+
+/* Pública: la usan alquiler.html y transporte.html. Solo lo activo. */
+function listarFlota(req, res, ctx, servicio) {
+  if (!SERVICIOS.includes(servicio)) return fallo(res, 404, 'No existe');
+  return responder(res, 200, { servicio, flota: db.flotaPublica(servicio) });
+}
+
+/* Valida lo que llega del formulario de administración. Devuelve el
+   objeto ya limpio o el error, para no repetir esto en alta y edición. */
+function datosFlota(c, servicio, { parcial = false } = {}) {
+  const d = {};
+
+  if (c.nombre !== undefined || !parcial) {
+    if (!texto(c.nombre, 80)) return { error: 'Escriba el nombre del equipo' };
+    d.nombre = texto(c.nombre, 80);
+  }
+  if (c.detalle !== undefined) d.detalle = texto(c.detalle, 240);
+  if (c.icono !== undefined) d.icono = texto(c.icono, 40);
+  if (c.foto !== undefined) d.foto = texto(c.foto, 300);
+
+  if (servicio === 'alquiler') {
+    if (c.unidad !== undefined || !parcial) {
+      const u = String(c.unidad || 'día').toLowerCase();
+      if (!['día', 'dia', 'semana', 'mes', 'viaje', 'hora'].includes(u)) {
+        return { error: 'La unidad debe ser día, semana, mes, hora o viaje' };
+      }
+      d.unidad = u === 'dia' ? 'día' : u;
+    }
+  } else {
+    // La capacidad es lo que decide qué cama se asigna a cada equipo,
+    // así que en transporte no es opcional.
+    if (c.capacidad !== undefined || !parcial) {
+      const cap = entero(c.capacidad);
+      if (!cap || cap <= 0) return { error: 'Indique la capacidad en toneladas' };
+      d.capacidad = cap;
+    }
+  }
+
+  if (c.activo !== undefined) d.activo = c.activo ? 1 : 0;
+  if (c.orden !== undefined) d.orden = entero(c.orden) ?? 0;
+
+  return { datos: d };
+}
+
+const listarFlotaAdmin = conAdmin((req, res, ctx, servicio) => {
+  if (!SERVICIOS.includes(servicio)) return fallo(res, 404, 'No existe');
+  return responder(res, 200, { servicio, flota: db.flotaCompleta(servicio) });
+});
+
+const crearFlota = conAdmin(async (req, res, ctx, servicio) => {
+  if (!SERVICIOS.includes(servicio)) return fallo(res, 404, 'No existe');
+  const c = await leerCuerpo(req);
+  const { error, datos } = datosFlota(c, servicio);
+  if (error) return fallo(res, 400, error);
+  return responder(res, 201, { elemento: db.crearFlota({ ...datos, servicio }) });
+});
+
+const editarFlota = conAdmin(async (req, res, ctx, idFlota) => {
+  const actual = db.flotaPorId(idFlota);
+  if (!actual) return fallo(res, 404, 'Ese elemento no existe');
+
+  const c = await leerCuerpo(req);
+  const { error, datos } = datosFlota(c, actual.servicio, { parcial: true });
+  if (error) return fallo(res, 400, error);
+
+  try {
+    return responder(res, 200, { elemento: db.actualizarFlota(idFlota, datos) });
+  } catch (e) {
+    return fallo(res, e.codigo || 500, e.message);
+  }
+});
+
+/* Borra de verdad. Desactivar es lo habitual —y lo que hace el
+   interruptor de la pantalla—, pero un elemento creado por error no
+   tiene por qué quedarse ahí para siempre. */
+const eliminarFlota = conAdmin((req, res, ctx, idFlota) => {
+  const actual = db.flotaPorId(idFlota);
+  if (!actual) return fallo(res, 404, 'Ese elemento no existe');
+  db.borrarFlota(idFlota);
+  return responder(res, 200, { ok: true });
+});
+
 /* ── Rutas: revisión de solicitudes ─────────────────────── */
 
 /* Manda el expediente al equipo de revisión. No devuelve nada ni
@@ -526,16 +625,6 @@ function avisarSolicitudDealer(idOrg) {
   const s = db.solicitudCompleta(idOrg, { porOrganizacion: true });
   if (s) correo.enviarSolicitudDealer(s);
 }
-
-/* Solo el personal de TuEquipoRD. La marca `es_admin` no se concede
-   desde ninguna pantalla: se pone con tools/admin.js. Se comprueba
-   contra la base en cada petición y no contra la cookie, para que
-   quitar el permiso tenga efecto inmediato. */
-const conAdmin = (manejador) => conSesion((req, res, ctx, ...resto) => {
-  const u = db.usuarioPorId(ctx.usuario.id);
-  if (!u || !u.es_admin) return fallo(res, 404, 'No existe');
-  return manejador(req, res, ctx, ...resto);
-});
 
 const listarSolicitudes = conAdmin((req, res, ctx, consulta) => {
   const estado = ['pendiente', 'aprobada', 'rechazada'].includes(consulta?.get('estado'))
@@ -742,14 +831,26 @@ const publicar = conSesion(async (req, res, ctx) => {
     && suscripcion.plan_id === plan.id
     && (suscripcion.anuncios_incluidos === null || activos < suscripcion.anuncios_incluidos);
 
-  // Si lo que ya tiene contratado no cubre este anuncio, se cobra.
+  /* Si lo que ya tiene contratado no cubre este anuncio, se cobra.
+     Salvo que la organización esté exenta: son las cuentas internas.
+     La exención se comprueba contra la BASE y no contra `ctx`, para
+     que quitarla tenga efecto en la siguiente publicación sin esperar
+     a que caduque ninguna sesión.
+
+     La suscripción se crea igual, con importe cero. Así el anuncio
+     tiene un plan detrás —con su cupo, sus fotos y su vigencia— y el
+     resto del código no necesita saber nada de esto. */
+  const exenta = !!(db.organizacionDe(ctx.usuario.id) || {}).exenta_pago;
+
   let cobro = null;
   if (!cubre) {
-    const importe = calcularCobro(plan, { dias: c.dias, ciclo: c.ciclo });
+    const importe = exenta
+      ? { subtotal: 0, itbis: 0, total: 0 }
+      : calcularCobro(plan, { dias: c.dias, ciclo: c.ciclo });
     cobro = {
       ...importe,
       referencia: `TE-${new Date().getFullYear()}-${db.id().slice(0, 6).toUpperCase()}`,
-      procesador: 'demo',
+      procesador: exenta ? 'interna' : 'demo',
     };
     suscripcion = db.contratar({
       idOrg: org.id, idPlan: plan.id, dias: Number(c.dias) || 30, ciclo: c.ciclo, cobro,
@@ -952,6 +1053,14 @@ const RUTAS = [
   ['PATCH', /^\/api\/anuncios\/([\w-]+)$/, cambiarEstado],
   ['POST', /^\/api\/eventos$/,           evento],
   ['POST', /^\/api\/fotos$/,             subirFoto],
+
+  // Flota propia de alquiler y transporte. La lectura es pública;
+  // todo lo que la modifica exige sesión con es_admin.
+  ['GET',  /^\/api\/flota\/(\w+)$/,                     listarFlota],
+  ['GET',  /^\/api\/admin\/flota\/(\w+)$/,              listarFlotaAdmin],
+  ['POST', /^\/api\/admin\/flota\/(\w+)$/,              crearFlota],
+  ['PATCH', /^\/api\/admin\/flota\/item\/([\w-]+)$/,    editarFlota],
+  ['DELETE', /^\/api\/admin\/flota\/item\/([\w-]+)$/,   eliminarFlota],
 
   // Revisión de solicitudes. Todas exigen sesión con es_admin.
   ['GET',  /^\/api\/admin\/solicitudes$/,               listarSolicitudes],

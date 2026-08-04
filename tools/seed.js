@@ -304,12 +304,49 @@ function sembrar() {
   return { anunciantes: porClave.size, anuncios: creados };
 }
 
+/* ── Flota propia ───────────────────────────────────────── */
+
+/* Los equipos de alquiler y las camas de transporte, tal como estaban
+   escritos a mano en assets/data.js antes de que se pudieran
+   administrar. No es demostración: es el inventario real de partida, y
+   por eso se siembra siempre y no se toca si ya existe. */
+const FLOTA_INICIAL = [
+  ['alquiler', 'Excavadora 20 t', 'Clase CAT 320 · brazo estándar · con operador', 'i-excavadora', 'día', null],
+  ['alquiler', 'Retroexcavadora 4x4', 'Clase JCB 3CX · martillo opcional', 'i-retro', 'día', null],
+  ['alquiler', 'Cargador frontal 3 m³', 'Clase WA200 · ideal para acopio', 'i-cargador', 'día', null],
+  ['alquiler', 'Camión volteo 16 m³', 'Con chofer · movimiento de material', 'i-volteo', 'viaje', null],
+  ['alquiler', 'Rodillo compactador', '11 t · vibratorio liso', 'i-rodillo', 'día', null],
+  ['alquiler', 'Planta eléctrica 100 kW', 'Insonorizada · diésel · tablero incluido', 'i-generador', 'semana', null],
+
+  ['transporte', 'Lowboy 40 t', 'Excavadoras de 20 t en adelante, grúas y equipo de oruga', 'i-lowboy', null, 40],
+  ['transporte', 'Cama baja 25 t', 'Retroexcavadoras, cargadores medianos y rodillos', 'i-lowboy', null, 25],
+  ['transporte', 'Plataforma 15 t', 'Montacargas, plantas eléctricas y equipo compacto', 'i-lowboy', null, 15],
+  ['transporte', 'Cama con rampas 8 t', 'Minicargadores, miniexcavadoras y compactadoras chicas', 'i-lowboy', null, 8],
+];
+
+function sembrarFlota() {
+  const d = db.abrir();
+  const hay = d.prepare('SELECT COUNT(*) AS n FROM flota').get().n;
+  if (hay) return 0;
+
+  const ins = d.prepare(`INSERT INTO flota
+    (id, servicio, nombre, detalle, icono, unidad, capacidad, activo, orden, creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
+  const t = db.ahora();
+  FLOTA_INICIAL.forEach(([servicio, nombre, detalle, icono, unidad, capacidad], i) => {
+    ins.run(db.id(), servicio, nombre, detalle, icono, unidad, capacidad, i, t);
+  });
+  return FLOTA_INICIAL.length;
+}
+
 if (require.main === module) {
   db.abrir();
   if (process.argv.includes('--vaciar')) {
     const n = vaciar();
     console.log(n ? `Retirados ${n} anunciantes de demostración.` : 'No había nada de demostración.');
   } else {
+    const nf = sembrarFlota();
+    if (nf) console.log(`Flota propia: ${nf} elementos sembrados (alquiler y transporte).`);
     const r = sembrar();
     const total = db.estadisticas();
     console.log(`\n${r.anuncios} anuncios nuevos. El catálogo tiene ${total.anuncios} activos `
@@ -318,4 +355,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { sembrar, vaciar };
+module.exports = { sembrar, vaciar, sembrarFlota };

@@ -92,6 +92,11 @@ CREATE TABLE IF NOT EXISTS organizaciones (
   -- ocurran el pago y la aprobación, y el directorio exige las dos.
   estado_revision TEXT NOT NULL DEFAULT 'no_aplica'
                   CHECK (estado_revision IN ('no_aplica', 'pendiente', 'aprobada', 'rechazada')),
+  -- Publica sin pagar. Son las cuentas internas —las de los socios—,
+  -- no una promoción: se concede a mano con tools/admin.js y no hay
+  -- pantalla ni ruta de la API que la otorgue. Va en la organización
+  -- porque quien contrata y factura es la empresa, no la persona.
+  exenta_pago    INTEGER NOT NULL DEFAULT 0,
   creada         TEXT NOT NULL,
   actualizada    TEXT
 );
@@ -131,6 +136,41 @@ CREATE TABLE IF NOT EXISTS sucursales (
 );
 
 CREATE INDEX IF NOT EXISTS ix_sucursales_org ON sucursales (organizacion_id);
+
+-- ── Flota propia ───────────────────────────────────────────
+
+-- Los equipos que TuEquipoRD alquila y las camas con las que
+-- transporta. No son anuncios de terceros: son los servicios propios
+-- de la plataforma.
+--
+-- Estaban escritos a mano en assets/data.js, así que quitar una
+-- excavadora del alquiler exigía editar código y volver a desplegar.
+-- Ahora los administra el equipo desde /admin.html.
+--
+-- UNA SOLA TABLA con `servicio` en vez de dos: comparten forma
+-- —nombre, detalle, icono, orden, activo— y todo lo que se hace con
+-- una se hace con la otra. Dos tablas serían dos veces el mismo CRUD.
+-- `capacidad` solo la usa el transporte y `unidad` solo el alquiler;
+-- cada una queda NULL donde no aplica.
+CREATE TABLE IF NOT EXISTS flota (
+  id         TEXT PRIMARY KEY,
+  servicio   TEXT NOT NULL CHECK (servicio IN ('alquiler', 'transporte')),
+  nombre     TEXT NOT NULL,
+  detalle    TEXT,
+  icono      TEXT,
+  unidad     TEXT,                      -- alquiler: día, semana, viaje
+  capacidad  INTEGER,                   -- transporte: toneladas
+  foto       TEXT,
+  -- Se desactiva en vez de borrarse: una cama retirada del servicio
+  -- puede volver, y borrarla perdería el histórico de cotizaciones
+  -- que la mencionan.
+  activo     INTEGER NOT NULL DEFAULT 1,
+  orden      INTEGER NOT NULL DEFAULT 0,
+  creado     TEXT NOT NULL,
+  actualizado TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_flota_servicio ON flota (servicio, activo, orden);
 
 -- ── Alta de dealers ────────────────────────────────────────
 

@@ -2532,3 +2532,16 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   .sol__fecha { margin-left: 0; width: 100%; }
   .sol__acciones .btn { flex: 1 1 auto; }
 }
+
+/* Alta de un elemento de la flota. Plegado por defecto: la pantalla
+   se usa mucho más para retirar y reordenar que para añadir. */
+.flota-alta { margin-top: 18px; border-top: 1px solid var(--linea-suave); padding-top: 16px; }
+.flota-alta__abrir {
+  cursor: pointer; list-style: none;
+  font-family: var(--display); font-size: 13px; font-weight: 700;
+  color: var(--ambar-hondo);
+}
+.flota-alta__abrir::-webkit-details-marker { display: none; }
+.flota-alta__abrir::before { content: '+ '; }
+.flota-alta[open] .flota-alta__abrir::before { content: '− '; }
+.flota-alta form { margin-top: 14px; }

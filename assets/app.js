@@ -820,18 +820,28 @@ function montarCategoriasPagina() {
 
 /* ── Alquiler, financiamiento, planes ───────────────────── */
 
-function montarAlquiler() {
+/* La flota de alquiler viene de la base, no del código: el equipo la
+   administra desde /admin.html sin tocar un archivo ni desplegar.
+   EQUIPOS_ALQUILER queda como reserva por si la API no responde, para
+   que la página no salga vacía. */
+async function montarAlquiler() {
   const cont = $('#alquilerLista');
   if (!cont) return;
-  cont.innerHTML = EQUIPOS_ALQUILER.map((a) => `<li>
+
+  const datos = await api('/flota/alquiler', { silencioso: true });
+  const flota = (datos && datos.flota && datos.flota.length)
+    ? datos.flota
+    : (typeof EQUIPOS_ALQUILER !== 'undefined' ? EQUIPOS_ALQUILER : []);
+
+  cont.innerHTML = flota.map((a) => `<li>
     <label class="alq">
       <input type="checkbox" name="equipo" value="${esc(a.nombre)}">
-      <span class="alq__ico">${icono(a.icono)}</span>
+      <span class="alq__ico">${icono(a.icono || 'i-hex')}</span>
       <span class="alq__cuerpo">
         <span class="alq__nombre">${esc(a.nombre)}</span>
-        <span class="alq__detalle">${esc(a.detalle)}</span>
+        <span class="alq__detalle">${esc(a.detalle || '')}</span>
       </span>
-      <span class="alq__unidad">por ${esc(a.unidad)}</span>
+      <span class="alq__unidad">por ${esc(a.unidad || 'día')}</span>
     </label>
   </li>`).join('');
 }
@@ -1178,21 +1188,29 @@ async function montarTransporte() {
   const forma = $('#formTransporte');
   if (!forma) return;
 
+  /* Las camas vienen de la base. Se piden una sola vez y alimentan el
+     selector del formulario y la lista de la flota, que son la misma
+     información en dos sitios. */
+  const datosFlota = await api('/flota/transporte', { silencioso: true });
+  const camas = (datosFlota && datosFlota.flota && datosFlota.flota.length)
+    ? datosFlota.flota
+    : (typeof FLOTA_TRANSPORTE !== 'undefined' ? FLOTA_TRANSPORTE : []);
+
   const cama = forma.querySelector('select[name="Tipo de cama"]');
   if (cama) {
-    FLOTA_TRANSPORTE.forEach((f) =>
-      cama.add(new Option(`${f.nombre} — ${f.detalle}`, f.nombre)));
+    camas.forEach((f) =>
+      cama.add(new Option(`${f.nombre} — ${f.detalle || ''}`.trim(), f.nombre)));
   }
 
   const lista = $('#flotaLista');
   if (lista) {
-    lista.innerHTML = FLOTA_TRANSPORTE.map((f) => `<li class="cama">
-      <span class="cama__ico">${icono(f.icono)}</span>
+    lista.innerHTML = camas.map((f) => `<li class="cama">
+      <span class="cama__ico">${icono(f.icono || 'i-lowboy')}</span>
       <span class="cama__cuerpo">
         <span class="cama__nombre">${esc(f.nombre)}</span>
-        <span class="cama__detalle">${esc(f.detalle)}</span>
+        <span class="cama__detalle">${esc(f.detalle || '')}</span>
       </span>
-      <span class="cama__cap num">hasta ${f.capacidad} t</span>
+      <span class="cama__cap num">hasta ${Number(f.capacidad) || '—'} t</span>
     </li>`).join('');
   }
 

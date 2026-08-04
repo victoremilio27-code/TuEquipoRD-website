@@ -198,6 +198,158 @@ async function resolver(id, decision, motivo) {
   }
 }
 
+/* ═══ Flota propia ═══════════════════════════════════════
+   Los equipos de alquiler y las camas de transporte. Estaban escritos
+   a mano en assets/data.js, así que quitar una excavadora del alquiler
+   obligaba a editar código y volver a desplegar.
+
+   Se desactiva en vez de borrarse: una cama retirada del servicio
+   suele volver, y borrarla perdería el histórico de cotizaciones que
+   la mencionan. El botón de eliminar existe para lo creado por error.
+   ═══════════════════════════════════════════════════════ */
+
+let SERVICIO = 'alquiler';
+
+function avisarFlota(mensaje, bien = false) {
+  const aviso = $('#avisoFlota');
+  aviso.hidden = !mensaje;
+  aviso.className = `acceso__aviso${bien ? ' acceso__aviso--bien' : ''}`;
+  aviso.textContent = mensaje || '';
+}
+
+function flotaHTML(f) {
+  const medida = SERVICIO === 'transporte'
+    ? `hasta ${Number(f.capacidad) || '—'} t`
+    : `por ${esc(f.unidad || 'día')}`;
+
+  return `<li class="sol${f.activo ? '' : ' sol--rechazada'}" data-id="${esc(f.id)}">
+    <div class="sol__cabeza">
+      <b class="sol__nombre">${esc(f.nombre)}</b>
+      <span class="sol__meta">${medida}</span>
+      ${f.activo ? '' : '<span class="pastilla pastilla--roja">Fuera de servicio</span>'}
+    </div>
+    ${f.detalle ? `<p class="sol__meta">${esc(f.detalle)}</p>` : ''}
+    <div class="sol__acciones">
+      <button type="button" class="btn btn--linea btn--chico" data-flota="alternar">
+        ${f.activo ? 'Retirar del servicio' : 'Volver a poner'}
+      </button>
+      <button type="button" class="btn btn--linea btn--chico" data-flota="subir">Subir</button>
+      <button type="button" class="btn btn--linea btn--chico" data-flota="borrar">Eliminar</button>
+    </div>
+  </li>`;
+}
+
+async function cargarFlota() {
+  avisarFlota('');
+  try {
+    const datos = await api(`/admin/flota/${SERVICIO}`);
+    if (!datos) return avisarFlota('No hay conexión con el servidor.');
+    $('#listaFlota').innerHTML = datos.flota.length
+      ? datos.flota.map(flotaHTML).join('')
+      : '<li class="revision__vacio">No hay nada en esta flota todavía.</li>';
+  } catch (e) {
+    avisarFlota(e.message);
+  }
+}
+
+/* Sube un puesto intercambiando el orden con el de arriba. Mover con
+   dos botones es más fiable que arrastrar, sobre todo desde el móvil,
+   que es donde se administra esto la mitad de las veces. */
+async function subirEnFlota(id) {
+  const filas = [...document.querySelectorAll('#listaFlota .sol')];
+  const i = filas.findIndex((f) => f.dataset.id === id);
+  if (i <= 0) return;
+
+  const anterior = filas[i - 1].dataset.id;
+  await api(`/admin/flota/item/${encodeURIComponent(id)}`, { metodo: 'PATCH', cuerpo: { orden: i - 1 } });
+  await api(`/admin/flota/item/${encodeURIComponent(anterior)}`, { metodo: 'PATCH', cuerpo: { orden: i } });
+  await cargarFlota();
+}
+
+function montarFlota() {
+  if (!document.getElementById('listaFlota')) return;
+
+  // Alquiler pide unidad de cobro; transporte, capacidad.
+  const pintarCampos = () => {
+    $('#campoUnidad').hidden = SERVICIO !== 'alquiler';
+    $('#campoCapacidad').hidden = SERVICIO !== 'transporte';
+  };
+
+  $$('[data-servicio]').forEach((boton) => {
+    boton.addEventListener('click', () => {
+      SERVICIO = boton.dataset.servicio;
+      $$('[data-servicio]').forEach((b) => {
+        b.setAttribute('aria-selected', String(b === boton));
+        b.classList.toggle('btn--ambar', b === boton);
+        b.classList.toggle('btn--linea', b !== boton);
+      });
+      pintarCampos();
+      cargarFlota();
+    });
+  });
+  pintarCampos();
+
+  $('#listaFlota').addEventListener('click', async (ev) => {
+    const boton = ev.target.closest('button[data-flota]');
+    if (!boton) return;
+    const fila = boton.closest('.sol');
+    const id = fila.dataset.id;
+
+    try {
+      switch (boton.dataset.flota) {
+        case 'alternar': {
+          const activo = !fila.classList.contains('sol--rechazada');
+          await api(`/admin/flota/item/${encodeURIComponent(id)}`, {
+            metodo: 'PATCH', cuerpo: { activo: !activo },
+          });
+          await cargarFlota();
+          avisarFlota(activo ? 'Retirado del servicio.' : 'De vuelta en servicio.', true);
+          break;
+        }
+        case 'subir':
+          await subirEnFlota(id);
+          break;
+        case 'borrar': {
+          const nombre = fila.querySelector('.sol__nombre').textContent;
+          // eslint-disable-next-line no-alert
+          if (!confirm(`¿Eliminar «${nombre}» de la flota? Esto no se puede deshacer.`)) return;
+          await api(`/admin/flota/item/${encodeURIComponent(id)}`, { metodo: 'DELETE' });
+          await cargarFlota();
+          avisarFlota('Eliminado.', true);
+          break;
+        }
+        default:
+      }
+    } catch (e) {
+      avisarFlota(e.message);
+    }
+  });
+
+  $('#formFlota').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const cuerpo = {
+      nombre: $('#fl-nombre').value.trim(),
+      detalle: $('#fl-detalle').value.trim(),
+      icono: $('#fl-icono').value,
+    };
+    if (SERVICIO === 'alquiler') cuerpo.unidad = $('#fl-unidad').value;
+    else cuerpo.capacidad = $('#fl-capacidad').value;
+
+    try {
+      const r = await api(`/admin/flota/${SERVICIO}`, { metodo: 'POST', cuerpo });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      $('#formFlota').reset();
+      $('#altaFlota').open = false;
+      await cargarFlota();
+      avisarFlota(`«${r.elemento.nombre}» añadido a ${SERVICIO}.`, true);
+    } catch (e) {
+      avisarFlota(e.message);
+    }
+  });
+
+  cargarFlota();
+}
+
 /* ── Arranque ───────────────────────────────────────────── */
 
 async function montarAdmin() {
@@ -219,7 +371,12 @@ async function montarAdmin() {
   $('#adminCargando').hidden = true;
   $('#adminContenido').hidden = false;
 
-  $$('.revision__filtros button').forEach((boton) => {
+  /* Se filtra por `data-estado` y no por la clase del contenedor: hay
+     dos bloques de filtros en la página —el de solicitudes y el de la
+     flota— y engancharse a `.revision__filtros button` a secas ponía
+     este manejador también en los botones de la flota, que dejaban
+     ESTADO en undefined al pulsarlos. */
+  $$('[data-estado]').forEach((boton) => {
     boton.addEventListener('click', () => {
       ESTADO = boton.dataset.estado;
       ABIERTA = null;
@@ -252,6 +409,7 @@ async function montarAdmin() {
   });
 
   await cargar();
+  montarFlota();
 }
 
 document.addEventListener('DOMContentLoaded', montarAdmin);

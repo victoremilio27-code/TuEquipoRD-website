@@ -108,6 +108,14 @@ const MIGRACIONES = [
      planes y métodos de pago son datos de referencia que no se
      eliminan, y un índice que nunca se usa solo encarece cada
      escritura. */
+  /* Cuentas internas que publican sin pagar: las de los socios.
+     Va en la organización y no en el usuario porque quien contrata y
+     factura es la empresa, no la persona que pulsa el botón.
+     Se concede desde tools/admin.js, nunca desde una pantalla. */
+  ['2026-08-exencion-pago', [
+    'ALTER TABLE organizaciones ADD COLUMN exenta_pago INTEGER NOT NULL DEFAULT 0',
+  ]],
+
   // Las fotos pasan a disco y la base guarda la ruta. La miniatura es
   // nueva; las filas antiguas se quedan con NULL y el código cae en
   // `url` cuando falta, así que nada se rompe mientras se migran.
@@ -533,6 +541,60 @@ function registrarDealer(idOrg, idUsuario, { rnc, empresa, web, descripcion, sol
 
   return d.prepare('SELECT * FROM organizaciones WHERE id = ?').get(idOrg);
 }
+
+/* ── Flota propia (alquiler y transporte) ───────────────── */
+
+/* Lo que ve el visitante: solo lo activo, en su orden. */
+const flotaPublica = (servicio) =>
+  abrir().prepare(`SELECT id, nombre, detalle, icono, unidad, capacidad, foto
+                   FROM flota WHERE servicio = ? AND activo = 1
+                   ORDER BY orden, nombre`).all(servicio);
+
+/* Lo que ve el administrador: también lo desactivado, porque desde
+   ahí se vuelve a activar. */
+const flotaCompleta = (servicio) =>
+  abrir().prepare(`SELECT * FROM flota WHERE servicio = ? ORDER BY orden, nombre`).all(servicio);
+
+const flotaPorId = (idFlota) =>
+  abrir().prepare('SELECT * FROM flota WHERE id = ?').get(idFlota);
+
+function crearFlota(datos) {
+  const idFlota = id();
+  const t = ahora();
+  // Al final de la lista: quien añade una máquina no debería tener que
+  // decidir en qué posición va antes de verla.
+  const ultimo = abrir().prepare('SELECT MAX(orden) AS n FROM flota WHERE servicio = ?')
+    .get(datos.servicio).n;
+
+  abrir().prepare(`INSERT INTO flota
+    (id, servicio, nombre, detalle, icono, unidad, capacidad, foto, activo, orden, creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
+    .run(idFlota, datos.servicio, datos.nombre, datos.detalle || null,
+      datos.icono || null, datos.unidad || null, datos.capacidad ?? null,
+      datos.foto || null, (ultimo || 0) + 1, t);
+
+  return flotaPorId(idFlota);
+}
+
+/* Solo se tocan los campos que llegan: así el formulario puede mandar
+   un cambio parcial sin borrar lo que no incluye. */
+function actualizarFlota(idFlota, datos) {
+  const actual = flotaPorId(idFlota);
+  if (!actual) throw Object.assign(new Error('Ese elemento no existe'), { codigo: 404 });
+
+  const campos = ['nombre', 'detalle', 'icono', 'unidad', 'capacidad', 'foto', 'activo', 'orden'];
+  const cambios = campos.filter((c) => datos[c] !== undefined);
+  if (!cambios.length) return actual;
+
+  abrir().prepare(`UPDATE flota SET ${cambios.map((c) => `${c} = ?`).join(', ')}, actualizado = ?
+                   WHERE id = ?`)
+    .run(...cambios.map((c) => datos[c]), ahora(), idFlota);
+
+  return flotaPorId(idFlota);
+}
+
+const borrarFlota = (idFlota) =>
+  abrir().prepare('DELETE FROM flota WHERE id = ?').run(idFlota);
 
 /* ── Revisión de solicitudes ────────────────────────────── */
 
@@ -1215,6 +1277,7 @@ module.exports = {
   permitir, limpiarIntentos,
   registrarDealer, dealersPublicos, dealerPorSlug,
   solicitudes, solicitudCompleta, resolverSolicitud, contarPendientes, marcarAdmin,
+  flotaPublica, flotaCompleta, flotaPorId, crearFlota, actualizarFlota, borrarFlota,
   sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,
   planes, planPorId, suscripcionActiva, contratar,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,
