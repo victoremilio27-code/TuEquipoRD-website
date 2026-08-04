@@ -60,7 +60,9 @@ async function entrar(correo, clave) {
   const fs = require('fs');
   const dir = '.tmp/correos';
   const arch = fs.existsSync(dir)
-    && fs.readdirSync(dir).filter((f) => f.includes(correo.split('@')[0])).sort().pop();
+    // Solo .txt: el buzón guarda también el .html de cada correo.
+    && fs.readdirSync(dir)
+      .filter((f) => f.endsWith('.txt') && f.includes(correo.split('@')[0])).sort().pop();
   if (!arch) {
     console.log(`\n  No hay código en ${dir} para ${correo}.`);
     console.log('  Esta auditoría necesita TUEQUIPO_CORREO=archivo.\n');
@@ -178,7 +180,45 @@ async function entrar(correo, clave) {
   comprobar('la sesión solo lleva el RNC enmascarado',
     !/"rnc":/.test(JSON.stringify(ses.json)), 'la sesión lleva el RNC completo');
 
-  // 9. Cabeceras de seguridad
+  /* 9. Archivos que no deben servirse nunca.
+     El servidor llegó a publicar el proyecto entero: /.env con la
+     clave de Brevo, /db/tuequipord.db con los hashes y los RNC, y
+     /.git con el repositorio. Se comprueba en cada auditoría porque
+     basta con añadir una ruta a la lista blanca de serve.js sin
+     pensarla para volver a abrir el agujero. */
+  console.log('');
+  const privados = [
+    '/.env', '/.env.example', '/.git/config', '/.gitignore',
+    '/db/tuequipord.db', '/db/schema.sql',
+    '/package.json', '/package-lock.json',
+    '/tools/db.js', '/tools/serve.js', '/tools/api.js', '/tools/correo.js',
+    '/deploy/README.md', '/node_modules/puppeteer/package.json',
+  ];
+  const filtrados = [];
+  for (const ruta of privados) {
+    const estado = await new Promise((res) => {
+      http.get({ ...BASE, path: ruta }, (r) => { r.resume(); res(r.statusCode); })
+        .on('error', () => res(0));
+    });
+    if (estado === 200) filtrados.push(ruta);
+  }
+  comprobar(`${privados.length} archivos internos fuera del alcance público`,
+    filtrados.length === 0, `SE SIRVEN: ${filtrados.join(', ')}`);
+
+  // Y que lo público siga siéndolo
+  const publicos = ['/', '/index.html', '/equipos.html', '/styles.css', '/assets/app.js'];
+  const rotos = [];
+  for (const ruta of publicos) {
+    const estado = await new Promise((res) => {
+      http.get({ ...BASE, path: ruta }, (r) => { r.resume(); res(r.statusCode); })
+        .on('error', () => res(0));
+    });
+    if (estado !== 200) rotos.push(`${ruta} (${estado})`);
+  }
+  comprobar('las páginas y recursos públicos siguen sirviéndose',
+    rotos.length === 0, `no responden: ${rotos.join(', ')}`);
+
+  // 10. Cabeceras de seguridad
   const cabeceras = await new Promise((res) => {
     http.get({ ...BASE, path: '/' }, (r) => res(r.headers));
   });
@@ -186,7 +226,7 @@ async function entrar(correo, clave) {
     .filter((h) => !cabeceras[h]);
   comprobar('cabeceras de seguridad presentes', faltan.length === 0, `faltan: ${faltan.join(', ')}`);
 
-  // 10. Cookie de sesión
+  // 11. Cookie de sesión
   const login = await pedir('/cuenta/entrar', {
     metodo: 'POST', cuerpo: { correo: 'caribe@demo.tuequipord.do', clave: 'demostracion2026' },
   });

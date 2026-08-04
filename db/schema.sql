@@ -450,10 +450,21 @@ BEGIN
   END;
 END;
 
+-- `url` y `miniatura` guardan RUTAS, no la imagen.
+--
+-- Antes aquí se metía el `data:` URI completo. Medido con el mismo
+-- código del navegador sobre una foto de móvil: 697 KB por imagen,
+-- 16,3 MB una página de catálogo de 24 anuncios y 5,3 GB con mil
+-- anuncios a ocho fotos. Y nada de eso se podía cachear, porque
+-- viajaba dentro del JSON.
+--
+-- Dos tamaños porque una tarjeta del catálogo mide unos 400 px:
+-- mandarle la de 1600 es tirar el 90 % de los bytes.
 CREATE TABLE IF NOT EXISTS anuncio_fotos (
   id         TEXT PRIMARY KEY,
   anuncio_id TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
-  url        TEXT NOT NULL,
+  url        TEXT NOT NULL,             -- 1600 px · ficha y galería
+  miniatura  TEXT,                      -- 900 px · tarjetas del catálogo
   orden      INTEGER NOT NULL DEFAULT 0,
   creada     TEXT NOT NULL
 );

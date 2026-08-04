@@ -19,6 +19,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+const fotos = require('./fotos');
+
 const RAIZ_PROYECTO = path.resolve(__dirname, '..');
 
 const PRODUCCION = process.env.NODE_ENV === 'production';
@@ -99,6 +101,36 @@ function cacheDe(ext) {
   return 'public, max-age=604800';
 }
 
+/* QUÉ SE PUEDE PEDIR POR HTTP.
+ *
+ * Lista blanca, no lista negra. Antes se servía cualquier archivo bajo
+ * la raíz del proyecto y eso dejaba a la vista:
+ *
+ *   /.env              la clave de Brevo y el secreto de sesión
+ *   /db/tuequipord.db  la base entera: correos, hashes, RNC
+ *   /.git/config       el repositorio
+ *   /tools/db.js       el código del servidor
+ *
+ * Con una lista negra siempre se olvida algo —un .bak, un .env.old, un
+ * volcado que alguien dejó en la carpeta—. Con una lista blanca, lo
+ * que no está previsto no se sirve, y añadir un archivo público es una
+ * línea aquí.
+ *
+ * Las fotografías NO están en esta lista: viven fuera del proyecto y
+ * las atiende su propia rama, más arriba.
+ */
+const PUBLICO = [
+  /^\/[\w-]+\.html$/,                       // páginas del sitio
+  /^\/assets\/[\w.-]+\.(js|svg|css|woff2?)$/, // scripts e iconos
+  /^\/brand_assets\/[\w.-]+\.(png|svg|jpe?g|webp)$/, // logotipos
+  /^\/styles\.css$/,
+  /^\/favicon\.ico$/,
+  /^\/robots\.txt$/,
+  /^\/sitemap\.xml$/,
+];
+
+const esPublico = (ruta) => PUBLICO.some((p) => p.test(ruta));
+
 function leerArgs(argv) {
   const args = { port: Number(process.env.PORT) || 8080, root: '.', api: true };
   for (let i = 0; i < argv.length; i++) {
@@ -162,11 +194,50 @@ const servidor = http.createServer((req, res) => {
     return;
   }
 
+  /* Fotografías de los anuncios. Viven fuera del proyecto —en el VPS,
+     en /var/lib— así que no las alcanza el servidor de estáticos de
+     más abajo y necesitan su propia rama.
+
+     Caché de un año e `immutable`: el nombre de cada archivo es
+     aleatorio y nunca se reescribe, así que una foto descargada no hay
+     que volver a pedirla jamás. Es lo que convierte la segunda visita
+     al catálogo en instantánea. */
+  if (ruta.startsWith('/fotos/')) {
+    const archivo = fotos.archivoDe(ruta);
+    if (!archivo) {
+      res.writeHead(404).end('No existe');
+      return;
+    }
+    fs.readFile(archivo, (err, datos) => {
+      if (err) {
+        res.writeHead(404).end('No existe');
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': fotos.tipoDe(archivo),
+        'Cache-Control': PRODUCCION ? 'public, max-age=31536000, immutable' : 'no-store',
+      });
+      res.end(datos);
+    });
+    return;
+  }
+
   if (ruta.endsWith('/')) ruta += 'index.html';
+
+  /* Solo lo declarado público. Se comprueba ANTES de tocar el disco:
+     así el servidor ni siquiera revela, por la diferencia entre un 403
+     y un 404, qué archivos existen fuera de la lista. */
+  if (!esPublico(ruta)) {
+    res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<h1>404</h1><p>No existe.</p>');
+    console.log(`404  ${ruta}  (fuera de la lista pública)`);
+    return;
+  }
 
   const archivo = path.join(RAIZ, ruta);
 
-  // No servir nada fuera de la raíz declarada.
+  // Cinturón y tirantes: aunque la lista blanca ya lo impide, no
+  // servir nada que quede fuera de la raíz declarada.
   if (!archivo.startsWith(RAIZ + path.sep) && archivo !== RAIZ) {
     res.writeHead(403).end('Prohibido');
     return;

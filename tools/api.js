@@ -13,6 +13,7 @@
 
 const db = require('./db');
 const correo = require('./correo');
+const fotos = require('./fotos');
 
 const ITBIS = 0.18;
 const RECARGO_60 = 1.8;
@@ -490,6 +491,31 @@ const registrarDealer = conSesion(async (req, res, ctx) => {
   return responder(res, 200, sesionPublica(ctx.usuario.id));
 });
 
+/* ── Rutas: fotografías ─────────────────────────────────── */
+
+/* Sube un par de imágenes ya reducidas por el navegador y devuelve sus
+   rutas. Se guardan en disco y la base solo se queda con la ruta: ver
+   el porqué, con los números medidos, en la cabecera de fotos.js.
+ *
+ * Exige sesión. Subir archivos sin identificar a quien sube convierte
+ * el servidor en alojamiento gratuito para cualquiera. */
+const subirFoto = conSesion(async (req, res, ctx) => {
+  if (!db.permitir(`fotos:${ctx.usuario.id}`, 120, 60)) {
+    return fallo(res, 429, 'Demasiadas fotos seguidas. Espere unos minutos.');
+  }
+
+  const c = await leerCuerpo(req);
+  try {
+    // La miniatura es opcional: si el navegador no pudo generarla, la
+    // completa sirve para las dos cosas y se ve igual, solo pesa más.
+    const completa = fotos.guardar(c.completa);
+    const miniatura = c.miniatura ? fotos.guardar(c.miniatura) : completa;
+    return responder(res, 201, { completa, miniatura });
+  } catch (e) {
+    return fallo(res, e.codigo || 500, e.message);
+  }
+});
+
 /* ── Rutas: revisión de solicitudes ─────────────────────── */
 
 /* Manda el expediente al equipo de revisión. No devuelve nada ni
@@ -925,6 +951,7 @@ const RUTAS = [
   ['GET',  /^\/api\/anuncios\/([\w-]+)$/, verAnuncio],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)$/, cambiarEstado],
   ['POST', /^\/api\/eventos$/,           evento],
+  ['POST', /^\/api\/fotos$/,             subirFoto],
 
   // Revisión de solicitudes. Todas exigen sesión con es_admin.
   ['GET',  /^\/api\/admin\/solicitudes$/,               listarSolicitudes],

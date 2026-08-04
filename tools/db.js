@@ -108,6 +108,13 @@ const MIGRACIONES = [
      planes y métodos de pago son datos de referencia que no se
      eliminan, y un índice que nunca se usa solo encarece cada
      escritura. */
+  // Las fotos pasan a disco y la base guarda la ruta. La miniatura es
+  // nueva; las filas antiguas se quedan con NULL y el código cae en
+  // `url` cuando falta, así que nada se rompe mientras se migran.
+  ['2026-08-fotos-miniatura', [
+    'ALTER TABLE anuncio_fotos ADD COLUMN miniatura TEXT',
+  ]],
+
   ['2026-08-indices-foraneas', [
     'CREATE INDEX IF NOT EXISTS ix_anuncios_usuario ON anuncios (usuario_id)',
     'CREATE INDEX IF NOT EXISTS ix_anuncios_sucursal ON anuncios (sucursal_id)',
@@ -806,8 +813,15 @@ function crearAnuncio(datos) {
         datos.financiamiento ? 1 : 0, datos.video || null,
         datos.destacadoHasta || null, t, datos.vence || null, t);
 
-    const foto = d.prepare('INSERT INTO anuncio_fotos (id, anuncio_id, url, orden, creada) VALUES (?, ?, ?, ?, ?)');
-    (datos.fotos || []).forEach((url, i) => foto.run(id(), idAnuncio, url, i, t));
+    /* Cada foto llega como {url, miniatura}, ya subidas a disco por
+       /api/fotos. Se admite también una cadena suelta para no romper
+       el seed ni ningún script antiguo que pase solo la URL. */
+    const foto = d.prepare('INSERT INTO anuncio_fotos (id, anuncio_id, url, miniatura, orden, creada) VALUES (?, ?, ?, ?, ?, ?)');
+    (datos.fotos || []).forEach((f, i) => {
+      const url = typeof f === 'string' ? f : f.url;
+      const mini = typeof f === 'string' ? null : (f.miniatura || null);
+      foto.run(id(), idAnuncio, url, mini, i, t);
+    });
 
     const tel = d.prepare('INSERT INTO anuncio_contactos (id, anuncio_id, numero, tipo, nota, orden) VALUES (?, ?, ?, ?, ?, ?)');
     (datos.telefonos || []).forEach((c, i) => tel.run(id(), idAnuncio, c.numero, c.tipo || 'ambos', c.nota || null, i));
@@ -840,7 +854,10 @@ function anuncio(idAnuncio) {
     FROM anuncios a JOIN organizaciones o ON o.id = a.organizacion_id
     WHERE a.id = ?`).get(idAnuncio);
   if (!a) return null;
-  a.fotos = d.prepare('SELECT url FROM anuncio_fotos WHERE anuncio_id = ? ORDER BY orden').all(idAnuncio).map((f) => f.url);
+  // La ficha muestra la imagen completa; la miniatura solo se usa como
+  // reserva mientras carga la grande.
+  a.fotos = d.prepare('SELECT url, miniatura FROM anuncio_fotos WHERE anuncio_id = ? ORDER BY orden')
+    .all(idAnuncio).map((f) => f.url);
   a.telefonos = d.prepare('SELECT numero, tipo, nota FROM anuncio_contactos WHERE anuncio_id = ? ORDER BY orden').all(idAnuncio);
   return a;
 }
@@ -954,7 +971,7 @@ function buscarAnuncios(f = {}) {
            a.uso_valor, a.uso_unidad, a.precio, a.moneda, a.modalidad_precio,
            a.provincia, a.municipio, a.publicado, a.vence, a.destacado_hasta,
            o.nombre AS dealer, o.slug AS dealer_slug, o.tipo AS org_tipo, o.verificada,
-           (SELECT url FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
+           (SELECT COALESCE(f.miniatura, f.url) FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
            (SELECT COUNT(*) FROM anuncio_fotos f WHERE f.anuncio_id = a.id) AS fotos_total
     FROM anuncios a JOIN organizaciones o ON o.id = a.organizacion_id
     WHERE ${donde}
@@ -1020,7 +1037,7 @@ function anunciosDeOrganizacion(idOrg) {
   return abrir().prepare(`
     SELECT a.id, a.marca, a.modelo, a.anio, a.categoria, a.estado, a.precio, a.moneda,
            a.modalidad_precio, a.provincia, a.publicado, a.vence,
-           (SELECT url FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
+           (SELECT COALESCE(f.miniatura, f.url) FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
            COALESCE(SUM(m.vistas), 0)         AS vistas,
            COALESCE(SUM(m.clics_telefono), 0) AS telefono,
            COALESCE(SUM(m.clics_whatsapp), 0) AS whatsapp,

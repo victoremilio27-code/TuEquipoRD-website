@@ -16,6 +16,7 @@ Environment=NODE_ENV=production
 Environment=PORT=8080
 Environment=TUEQUIPO_HTTPS=1
 Environment=TUEQUIPO_DB=/var/lib/tuequipord/tuequipord.db
+Environment=TUEQUIPO_FOTOS=/var/lib/tuequipord/fotos
 
 # Secretos: NO ponerlos aquí. Van en /etc/tuequipord.env, con
 # permisos 600 y propietario root. Ver deploy/README.md.

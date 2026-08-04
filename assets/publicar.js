@@ -33,6 +33,12 @@ const FOTOS_MAXIMAS = 20;
 const ANCHO_MAXIMO_FOTO = 1600;
 const CALIDAD_FOTO = 0.82;
 
+/* Segundo tamaño, para las tarjetas del catálogo. Una tarjeta mide
+   unos 400 px en pantalla, así que 900 cubre también las de retina sin
+   mandar la de 1600, que sería tirar el 90 % de los bytes. */
+const ANCHO_MINIATURA = 900;
+const CALIDAD_MINIATURA = 0.78;
+
 const CLAVE_BORRADOR = 'tuequipord:borrador';
 
 /* ── Estado ─────────────────────────────────────────────── */
@@ -283,9 +289,44 @@ function validarEquipo(seccion) {
 
 /* ── Paso 2 · Fotografías ───────────────────────────────── */
 
-/* Reduce la imagen en el navegador antes de guardarla. Devuelve una
-   promesa con el data URL en JPEG: entra un archivo de 6 MB y sale
-   uno de 200 KB sin diferencia visible en la ficha. */
+/* ¿Sabe este navegador CODIFICAR WebP con canvas?
+ *
+ * No basta con que sepa mostrarlo. Safari lo muestra desde hace años
+ * pero tardó en poder generarlo, y cuando no puede, `toDataURL` no
+ * avisa: devuelve un PNG. Un PNG de una foto pesa varias veces más que
+ * el JPEG, así que dar por hecho el soporte empeoraría justo lo que se
+ * quiere arreglar. Se comprueba una vez y se decide con el resultado. */
+const ADMITE_WEBP = (() => {
+  try {
+    const c = document.createElement('canvas');
+    c.width = 1; c.height = 1;
+    return c.toDataURL('image/webp').startsWith('data:image/webp');
+  } catch { return false; }
+})();
+
+const FORMATO_FOTO = ADMITE_WEBP ? 'image/webp' : 'image/jpeg';
+
+/* Dibuja la imagen a un ancho dado y devuelve el data URL. */
+function aDataUrl(img, ancho, calidad) {
+  const escala = Math.min(1, ancho / img.width);
+  const lienzo = document.createElement('canvas');
+  lienzo.width = Math.round(img.width * escala);
+  lienzo.height = Math.round(img.height * escala);
+  const ctx = lienzo.getContext('2d');
+  // Fondo blanco: un PNG con transparencia sobre JPEG saldría negro.
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+  ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+  return lienzo.toDataURL(FORMATO_FOTO, calidad);
+}
+
+/* Reduce la imagen en el navegador y la sube al servidor. Devuelve las
+   RUTAS de los dos tamaños, no la imagen.
+ *
+ * Antes esto devolvía el data URL y acababa guardado en la base. Una
+ * foto de móvil ocupaba 697 KB así, una página de catálogo pesaba
+ * 16 MB y nada de eso se podía cachear. Ahora el navegador manda los
+ * bytes una vez y a partir de ahí pide archivos normales. */
 function procesarImagen(archivo) {
   return new Promise((resolver, rechazar) => {
     if (!archivo.type.startsWith('image/')) {
@@ -297,20 +338,22 @@ function procesarImagen(archivo) {
     lector.onload = () => {
       const img = new Image();
       img.onerror = () => rechazar(new Error('Imagen dañada'));
-      img.onload = () => {
-        const escala = Math.min(1, ANCHO_MAXIMO_FOTO / img.width);
-        const lienzo = document.createElement('canvas');
-        lienzo.width = Math.round(img.width * escala);
-        lienzo.height = Math.round(img.height * escala);
-        const ctx = lienzo.getContext('2d');
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, lienzo.width, lienzo.height);
-        ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height);
-        resolver({
-          id: `f-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          nombre: archivo.name,
-          url: lienzo.toDataURL('image/jpeg', CALIDAD_FOTO),
-        });
+      img.onload = async () => {
+        const completa = aDataUrl(img, ANCHO_MAXIMO_FOTO, CALIDAD_FOTO);
+        const miniatura = aDataUrl(img, ANCHO_MINIATURA, CALIDAD_MINIATURA);
+
+        try {
+          const r = await api('/fotos', { metodo: 'POST', cuerpo: { completa, miniatura } });
+          if (!r) throw new Error('No hay conexión con el servidor');
+          resolver({
+            id: `f-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            nombre: archivo.name,
+            url: r.completa,
+            miniatura: r.miniatura,
+          });
+        } catch (e) {
+          rechazar(new Error(`No se pudo subir «${archivo.name}»: ${e.message}`));
+        }
       };
       img.src = lector.result;
     };
@@ -1023,7 +1066,9 @@ function anuncioParaApi() {
     financiamiento: estado.precio.financiamiento,
     video: estado.video,
 
-    fotos: estado.fotos.slice(0, limiteFotos()).map((f) => f.url),
+    // Van los dos tamaños: el catálogo pinta la miniatura y la ficha
+    // la completa. Son rutas, no imágenes; las subió procesarImagen().
+    fotos: estado.fotos.slice(0, limiteFotos()).map((f) => ({ url: f.url, miniatura: f.miniatura })),
     telefonos: estado.contacto.telefonos.filter((t) => telefonoValido(t.numero)),
     sucursal: estado.contacto.sucursal || null,
   };

@@ -19,7 +19,11 @@ const ok = (t) => console.log(`    ✓ ${t}`);
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function codigoDe(fragmento) {
-  const archivos = fs.readdirSync(BUZON).filter((f) => f.includes(fragmento)).sort();
+  // Solo .txt: el buzón guarda también la versión .html de cada correo
+  // para poder revisarla en el navegador, y ahí el código no está en
+  // el formato «Código: 123456» que busca la expresión de abajo.
+  const archivos = fs.readdirSync(BUZON)
+    .filter((f) => f.endsWith('.txt') && f.includes(fragmento)).sort();
   if (!archivos.length) return null;
   const texto = fs.readFileSync(`${BUZON}/${archivos[archivos.length - 1]}`, 'utf8');
   const m = /Código: (\d+)/.exec(texto);
