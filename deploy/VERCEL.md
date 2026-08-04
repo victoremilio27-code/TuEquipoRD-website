@@ -29,6 +29,19 @@ sin contenido antes del lanzamiento.
 «próximamente» posicionada sigue apareciendo en el buscador semanas
 después de abrir.
 
+### Por qué usa `routes` y no `rewrites`
+
+El primer intento usó `rewrites`, que es la forma moderna, y **no
+funcionó**: `/equipos.html` seguía sirviendo la página real. Vercel
+resuelve el sistema de archivos ANTES de aplicar `rewrites`, así que
+cualquier ruta que corresponda a un archivo existente del repositorio
+no llega nunca a la regla.
+
+`routes` es la forma antigua y se evalúa antes del sistema de
+archivos, que es justo lo que hace falta aquí. Tiene una limitación:
+no se puede combinar con `headers`, `redirects` ni `cleanUrls`, de ahí
+que las cabeceras vayan dentro de la propia regla.
+
 `proximamente.html` es autónomo a propósito —los estilos y el logotipo
 van dentro del archivo— porque la reescritura atrapa todas las rutas y
 la página no puede depender de nada más.
