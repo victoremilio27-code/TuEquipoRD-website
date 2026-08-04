@@ -36,6 +36,53 @@ const TIPOS = {
   '.pdf': 'application/pdf',
 };
 
+/* Cabeceras de seguridad. Van en todas las respuestas, también en las
+   de la API y en los errores: una cabecera que solo se pone en el
+   camino feliz no protege el camino que importa.
+
+   La CSP puede ser estricta porque el sitio no tiene ni un solo
+   <script> en línea ni un atributo onclick: todo el JavaScript vive en
+   assets/ y se carga con src. Lo único de fuera son las fuentes de
+   Google, declaradas una a una.
+
+   `style-src` sí lleva 'unsafe-inline' porque quedan dos atributos
+   style= en el HTML y dos asignaciones a element.style en el JS. Es la
+   concesión mínima y solo afecta a estilos, no a scripts, que es donde
+   está el riesgo real. */
+const CABECERAS_SEGURIDAD = {
+  // Nada de adivinar el tipo: un .txt subido no se ejecuta como script.
+  'X-Content-Type-Options': 'nosniff',
+  // El sitio no se embebe en iframes ajenos, así que no hay clickjacking.
+  'X-Frame-Options': 'DENY',
+  // No filtrar la URL completa —con sus filtros de búsqueda— a terceros.
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  // El sitio no usa cámara, micrófono ni geolocalización del navegador.
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "object-src 'none'",
+  ].join('; '),
+};
+
+function cabecerasDe(extra = {}) {
+  const h = { ...CABECERAS_SEGURIDAD, ...extra };
+  // HSTS solo con HTTPS activo. Enviarlo por HTTP no hace nada, y
+  // enviarlo antes de tener certificado deja el dominio inaccesible en
+  // los navegadores que ya lo hayan recordado.
+  if (PRODUCCION && process.env.TUEQUIPO_HTTPS === '1') {
+    h['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+  }
+  return h;
+}
+
 /* En desarrollo, nunca cachear: siempre quieres el archivo recién
    guardado. En producción sí, pero con cuidado: los nombres no llevan
    hash, así que un caché largo en styles.css o app.js dejaría a la
@@ -88,6 +135,12 @@ if (args.api) {
 }
 
 const servidor = http.createServer((req, res) => {
+  /* Las cabeceras de seguridad se fijan antes de mirar siquiera qué se
+     pide, de modo que las lleven también el 400, el 403 y el 404. Con
+     `setHeader` sobreviven a cualquier `writeHead` posterior, incluido
+     el de la API, que no sabe nada de esto. */
+  Object.entries(cabecerasDe()).forEach(([k, v]) => res.setHeader(k, v));
+
   let ruta;
   try {
     ruta = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

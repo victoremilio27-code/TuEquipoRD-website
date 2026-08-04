@@ -65,6 +65,13 @@ const MIGRACIONES = [
     "UPDATE organizaciones SET estado_revision = 'aprobada' WHERE tipo = 'dealer'",
     'CREATE INDEX IF NOT EXISTS ix_org_revision ON organizaciones (estado_revision)',
   ]],
+  // Marcas de los avisos ya enviados. Guardar la fecha en vez de un
+  // 0/1 permite saber cuándo se avisó, que es lo que se mira cuando
+  // alguien dice que no le llegó nada.
+  ['2026-08-avisos-vencimiento', [
+    'ALTER TABLE anuncios ADD COLUMN aviso_por_vencer TEXT',
+    'ALTER TABLE anuncios ADD COLUMN aviso_vencido TEXT',
+  ]],
 ];
 
 function migrar() {
@@ -992,6 +999,61 @@ const caducarAnuncios = () =>
                    WHERE estado = 'activo' AND vence IS NOT NULL AND vence < ?`)
     .run(ahora(), ahora());
 
+/* ── Cola de avisos ─────────────────────────────────────── */
+
+/* Anuncios que vencen dentro de `dias` y a los que todavía no se les
+   avisó. Devuelve ya el correo y el nombre de quien hay que avisar,
+   para que el proceso de tareas no tenga que encadenar consultas.
+
+   Se apoya en ix_anuncios_vence, que es un índice parcial: solo
+   contiene los anuncios que pueden caducar. */
+const anunciosPorVencer = (dias = 5) =>
+  abrir().prepare(`
+    SELECT a.id, a.marca, a.modelo, a.anio, a.vence,
+           u.correo, u.nombre
+    FROM anuncios a
+    JOIN organizaciones o ON o.id = a.organizacion_id
+    JOIN usuarios u ON u.id = COALESCE(
+      a.usuario_id,
+      (SELECT usuario_id FROM miembros WHERE organizacion_id = o.id AND rol = 'propietario' LIMIT 1))
+    WHERE a.estado = 'activo'
+      AND a.vence IS NOT NULL
+      AND a.vence > ?
+      AND a.vence <= ?
+      AND a.aviso_por_vencer IS NULL`)
+    .all(ahora(), sumarDias(dias));
+
+/* Anuncios recién vencidos a los que no se avisó del corte. */
+const anunciosVencidosSinAvisar = () =>
+  abrir().prepare(`
+    SELECT a.id, a.marca, a.modelo, a.anio, a.vence,
+           u.correo, u.nombre
+    FROM anuncios a
+    JOIN organizaciones o ON o.id = a.organizacion_id
+    JOIN usuarios u ON u.id = COALESCE(
+      a.usuario_id,
+      (SELECT usuario_id FROM miembros WHERE organizacion_id = o.id AND rol = 'propietario' LIMIT 1))
+    WHERE a.estado = 'vencido'
+      AND a.aviso_vencido IS NULL`)
+    .all();
+
+const marcarAviso = (idAnuncio, cual) =>
+  abrir().prepare(`UPDATE anuncios SET ${cual === 'vencido' ? 'aviso_vencido' : 'aviso_por_vencer'} = ?
+                   WHERE id = ?`).run(ahora(), idAnuncio);
+
+/* Dueño de un anuncio, para avisarle de un contacto o de una
+   publicación. Un anuncio sin usuario asociado cae en el propietario
+   de la organización. */
+const duenoDeAnuncio = (idAnuncio) =>
+  abrir().prepare(`
+    SELECT u.correo, u.nombre, a.marca, a.modelo, a.anio, a.vence
+    FROM anuncios a
+    JOIN organizaciones o ON o.id = a.organizacion_id
+    JOIN usuarios u ON u.id = COALESCE(
+      a.usuario_id,
+      (SELECT usuario_id FROM miembros WHERE organizacion_id = o.id AND rol = 'propietario' LIMIT 1))
+    WHERE a.id = ?`).get(idAnuncio);
+
 /* ── Métricas ───────────────────────────────────────────── */
 
 const COLUMNA_EVENTO = {
@@ -1095,5 +1157,6 @@ module.exports = {
   planes, planPorId, suscripcionActiva, contratar,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,
   cambiarEstadoAnuncio, caducarAnuncios,
+  anunciosPorVencer, anunciosVencidosSinAvisar, marcarAviso, duenoDeAnuncio,
   anotarEvento, resumenOrganizacion,
 };

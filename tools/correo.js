@@ -101,22 +101,100 @@ function porArchivo({ para, asunto, texto }) {
   return { entregado: true, archivo };
 }
 
-function porSmtp(mensaje) {
-  // Punto de integración: aquí va el proveedor (SES, Resend, Postmark
-  // o el SMTP del dominio). Debe devolver una promesa y no lanzar por
-  // un fallo puntual: el registro no puede caerse porque el correo
-  // tarde. Encolar y reintentar es lo correcto a partir de cierto
-  // volumen.
-  throw new Error('Transporte SMTP sin configurar. Defina TUEQUIPO_CORREO=archivo o implemente porSmtp().');
+/* Brevo, por su API HTTPS de correo transaccional.
+ *
+ * Se usa la API y no el SMTP a propósito: no hace falta abrir el
+ * puerto 587 (muchos proveedores de VPS lo bloquean de salida para
+ * frenar el spam), la respuesta dice si el mensaje se aceptó, y no se
+ * arrastra una dependencia de cliente SMTP.
+ *
+ * Sin `node:https` extra: viene con Node.
+ *
+ * Configuración:
+ *   TUEQUIPO_CORREO=brevo
+ *   BREVO_API_KEY=xkeysib-…
+ *
+ * El remitente debe estar verificado en Brevo y el dominio necesita
+ * SPF, DKIM y DMARC publicados, o el correo acaba en spam. Ver
+ * deploy/README.md.
+ */
+const https = require('https');
+
+/* Separa "Nombre <correo@dominio>" en las dos partes que pide la API. */
+function partirRemitente(cadena) {
+  const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(String(cadena));
+  return m ? { name: m[1] || undefined, email: m[2] } : { email: String(cadena).trim() };
+}
+
+function porBrevo({ para, asunto, texto, html }) {
+  const clave = process.env.BREVO_API_KEY;
+  if (!clave) throw new Error('Falta BREVO_API_KEY');
+
+  const cuerpo = JSON.stringify({
+    sender: partirRemitente(REMITENTE),
+    to: [{ email: para }],
+    subject: asunto,
+    textContent: texto,
+    ...(html ? { htmlContent: html } : {}),
+  });
+
+  return new Promise((resolver) => {
+    const req = https.request({
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'api-key': clave,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(cuerpo),
+      },
+      timeout: 10000,
+    }, (res) => {
+      let datos = '';
+      res.on('data', (c) => { datos += c; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolver({ entregado: true, id: (JSON.parse(datos || '{}') || {}).messageId });
+        } else {
+          // No se lanza: quien llama ya trata `entregado: false`, y una
+          // caída de Brevo no puede tumbar un registro que sí se guardó.
+          console.error(`correo: Brevo devolvió ${res.statusCode} · ${datos.slice(0, 200)}`);
+          resolver({ entregado: false, error: `Brevo ${res.statusCode}` });
+        }
+      });
+    });
+
+    req.on('timeout', () => { req.destroy(); resolver({ entregado: false, error: 'tiempo agotado' }); });
+    req.on('error', (e) => resolver({ entregado: false, error: e.message }));
+    req.write(cuerpo);
+    req.end();
+  });
 }
 
 /* ── Salida única ───────────────────────────────────────── */
 
+const TRANSPORTES = { archivo: porArchivo, brevo: porBrevo };
+
 /* Nunca lanza: un fallo del correo no debe tumbar la operación que lo
-   provocó. Devuelve si se entregó para que quien llame decida. */
+   provocó. Devuelve si se entregó para que quien llame decida.
+
+   Con Brevo devuelve una promesa. Quien llama puede ignorarla —el
+   correo es accesorio a la operación— o esperarla si necesita saber si
+   salió; por eso el `catch` cubre los dos casos. */
 function enviar(mensaje) {
+  const transporte = TRANSPORTES[TRANSPORTE];
+  if (!transporte) {
+    console.error(`correo: transporte "${TRANSPORTE}" desconocido; use archivo o brevo`);
+    return { entregado: false, error: 'transporte desconocido' };
+  }
   try {
-    return TRANSPORTE === 'smtp' ? porSmtp(mensaje) : porArchivo(mensaje);
+    const r = transporte(mensaje);
+    return r && typeof r.catch === 'function'
+      ? r.catch((e) => {
+        console.error('correo: no se pudo enviar a', mensaje.para, '·', e.message);
+        return { entregado: false, error: e.message };
+      })
+      : r;
   } catch (e) {
     console.error('correo: no se pudo enviar a', mensaje.para, '·', e.message);
     return { entregado: false, error: e.message };
@@ -230,8 +308,125 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
   });
 }
 
+/* ── Ciclo de vida del anuncio ──────────────────────────── */
+
+const SITIO = process.env.TUEQUIPO_SITIO || 'https://tuequipord.do';
+const fecha = (iso) => (iso
+  ? new Date(iso).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
+  : null);
+
+/* Confirmación de publicación. Lleva el enlace a la ficha porque es lo
+   primero que quiere hacer quien acaba de publicar: verla y
+   compartirla. */
+const enviarAnuncioPublicado = ({ para, nombre, equipo, idAnuncio, vence, plan }) => enviar({
+  para,
+  asunto: `Su ${equipo} ya está publicado · TuEquipoRD`,
+  texto: [
+    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+    `Su anuncio de ${equipo} está publicado y visible en el catálogo.`, '',
+    `Verlo: ${SITIO}/equipo.html?id=${idAnuncio}`,
+    plan ? `Plan: ${plan}` : null,
+    vence ? `Vigente hasta el ${fecha(vence)}.` : 'Se mantiene publicado mientras la membresía siga activa.',
+    '',
+    'Desde su panel puede editarlo, pausarlo, marcarlo como vendido y ver',
+    `cuánta gente lo está mirando: ${SITIO}/panel.html`, '',
+    'TuEquipoRD',
+  ].filter((l) => l !== null).join('\n'),
+});
+
+/* Aviso previo al vencimiento. Se manda una sola vez por anuncio; de
+   eso se encarga quien llama, anotándolo en la base. */
+const enviarAnuncioPorVencer = ({ para, nombre, equipo, idAnuncio, vence, dias }) => enviar({
+  para,
+  asunto: `Su ${equipo} vence en ${dias} ${dias === 1 ? 'día' : 'días'} · TuEquipoRD`,
+  texto: [
+    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+    `Su anuncio de ${equipo} deja de publicarse el ${fecha(vence)}.`, '',
+    'Si todavía no lo ha vendido, puede renovarlo desde el panel y sigue',
+    'apareciendo en el catálogo sin perder las visitas acumuladas:',
+    `${SITIO}/panel.html`, '',
+    'Si ya lo vendió, márquelo como vendido y así no le volvemos a escribir.', '',
+    'TuEquipoRD',
+  ].join('\n'),
+});
+
+const enviarAnuncioVencido = ({ para, nombre, equipo, idAnuncio }) => enviar({
+  para,
+  asunto: `Su ${equipo} dejó de publicarse · TuEquipoRD`,
+  texto: [
+    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+    `El anuncio de ${equipo} llegó al final de su vigencia y ya no aparece en el catálogo.`, '',
+    'Sus fotos, su descripción y sus estadísticas siguen guardadas: renovarlo',
+    `lo vuelve a publicar tal como estaba. ${SITIO}/panel.html`, '',
+    'TuEquipoRD',
+  ].join('\n'),
+});
+
+/* Comprobante del cobro. No sustituye a la factura fiscal; sirve para
+   que el anunciante tenga por escrito qué contrató y por cuánto. */
+const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referencia, fin }) => enviar({
+  para,
+  asunto: `Comprobante de su plan ${plan} · TuEquipoRD`,
+  texto: [
+    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+    `Confirmamos la contratación del plan ${plan}.`, '',
+    `Subtotal:   RD$${Number(subtotal).toLocaleString('en-US')}`,
+    `ITBIS 18%:  RD$${Number(itbis).toLocaleString('en-US')}`,
+    `Total:      RD$${Number(total).toLocaleString('en-US')}`,
+    `Referencia: ${referencia}`,
+    fin ? `Vigente hasta el ${fecha(fin)}.` : null,
+    '',
+    `Su historial de pagos está en ${SITIO}/panel.html`, '',
+    'TuEquipoRD',
+  ].filter((l) => l !== null).join('\n'),
+});
+
+/* Aviso al vendedor de que alguien pidió su contacto. Es la señal de
+   que el anuncio está funcionando, y la razón principal por la que
+   alguien renueva. */
+const enviarContactoRecibido = ({ para, nombre, equipo, idAnuncio, via }) => enviar({
+  para,
+  asunto: `Alguien pidió su contacto por el ${equipo} · TuEquipoRD`,
+  texto: [
+    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+    `Una persona interesada pidió su ${via === 'whatsapp' ? 'WhatsApp' : 'teléfono'}`,
+    `desde el anuncio de ${equipo}.`, '',
+    'No tenemos sus datos: el contacto ocurre directamente entre ustedes.',
+    'Le avisamos para que esté pendiente de la llamada o del mensaje.', '',
+    `Ver el anuncio y sus estadísticas: ${SITIO}/panel.html`, '',
+    'TuEquipoRD',
+  ].join('\n'),
+});
+
+/* Bienvenida, tras confirmar el correo. Orienta sobre el primer paso
+   en vez de limitarse a celebrar el registro. */
+const enviarBienvenida = ({ para, nombre, esDealer }) => enviar({
+  para,
+  asunto: 'Su cuenta de TuEquipoRD está lista',
+  texto: [
+    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+    'Su correo quedó confirmado y ya puede usar su cuenta.', '',
+    esDealer
+      ? [
+        'Como pidió una cuenta de empresa, revisaremos los datos que nos dio',
+        'y le escribiremos con el resultado, normalmente en menos de 24 horas',
+        'hábiles. Mientras tanto puede ir preparando sus equipos.',
+      ].join('\n')
+      : [
+        'Para publicar un equipo necesita sus fotos, el año, las horas de uso',
+        'y el precio. El asistente le guía paso a paso y toma unos minutos.',
+      ].join('\n'),
+    '',
+    `Publicar un equipo: ${SITIO}/publicar.html`,
+    `Su panel:           ${SITIO}/panel.html`, '',
+    'TuEquipoRD',
+  ].join('\n'),
+});
+
 module.exports = {
   enviar, enviarCodigo, enviarAvisoCambioClave,
   enviarSolicitudDealer, enviarResolucionDealer,
-  BANDEJA, REVISION,
+  enviarAnuncioPublicado, enviarAnuncioPorVencer, enviarAnuncioVencido,
+  enviarComprobante, enviarContactoRecibido, enviarBienvenida,
+  BANDEJA, REVISION, SITIO,
 };

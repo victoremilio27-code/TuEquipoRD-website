@@ -1,0 +1,25 @@
+# Mantenimiento diario. Lo dispara tuequipord-tareas.timer.
+# Instalar junto al .timer en /etc/systemd/system/
+
+[Unit]
+Description=TuEquipoRD — mantenimiento diario
+After=network.target
+
+[Service]
+Type=oneshot
+User=tuequipord
+Group=tuequipord
+WorkingDirectory=/var/www/tuequipord
+
+Environment=NODE_ENV=production
+Environment=TUEQUIPO_DB=/var/lib/tuequipord/tuequipord.db
+Environment=TUEQUIPO_RESPALDOS=/var/backups/tuequipord
+EnvironmentFile=/etc/tuequipord.env
+
+ExecStart=/usr/bin/node tools/tareas.js
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tuequipord /var/backups/tuequipord

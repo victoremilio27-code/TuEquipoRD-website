@@ -333,7 +333,18 @@ async function verificar(req, res) {
   const u = db.usuarioPorId(r.usuario_id);
   if (!u) return fallo(res, 400, 'La cuenta ya no existe');
 
-  if (tipo === 'verificacion') db.marcarCorreoVerificado(u.id);
+  if (tipo === 'verificacion') {
+    db.marcarCorreoVerificado(u.id);
+    // Bienvenida solo al confirmar la cuenta, no en cada acceso desde
+    // un equipo nuevo. Orienta sobre el siguiente paso, que es distinto
+    // según se haya registrado como particular o como empresa.
+    const org = db.organizacionDe(u.id);
+    correo.enviarBienvenida({
+      para: u.correo,
+      nombre: u.nombre,
+      esDealer: !!(org && org.tipo === 'dealer'),
+    });
+  }
 
   const cookies = [cookieSesion(db.abrirSesion(u.id))];
   if (c.recordar !== false) {
@@ -760,8 +771,35 @@ const publicar = conSesion(async (req, res, ctx) => {
     telefonos: telefonos.map((t) => ({ numero: t.numero, tipo: t.tipo, nota: t.nota })),
   });
 
+  /* Confirmación al anunciante, y comprobante aparte si hubo cobro.
+     Van después de responder conceptualmente —el anuncio ya existe— y
+     ninguno puede fallar de forma que afecte a la publicación: `enviar`
+     nunca lanza. */
+  const publicado = db.anuncio(idAnuncio);
+  correo.enviarAnuncioPublicado({
+    para: ctx.usuario.correo,
+    nombre: ctx.usuario.nombre,
+    equipo: `${publicado.anio} ${publicado.marca} ${publicado.modelo}`,
+    idAnuncio,
+    vence: publicado.vence,
+    plan: plan.nombre,
+  });
+
+  if (cobro && cobro.total > 0) {
+    correo.enviarComprobante({
+      para: ctx.usuario.correo,
+      nombre: ctx.usuario.nombre,
+      plan: plan.nombre,
+      subtotal: cobro.subtotal,
+      itbis: cobro.itbis,
+      total: cobro.total,
+      referencia: cobro.referencia,
+      fin: suscripcion && suscripcion.fin,
+    });
+  }
+
   return responder(res, 201, {
-    anuncio: db.anuncio(idAnuncio),
+    anuncio: publicado,
     cobro,
     suscripcion,
     sesion: sesionPublica(ctx.usuario.id),
@@ -835,7 +873,29 @@ async function evento(req, res, ctx) {
   const c = await leerCuerpo(req);
   const ip = req.socket.remoteAddress || '';
   const agente = req.headers['user-agent'] || '';
-  const ok = db.anotarEvento(String(c.anuncio || ''), String(c.tipo || ''), db.huella(ip, agente));
+  const tipo = String(c.tipo || '');
+  const idAnuncio = String(c.anuncio || '');
+  const ok = db.anotarEvento(idAnuncio, tipo, db.huella(ip, agente));
+
+  /* Un contacto es la señal de que el anuncio funciona, y la razón
+     principal por la que alguien renueva. `anotarEvento` devuelve
+     false cuando ya se contó a ese visitante hoy, así que esto no
+     manda un correo por cada pulsación: uno por persona y día.
+
+     Las vistas no avisan; serían decenas de correos diarios. */
+  if (ok && (tipo === 'telefono' || tipo === 'whatsapp')) {
+    const dueno = db.duenoDeAnuncio(idAnuncio);
+    if (dueno) {
+      correo.enviarContactoRecibido({
+        para: dueno.correo,
+        nombre: dueno.nombre,
+        equipo: `${dueno.anio} ${dueno.marca} ${dueno.modelo}`,
+        idAnuncio,
+        via: tipo,
+      });
+    }
+  }
+
   return responder(res, ok ? 202 : 400, { ok });
 }
 

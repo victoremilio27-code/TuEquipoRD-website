@@ -370,6 +370,12 @@ CREATE TABLE IF NOT EXISTS anuncios (
   destacado_hasta TEXT,
   publicado       TEXT,
   vence           TEXT,                    -- NULL si lo sostiene una membresía
+
+  -- Cuándo se avisó de cada cosa. Fecha y no 0/1: cuando alguien
+  -- reclama que no le llegó el aviso, lo que se mira es el cuándo.
+  aviso_por_vencer TEXT,
+  aviso_vencido    TEXT,
+
   creado          TEXT NOT NULL,
   actualizado     TEXT
 );

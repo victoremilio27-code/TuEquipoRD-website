@@ -1,0 +1,18 @@
+# Despierta el mantenimiento una vez al día.
+#
+# A las 5:00, hora del servidor: la madrugada dominicana es cuando
+# menos tráfico hay, y el respaldo bloquea la base unos segundos.
+#
+# `Persistent=true` recupera la ejecución perdida si el servidor
+# estuvo apagado a esa hora, en vez de saltarse el día.
+
+[Unit]
+Description=Mantenimiento diario de TuEquipoRD
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

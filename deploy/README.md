@@ -58,8 +58,12 @@ Crea `/etc/tuequipord.env` con ese valor:
 
 ```
 TUEQUIPO_SECRETO=<el valor generado arriba>
-TUEQUIPO_CORREO=contacto@DOMINIO
-TUEQUIPO_REMITENTE=TuEquipoRD <contacto@DOMINIO>
+
+TUEQUIPO_CORREO=brevo
+BREVO_API_KEY=<la clave de Brevo>
+TUEQUIPO_REMITENTE=TuEquipoRD <no-responder@DOMINIO>
+TUEQUIPO_REVISION=dealers@DOMINIO
+TUEQUIPO_SITIO=https://DOMINIO
 ```
 
 Ciérralo para que solo root lo lea:
@@ -139,6 +143,66 @@ ufw --force enable
 ```
 
 ---
+
+## 9. Correo saliente (Brevo)
+
+Sin esto no salen ni los códigos de verificación: nadie puede crear
+una cuenta. Es el paso que más se olvida y el que más rápido se nota.
+
+1. Crea la cuenta en [brevo.com](https://www.brevo.com) y añade el
+   dominio en **Senders, Domains & Dedicated IPs → Domains**.
+2. Brevo da tres registros DNS —**DKIM**, **DMARC** y un TXT de
+   verificación—. Añádelos en el registrador junto al SPF:
+
+   ```
+   TXT  @   v=spf1 include:spf.brevo.com ~all
+   ```
+
+   Los tres son necesarios. Sin ellos el correo sale, pero Gmail y
+   Outlook lo mandan a spam, que a efectos prácticos es lo mismo que
+   no enviarlo.
+3. Genera la clave en **SMTP & API → API Keys** y ponla en
+   `/etc/tuequipord.env` como `BREVO_API_KEY`.
+4. Comprueba que sale de verdad:
+
+   ```bash
+   sudo -u tuequipord TUEQUIPO_CORREO=brevo \
+     node -e "require('./tools/correo').enviarBienvenida({para:'tucorreo@gmail.com',nombre:'Prueba'})"
+   ```
+
+El plan gratuito son 300 correos al día. Con el volumen inicial sobra;
+si se queda corto, se nota porque la API empieza a devolver 402 y el
+registro del servicio lo anota.
+
+## 10. Mantenimiento automático
+
+Caducar anuncios, avisar de vencimientos, purgar y respaldar la base:
+
+```bash
+mkdir -p /var/backups/tuequipord
+chown tuequipord:tuequipord /var/backups/tuequipord
+
+cp /var/www/tuequipord/deploy/tuequipord-tareas.* /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now tuequipord-tareas.timer
+systemctl list-timers tuequipord-tareas.timer
+```
+
+Corre a las 5:00. Para ver qué haría sin hacer nada:
+
+```bash
+sudo -u tuequipord node tools/tareas.js --seco
+```
+
+Cada tarea es idempotente: repetirla no manda dos veces el mismo aviso.
+
+**Saca los respaldos del servidor.** Un respaldo en la misma máquina no
+protege del fallo que más importa, que es perder la máquina. Con
+`rclone` a cualquier almacenamiento remoto:
+
+```bash
+rclone sync /var/backups/tuequipord remoto:tuequipord-respaldos
+```
 
 ## Actualizar el sitio
 
