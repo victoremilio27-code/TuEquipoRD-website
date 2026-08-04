@@ -605,9 +605,10 @@ function pintarIdentidad() {
         <b class="identidad__nombre">${esc(org.nombre)}
           ${org.verificada ? `<span class="pastilla pastilla--verde">${icono('i-check')} Verificado</span>` : ''}
         </b>
-        <span class="identidad__meta">RNC <b class="num">${esc(org.rnc || '—')}</b> · cuenta de empresa</span>
-        <span class="identidad__nota">El anuncio se publica bajo esta empresa y aparece en
-          ${org.slug ? `<a href="dealer.html?d=${encodeURIComponent(org.slug)}">su página pública</a>` : 'su página pública'}.</span>
+        <span class="identidad__meta">Cuenta de empresa · RNC <b class="num">${esc(org.rncMascara || '—')}</b></span>
+        <span class="identidad__nota">${org.estadoRevision === 'aprobada'
+    ? `El anuncio se publica bajo esta empresa y aparece en ${org.slug ? `<a href="dealer.html?d=${encodeURIComponent(org.slug)}">su página pública</a>` : 'su página pública'}.`
+    : 'El anuncio se publica bajo esta empresa. Su página pública se activa cuando aprobemos la cuenta.'}</span>
       </span>`;
     return;
   }

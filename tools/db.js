@@ -55,6 +55,16 @@ const MIGRACIONES = [
     `UPDATE planes SET precio_promocional = 0, promo_hasta = '${PROMO_LANZAMIENTO}'
        WHERE nivel = 'estandar'`,
   ]],
+  // El alta de dealer pasa por revisión de un administrador. Las
+  // empresas que ya estaban publicadas antes de esta regla se dan por
+  // aprobadas: llevaban su perfil visible y quitárselo de golpe sería
+  // sacarlas del directorio sin aviso.
+  ['2026-08-revision-dealers', [
+    "ALTER TABLE usuarios ADD COLUMN es_admin INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE organizaciones ADD COLUMN estado_revision TEXT NOT NULL DEFAULT 'no_aplica'",
+    "UPDATE organizaciones SET estado_revision = 'aprobada' WHERE tipo = 'dealer'",
+    'CREATE INDEX IF NOT EXISTS ix_org_revision ON organizaciones (estado_revision)',
+  ]],
 ];
 
 function migrar() {
@@ -149,7 +159,7 @@ const usuarioPorId = (idUsuario) =>
    propietario. Va en una transacción porque una cuenta a medio crear
    (usuario sin organización) no podría publicar nada y habría que
    repararla a mano. */
-function crearCuenta({ correo, clave, nombre, telefono, tipo, empresa, rnc, direccion, provincia, municipio }) {
+function crearCuenta({ correo, clave, nombre, telefono, tipo, empresa, rnc, direccion, provincia, municipio, solicitud }) {
   const d = abrir();
   const { hash, sal } = cifrarClave(clave);
   const idUsuario = id();
@@ -159,6 +169,9 @@ function crearCuenta({ correo, clave, nombre, telefono, tipo, empresa, rnc, dire
   const esDealer = tipo === 'dealer';
 
   const nombreOrg = esDealer ? empresa : nombre;
+  // El slug se reserva desde el alta aunque el perfil todavía no se
+  // publique: si se calculara al aprobar, dos empresas con el mismo
+  // nombre podrían quedarse esperando por la misma URL.
   const slug = esDealer ? slugLibre(aSlug(nombreOrg)) : null;
 
   const tx = d.prepare('BEGIN');
@@ -168,10 +181,12 @@ function crearCuenta({ correo, clave, nombre, telefono, tipo, empresa, rnc, dire
                VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(idUsuario, String(correo).trim().toLowerCase(), nombre, telefono || null, hash, sal, t);
 
-    d.prepare(`INSERT INTO organizaciones (id, tipo, nombre, rnc, slug, correo, telefono, creada)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    d.prepare(`INSERT INTO organizaciones
+               (id, tipo, nombre, rnc, slug, correo, telefono, estado_revision, creada)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(idOrg, esDealer ? 'dealer' : 'particular', nombreOrg,
-        esDealer ? (rnc || null) : null, slug, String(correo).trim().toLowerCase(), telefono || null, t);
+        esDealer ? (rnc || null) : null, slug, String(correo).trim().toLowerCase(), telefono || null,
+        esDealer ? 'pendiente' : 'no_aplica', t);
 
     // La sucursal principal nace con la cuenta. En un dealer llega ya
     // con dirección y teléfono, que son obligatorios; en un particular
@@ -188,6 +203,21 @@ function crearCuenta({ correo, clave, nombre, telefono, tipo, empresa, rnc, dire
     d.prepare(`INSERT INTO miembros (id, organizacion_id, usuario_id, rol, creado)
                VALUES (?, ?, ?, 'propietario', ?)`)
       .run(id(), idOrg, idUsuario, t);
+
+    // La solicitud va dentro de la misma transacción: un dealer sin
+    // solicitud quedaría pendiente para siempre, sin nada que el
+    // administrador pudiera aprobar.
+    if (esDealer && solicitud) {
+      d.prepare(`INSERT INTO solicitudes_dealer
+        (id, organizacion_id, usuario_id, nombre_comercial, anios_operando, encargado, cargo,
+         equipos_inventario, equipos_publicar, tipos_equipo, origen, comentario, estado, creada)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`)
+        .run(id(), idOrg, idUsuario,
+          solicitud.nombreComercial || null, solicitud.aniosOperando ?? null,
+          solicitud.encargado, solicitud.cargo || null,
+          solicitud.equiposInventario ?? null, solicitud.equiposPublicar ?? null,
+          solicitud.tiposEquipo || null, solicitud.origen || null, solicitud.comentario || null, t);
+    }
 
     d.prepare('COMMIT').run();
   } catch (e) {
@@ -390,48 +420,168 @@ function purgar() {
 
 /* ── Perfil de dealer ───────────────────────────────────── */
 
-/* Convierte una organización en dealer al registrar el RNC. Es
-   idempotente: si ya lo era, solo actualiza los datos. El slug se
-   calcula una vez y no se vuelve a tocar, porque es una URL que
-   puede estar compartida por ahí. */
-function registrarDealer(idOrg, { rnc, empresa, web, descripcion }) {
+/* Convierte una organización en dealer al registrar el RNC: es el
+   camino del particular que crece y pasa a empresa. Deja la cuenta
+   'pendiente' y abre su solicitud, igual que si se hubiera registrado
+   como dealer desde el principio; no hay atajo que se salte la
+   revisión. El slug se calcula una vez y no se vuelve a tocar, porque
+   es una URL que puede estar compartida por ahí. */
+function registrarDealer(idOrg, idUsuario, { rnc, empresa, web, descripcion, solicitud }) {
   const d = abrir();
   const org = d.prepare('SELECT * FROM organizaciones WHERE id = ?').get(idOrg);
   if (!org) throw Object.assign(new Error('Organización inexistente'), { codigo: 404 });
+
+  // Una solicitud ya resuelta no se reabre por volver a mandar el
+  // formulario; una pendiente se actualiza en vez de duplicarse.
+  if (org.estado_revision === 'pendiente') {
+    throw Object.assign(new Error('Su solicitud ya está en revisión'), { codigo: 409 });
+  }
+  if (org.estado_revision === 'aprobada') {
+    throw Object.assign(new Error('Su cuenta de empresa ya está aprobada'), { codigo: 409 });
+  }
 
   const duenoDelRnc = d.prepare('SELECT id FROM organizaciones WHERE rnc = ? AND id <> ?').get(rnc, idOrg);
   if (duenoDelRnc) throw Object.assign(new Error('Ese RNC ya está registrado por otra cuenta'), { codigo: 409 });
 
   const nombre = empresa || org.nombre;
   const slug = org.slug || slugLibre(aSlug(nombre));
+  const t = ahora();
 
-  d.prepare(`UPDATE organizaciones
-             SET tipo = 'dealer', rnc = ?, nombre = ?, slug = ?, web = COALESCE(?, web),
-                 descripcion = COALESCE(?, descripcion), actualizada = ?
-             WHERE id = ?`)
-    .run(rnc, nombre, slug, web || null, descripcion || null, ahora(), idOrg);
+  d.prepare('BEGIN').run();
+  try {
+    d.prepare(`UPDATE organizaciones
+               SET tipo = 'dealer', rnc = ?, nombre = ?, slug = ?, web = COALESCE(?, web),
+                   descripcion = COALESCE(?, descripcion),
+                   estado_revision = 'pendiente', perfil_publico = 0, actualizada = ?
+               WHERE id = ?`)
+      .run(rnc, nombre, slug, web || null, descripcion || null, t, idOrg);
+
+    d.prepare(`INSERT INTO solicitudes_dealer
+      (id, organizacion_id, usuario_id, nombre_comercial, anios_operando, encargado, cargo,
+       equipos_inventario, equipos_publicar, tipos_equipo, origen, comentario, estado, creada)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)`)
+      .run(id(), idOrg, idUsuario,
+        solicitud?.nombreComercial || null, solicitud?.aniosOperando ?? null,
+        solicitud?.encargado || nombre, solicitud?.cargo || null,
+        solicitud?.equiposInventario ?? null, solicitud?.equiposPublicar ?? null,
+        solicitud?.tiposEquipo || null, solicitud?.origen || null, solicitud?.comentario || null, t);
+
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
 
   return d.prepare('SELECT * FROM organizaciones WHERE id = ?').get(idOrg);
 }
 
-/* Directorio público. Solo salen los dealers cuyo plan habilita el
-   perfil y que tienen al menos un anuncio activo: un directorio con
-   fichas vacías no le sirve a quien compra. */
+/* ── Revisión de solicitudes ────────────────────────────── */
+
+/* Expediente completo de una solicitud: lo declarado, con quién
+   hablar y desde dónde opera. Es la única consulta que devuelve el
+   RNC entero, y solo la usan las rutas de administración y el correo
+   de aviso. */
+function solicitudCompleta(idSolicitud, { porOrganizacion = false } = {}) {
+  const campo = porOrganizacion ? 's.organizacion_id' : 's.id';
+  return abrir().prepare(`
+    SELECT s.*, o.nombre AS razon_social, o.rnc, o.slug, o.correo AS correo_empresa,
+           o.telefono, o.estado_revision, o.web,
+           u.nombre AS solicitante, u.correo AS correo_solicitante,
+           (SELECT direccion FROM sucursales WHERE organizacion_id = o.id ORDER BY principal DESC LIMIT 1) AS direccion,
+           (SELECT provincia FROM sucursales WHERE organizacion_id = o.id ORDER BY principal DESC LIMIT 1) AS provincia,
+           (SELECT municipio FROM sucursales WHERE organizacion_id = o.id ORDER BY principal DESC LIMIT 1) AS municipio,
+           r.nombre AS revisor
+    FROM solicitudes_dealer s
+    JOIN organizaciones o ON o.id = s.organizacion_id
+    JOIN usuarios u ON u.id = s.usuario_id
+    LEFT JOIN usuarios r ON r.id = s.revisada_por
+    WHERE ${campo} = ?
+    ORDER BY s.creada DESC
+    LIMIT 1`).get(idSolicitud);
+}
+
+/* Cola de revisión. Sin RNC: la lista se pinta en pantalla y el número
+   completo solo hace falta al abrir un expediente concreto. */
+const solicitudes = (estado = 'pendiente') =>
+  abrir().prepare(`
+    SELECT s.id, s.organizacion_id, s.encargado, s.cargo, s.nombre_comercial,
+           s.equipos_inventario, s.equipos_publicar, s.estado, s.creada, s.revisada, s.motivo,
+           o.nombre AS razon_social, o.slug,
+           u.correo AS correo_solicitante
+    FROM solicitudes_dealer s
+    JOIN organizaciones o ON o.id = s.organizacion_id
+    JOIN usuarios u ON u.id = s.usuario_id
+    WHERE s.estado = ?
+    ORDER BY s.creada DESC`).all(estado);
+
+const contarPendientes = () =>
+  abrir().prepare("SELECT COUNT(*) AS n FROM solicitudes_dealer WHERE estado = 'pendiente'").get().n;
+
+/* Aprueba o rechaza. Mueve la solicitud y la organización a la vez:
+   dejar una aprobada y la otra pendiente es justo el estado que haría
+   invisible a un dealer ya admitido. */
+function resolverSolicitud(idSolicitud, { aprobar, idRevisor, motivo }) {
+  const d = abrir();
+  const s = d.prepare('SELECT * FROM solicitudes_dealer WHERE id = ?').get(idSolicitud);
+  if (!s) throw Object.assign(new Error('Esa solicitud no existe'), { codigo: 404 });
+  if (s.estado !== 'pendiente') {
+    throw Object.assign(new Error(`La solicitud ya está ${s.estado}`), { codigo: 409 });
+  }
+
+  const estado = aprobar ? 'aprobada' : 'rechazada';
+  const t = ahora();
+
+  d.prepare('BEGIN').run();
+  try {
+    d.prepare(`UPDATE solicitudes_dealer
+               SET estado = ?, revisada = ?, revisada_por = ?, motivo = ?
+               WHERE id = ?`)
+      .run(estado, t, idRevisor, aprobar ? null : (motivo || null), idSolicitud);
+
+    d.prepare('UPDATE organizaciones SET estado_revision = ?, actualizada = ? WHERE id = ?')
+      .run(estado, t, s.organizacion_id);
+
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+
+  return solicitudCompleta(idSolicitud);
+}
+
+/* El rol de administrador se concede desde la línea de comandos
+   (tools/admin.js), nunca desde una pantalla del sitio. */
+function marcarAdmin(correo, esAdmin = true) {
+  const info = abrir().prepare('UPDATE usuarios SET es_admin = ? WHERE correo = ?')
+    .run(esAdmin ? 1 : 0, String(correo).trim().toLowerCase());
+  return info.changes > 0;
+}
+
+/* Directorio público. Un dealer sale publicado cuando se cumplen las
+   dos condiciones, que son independientes entre sí: el administrador
+   aprobó la solicitud y el plan contratado habilita el perfil.
+
+   Ninguna de estas dos consultas selecciona `rnc`. Es deliberado y no
+   debe "simplificarse" a un SELECT *: el RNC solo se entrega en las
+   rutas de administración, y la forma más fiable de que no se escape
+   es que no viaje en el resultado. */
 function dealersPublicos() {
   return abrir().prepare(`
-    SELECT o.id, o.nombre, o.slug, o.rnc, o.verificada, o.descripcion, o.web,
+    SELECT o.id, o.nombre, o.slug, o.verificada, o.descripcion, o.web,
            (SELECT provincia FROM sucursales WHERE organizacion_id = o.id ORDER BY principal DESC LIMIT 1) AS provincia,
            COUNT(a.id) AS equipos
     FROM organizaciones o
     LEFT JOIN anuncios a ON a.organizacion_id = o.id AND a.estado = 'activo'
-    WHERE o.tipo = 'dealer' AND o.perfil_publico = 1
+    WHERE o.tipo = 'dealer' AND o.perfil_publico = 1 AND o.estado_revision = 'aprobada'
     GROUP BY o.id
     ORDER BY equipos DESC, o.nombre`).all();
 }
 
 const dealerPorSlug = (slug) =>
-  abrir().prepare(`SELECT id, nombre, slug, rnc, verificada, descripcion, web, telefono, correo, creada
-                   FROM organizaciones WHERE slug = ? AND tipo = 'dealer'`).get(slug);
+  abrir().prepare(`SELECT id, nombre, slug, verificada, descripcion, web, telefono, correo, creada
+                   FROM organizaciones
+                   WHERE slug = ? AND tipo = 'dealer' AND estado_revision = 'aprobada'`).get(slug);
 
 const sucursalesDe = (idOrg) =>
   abrir().prepare('SELECT * FROM sucursales WHERE organizacion_id = ? AND activa = 1 ORDER BY principal DESC, nombre').all(idOrg);
@@ -793,9 +943,11 @@ function estadisticas() {
     WHERE estado = 'activo' AND provincia IS NOT NULL
     GROUP BY provincia ORDER BY total DESC, provincia`).all();
 
+  // Las mismas dos condiciones que el directorio: si la cifra contara
+  // los pendientes, la página anunciaría dealers que nadie encuentra.
   const dealers = d.prepare(`
     SELECT COUNT(*) AS n FROM organizaciones
-    WHERE tipo = 'dealer' AND perfil_publico = 1`).get().n;
+    WHERE tipo = 'dealer' AND perfil_publico = 1 AND estado_revision = 'aprobada'`).get().n;
 
   return {
     anuncios: totales.anuncios || 0,
@@ -938,6 +1090,7 @@ module.exports = {
   recordarDispositivo, dispositivoDeConfianza,
   permitir, limpiarIntentos,
   registrarDealer, dealersPublicos, dealerPorSlug,
+  solicitudes, solicitudCompleta, resolverSolicitud, contarPendientes, marcarAdmin,
   sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,
   planes, planPorId, suscripcionActiva, contratar,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,

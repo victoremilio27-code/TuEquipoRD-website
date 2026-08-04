@@ -122,13 +122,23 @@ const entero = (v) => {
 };
 const correoValido = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '').trim());
 
-/* El RNC dominicano tiene 9 dígitos; la cédula, 11. Se acepta con
-   guiones y se guarda solo con dígitos para que dos formatos del
-   mismo número no pasen el control de duplicados. */
+/* El RNC dominicano tiene 9 dígitos. Se acepta escrito con guiones y
+   se guarda solo con dígitos para que dos formatos del mismo número no
+   burlen el control de duplicados.
+
+   Antes también se admitían 11 dígitos, que es una cédula. Ya no: la
+   cuenta de dealer es para empresas constituidas, y aceptar la cédula
+   de una persona convertía la comprobación en un trámite sin valor. */
 function rncValido(v) {
   const d = String(v || '').replace(/\D/g, '');
-  return (d.length === 9 || d.length === 11) ? d : null;
+  return d.length === 9 ? d : null;
 }
+
+/* El RNC nunca sale entero hacia el navegador, ni siquiera al dueño de
+   la cuenta: se enseñan los últimos cuatro dígitos, suficientes para
+   que reconozca cuál tiene registrado. Entero solo se ve en las rutas
+   de administración y en el correo de revisión. */
+const rncEnmascarado = (rnc) => (rnc ? `•••••${String(rnc).slice(-4)}` : null);
 
 const telefonoValido = (v) => String(v || '').replace(/\D/g, '').length === 10;
 
@@ -179,24 +189,43 @@ async function registro(req, res) {
 
   const esDealer = c.tipo === 'dealer';
   let rnc = null;
+  let solicitud = null;
   if (esDealer) {
     // Una cuenta de empresa sin dirección ni teléfono no sirve: su
     // página pública quedaría sin forma de visitarla ni de llamar.
     if (!texto(c.empresa, 160)) return fallo(res, 400, 'Escriba la razón social de la empresa');
     rnc = rncValido(c.rnc);
-    if (!rnc) return fallo(res, 400, 'El RNC tiene 9 dígitos y la cédula 11');
+    if (!rnc) return fallo(res, 400, 'El RNC de la empresa tiene 9 dígitos');
     if (!telefonoValido(c.telefono)) return fallo(res, 400, 'Indique el teléfono principal de la empresa, de 10 dígitos');
     if (!texto(c.direccion, 200) || String(c.direccion).trim().length < 8) {
       return fallo(res, 400, 'Indique la dirección de la oficina principal');
     }
     if (!texto(c.provincia, 60)) return fallo(res, 400, 'Indique la provincia de la oficina principal');
+
+    // Quién responde por la empresa. Es la persona con la que el
+    // administrador habla si algo del expediente no cuadra, así que se
+    // pide aparte de quien abre la cuenta.
+    if (!texto(c.encargado, 120)) return fallo(res, 400, 'Indique el nombre del encargado o representante');
+
+    solicitud = {
+      nombreComercial: texto(c.nombreComercial, 160),
+      aniosOperando: entero(c.aniosOperando),
+      encargado: texto(c.encargado, 120),
+      cargo: texto(c.cargo, 80),
+      equiposInventario: entero(c.equiposInventario),
+      equiposPublicar: entero(c.equiposPublicar),
+      tiposEquipo: texto(c.tiposEquipo, 300),
+      origen: texto(c.origen, 120),
+      comentario: texto(c.comentario, 1000),
+    };
   }
 
   if (db.usuarioPorCorreo(c.correo)) return fallo(res, 409, 'Ya existe una cuenta con ese correo');
 
   let idUsuario;
+  let idOrg;
   try {
-    ({ idUsuario } = db.crearCuenta({
+    ({ idUsuario, idOrg } = db.crearCuenta({
       correo: c.correo,
       clave: c.clave,
       nombre: texto(c.nombre, 120),
@@ -207,6 +236,7 @@ async function registro(req, res) {
       direccion: texto(c.direccion, 200),
       provincia: texto(c.provincia, 60),
       municipio: texto(c.municipio, 60),
+      solicitud,
     }));
   } catch (e) {
     if (String(e.message).includes('UNIQUE') && String(e.message).includes('rnc')) {
@@ -215,13 +245,20 @@ async function registro(req, res) {
     throw e;
   }
 
+  // El expediente completo va al equipo que revisa. Se manda aquí y no
+  // al verificar el correo porque `enviar` no lanza nunca: si el correo
+  // falla, la solicitud sigue en la base y se ve en el panel.
+  if (esDealer) avisarSolicitudDealer(idOrg);
+
   // La cuenta existe pero todavía no hay sesión: primero el código.
   emitirCodigo({ correo: c.correo, tipo: 'verificacion', idUsuario, nombre: texto(c.nombre, 120) });
 
   return responder(res, 201, {
     verificacion: 'verificacion',
     correo: String(c.correo).trim().toLowerCase(),
-    mensaje: 'Le enviamos un código de 6 dígitos para confirmar su correo.',
+    mensaje: esDealer
+      ? 'Le enviamos un código de 6 dígitos para confirmar su correo. Después revisaremos los datos de la empresa.'
+      : 'Le enviamos un código de 6 dígitos para confirmar su correo.',
   });
 }
 
@@ -379,11 +416,11 @@ function sesionPublica(idUsuario) {
   const susc = org ? db.suscripcionActiva(org.id) : null;
 
   return {
-    usuario: { id: u.id, nombre: u.nombre, correo: u.correo, telefono: u.telefono },
+    usuario: { id: u.id, nombre: u.nombre, correo: u.correo, telefono: u.telefono, esAdmin: !!u.es_admin },
     organizacion: org && {
-      id: org.id, tipo: org.tipo, nombre: org.nombre, rnc: org.rnc, slug: org.slug,
+      id: org.id, tipo: org.tipo, nombre: org.nombre, rncMascara: rncEnmascarado(org.rnc), slug: org.slug,
       verificada: !!org.verificada, perfilPublico: !!org.perfil_publico, rol: org.rol,
-      descripcion: org.descripcion, web: org.web,
+      estadoRevision: org.estado_revision, descripcion: org.descripcion, web: org.web,
     },
     suscripcion: susc && {
       id: susc.id, plan: susc.plan_id, planNombre: susc.plan_nombre, modalidad: susc.modalidad,
@@ -412,20 +449,101 @@ const registrarDealer = conSesion(async (req, res, ctx) => {
   }
   const c = await leerCuerpo(req);
   const rnc = rncValido(c.rnc);
-  if (!rnc) return fallo(res, 400, 'El RNC tiene 9 dígitos y la cédula 11');
+  if (!rnc) return fallo(res, 400, 'El RNC de la empresa tiene 9 dígitos');
   if (!texto(c.empresa, 160)) return fallo(res, 400, 'Escriba la razón social de la empresa');
+  if (!texto(c.encargado, 120)) return fallo(res, 400, 'Indique el nombre del encargado o representante');
 
   try {
-    db.registrarDealer(ctx.organizacion.id, {
+    db.registrarDealer(ctx.organizacion.id, ctx.usuario.id, {
       rnc,
       empresa: texto(c.empresa, 160),
       web: texto(c.web, 200),
       descripcion: texto(c.descripcion, 2000),
+      solicitud: {
+        nombreComercial: texto(c.nombreComercial, 160),
+        aniosOperando: entero(c.aniosOperando),
+        encargado: texto(c.encargado, 120),
+        cargo: texto(c.cargo, 80),
+        equiposInventario: entero(c.equiposInventario),
+        equiposPublicar: entero(c.equiposPublicar),
+        tiposEquipo: texto(c.tiposEquipo, 300),
+        origen: texto(c.origen, 120),
+        comentario: texto(c.comentario, 1000),
+      },
     });
   } catch (e) {
     return fallo(res, e.codigo || 500, e.message);
   }
+
+  avisarSolicitudDealer(ctx.organizacion.id);
   return responder(res, 200, sesionPublica(ctx.usuario.id));
+});
+
+/* ── Rutas: revisión de solicitudes ─────────────────────── */
+
+/* Manda el expediente al equipo de revisión. No devuelve nada ni
+   propaga errores: `correo.enviar` ya se traga los suyos, y un fallo
+   de correo no puede tumbar un registro que sí quedó guardado. La
+   solicitud está en la base y se ve igual en el panel. */
+function avisarSolicitudDealer(idOrg) {
+  const s = db.solicitudCompleta(idOrg, { porOrganizacion: true });
+  if (s) correo.enviarSolicitudDealer(s);
+}
+
+/* Solo el personal de TuEquipoRD. La marca `es_admin` no se concede
+   desde ninguna pantalla: se pone con tools/admin.js. Se comprueba
+   contra la base en cada petición y no contra la cookie, para que
+   quitar el permiso tenga efecto inmediato. */
+const conAdmin = (manejador) => conSesion((req, res, ctx, ...resto) => {
+  const u = db.usuarioPorId(ctx.usuario.id);
+  if (!u || !u.es_admin) return fallo(res, 404, 'No existe');
+  return manejador(req, res, ctx, ...resto);
+});
+
+const listarSolicitudes = conAdmin((req, res, ctx, consulta) => {
+  const estado = ['pendiente', 'aprobada', 'rechazada'].includes(consulta?.get('estado'))
+    ? consulta.get('estado') : 'pendiente';
+  return responder(res, 200, {
+    estado,
+    pendientes: db.contarPendientes(),
+    solicitudes: db.solicitudes(estado),
+  });
+});
+
+/* Expediente completo, con el RNC. Es la única ruta que lo entrega, y
+   exige sesión de administrador. */
+const verSolicitud = conAdmin((req, res, ctx, idSolicitud) => {
+  const s = db.solicitudCompleta(idSolicitud);
+  if (!s) return fallo(res, 404, 'Esa solicitud no existe');
+  return responder(res, 200, { solicitud: s });
+});
+
+const resolverSolicitud = conAdmin(async (req, res, ctx, idSolicitud) => {
+  const c = await leerCuerpo(req);
+  const aprobar = c.decision === 'aprobar';
+  if (!aprobar && c.decision !== 'rechazar') {
+    return fallo(res, 400, 'La decisión debe ser aprobar o rechazar');
+  }
+  const motivo = texto(c.motivo, 500);
+  if (!aprobar && !motivo) return fallo(res, 400, 'Escriba el motivo del rechazo');
+
+  let s;
+  try {
+    s = db.resolverSolicitud(idSolicitud, { aprobar, idRevisor: ctx.usuario.id, motivo });
+  } catch (e) {
+    return fallo(res, e.codigo || 500, e.message);
+  }
+
+  correo.enviarResolucionDealer({
+    para: s.correo_solicitante,
+    nombre: s.solicitante,
+    empresa: s.razon_social,
+    aprobada: aprobar,
+    motivo,
+    slug: s.slug,
+  });
+
+  return responder(res, 200, { solicitud: s, pendientes: db.contarPendientes() });
 });
 
 /* ── Rutas: sucursales ──────────────────────────────────── */
@@ -747,6 +865,11 @@ const RUTAS = [
   ['GET',  /^\/api\/anuncios\/([\w-]+)$/, verAnuncio],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)$/, cambiarEstado],
   ['POST', /^\/api\/eventos$/,           evento],
+
+  // Revisión de solicitudes. Todas exigen sesión con es_admin.
+  ['GET',  /^\/api\/admin\/solicitudes$/,               listarSolicitudes],
+  ['GET',  /^\/api\/admin\/solicitudes\/([\w-]+)$/,     verSolicitud],
+  ['POST', /^\/api\/admin\/solicitudes\/([\w-]+)$/,     resolverSolicitud],
 ];
 
 async function manejar(req, res, ruta) {

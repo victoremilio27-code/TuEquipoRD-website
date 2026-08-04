@@ -142,4 +142,96 @@ function enviarAvisoCambioClave({ para, nombre }) {
   });
 }
 
-module.exports = { enviar, enviarCodigo, enviarAvisoCambioClave, BANDEJA };
+/* ── Alta de dealers ────────────────────────────────────── */
+
+/* Buzón del equipo que revisa las solicitudes de empresa. */
+const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@tuequipord.do';
+
+/* Expediente para quien revisa. Va en texto plano y ordenado por
+   bloques: se lee entero desde el teléfono y se compara contra el
+   registro mercantil sin abrir el panel.
+ *
+ * Este es el único correo que lleva el RNC completo, y va a una
+ * dirección interna. No se reenvía al dealer ni aparece en ningún
+ * mensaje que reciba un tercero. */
+function enviarSolicitudDealer(s) {
+  const linea = (rotulo, valor) => (valor == null || valor === '' ? null : `${rotulo}: ${valor}`);
+  const ubicacion = [s.direccion, s.municipio, s.provincia].filter(Boolean).join(', ');
+
+  const cuerpo = [
+    'Solicitud de cuenta de dealer pendiente de revisión.',
+    '',
+    '── Empresa ──',
+    linea('Razón social', s.razon_social),
+    linea('Nombre comercial', s.nombre_comercial),
+    linea('RNC', s.rnc),
+    linea('Años operando', s.anios_operando),
+    linea('Dirección', ubicacion),
+    linea('Teléfono', s.telefono),
+    linea('Web', s.web),
+    '',
+    '── Responsable ──',
+    linea('Encargado', s.encargado),
+    linea('Cargo', s.cargo),
+    linea('Abrió la cuenta', s.solicitante),
+    linea('Correo', s.correo_solicitante),
+    '',
+    '── Operación ──',
+    linea('Equipos en inventario', s.equipos_inventario),
+    linea('Equipos que desea publicar', s.equipos_publicar),
+    linea('Tipos de equipo', s.tipos_equipo),
+    '',
+    '── Contexto ──',
+    linea('Cómo nos conoció', s.origen),
+    linea('Comentario', s.comentario),
+    '',
+    `Solicitud ${s.id}`,
+    'Apruébela o recházela en /admin.html',
+  ].filter((l) => l !== null).join('\n');
+
+  return enviar({
+    para: REVISION,
+    asunto: `Solicitud de dealer · ${s.razon_social}`,
+    texto: cuerpo,
+  });
+}
+
+/* Resultado de la revisión, para la empresa. Un rechazo explica por
+   qué y cómo volver a intentarlo: una negativa sin motivo genera una
+   respuesta preguntando qué pasó, que hay que contestar igual. */
+function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug }) {
+  const texto = aprobada
+    ? [
+      nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+      `Revisamos los datos de ${empresa} y su cuenta de dealer quedó aprobada.`, '',
+      'Ya puede publicar equipos y su página de empresa aparecerá en el directorio',
+      'en cuanto contrate un plan que la incluya.',
+      slug ? `Su dirección será: https://tuequipord.do/dealer.html?d=${slug}` : null,
+      '',
+      'TuEquipoRD',
+    ]
+    : [
+      nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+      `Revisamos la solicitud de ${empresa} y por ahora no podemos aprobarla.`, '',
+      motivo ? `Motivo: ${motivo}` : 'No pudimos confirmar los datos de la empresa.',
+      '',
+      'Su cuenta sigue activa y puede escribirnos a dealers@tuequipord.do con la',
+      'documentación corregida para que la revisemos de nuevo.',
+      '',
+      'TuEquipoRD',
+    ];
+
+  return enviar({
+    para,
+    asunto: aprobada
+      ? `Su cuenta de dealer quedó aprobada · TuEquipoRD`
+      : `Sobre su solicitud de cuenta de dealer · TuEquipoRD`,
+    texto: texto.filter((l) => l !== null).join('\n'),
+  });
+}
+
+module.exports = {
+  enviar, enviarCodigo, enviarAvisoCambioClave,
+  enviarSolicitudDealer, enviarResolucionDealer,
+  BANDEJA, REVISION,
+};

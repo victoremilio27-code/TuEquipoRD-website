@@ -202,43 +202,123 @@ function pintarEmpresa() {
   caja.hidden = false;
 
   if (org.tipo === 'dealer') {
+    // Publicar exige las dos llaves: revisión aprobada y plan que
+    // incluya perfil. Se dicen por separado para que quien espera sepa
+    // cuál le falta en vez de ver un "no" sin explicación.
+    const revision = {
+      pendiente: {
+        clase: 'pastilla--ambar',
+        rotulo: 'En revisión',
+        nota: 'Estamos comprobando los datos de la empresa. Le escribiremos al correo de la cuenta en cuanto terminemos, normalmente en menos de 24 horas hábiles. Mientras tanto puede preparar sus equipos: se publicarán al aprobarse la cuenta.',
+      },
+      aprobada: {
+        clase: 'pastilla--verde',
+        rotulo: 'Aprobada',
+        nota: 'Su empresa está aprobada. La página pública aparece en el directorio mientras tenga un plan Dealer activo.',
+      },
+      rechazada: {
+        clase: 'pastilla--roja',
+        rotulo: 'No aprobada',
+        nota: 'No pudimos confirmar los datos de la empresa. Escríbanos desde <a href="contacto.html">contacto</a> con la documentación corregida y la revisamos de nuevo.',
+      },
+    }[org.estadoRevision] || { clase: '', rotulo: '—', nota: '' };
+
+    const aprobada = org.estadoRevision === 'aprobada';
+
     caja.innerHTML = `
       <h2 class="panel__titulo" id="t-empresa"><em>Perfil</em> de la empresa</h2>
       <dl class="plan-estado">
         <div><dt>Razón social</dt><dd>${esc(org.nombre)}</dd></div>
-        <div><dt>RNC</dt><dd class="num">${esc(org.rnc || '—')}</dd></div>
-        <div><dt>Dirección pública</dt><dd>${org.slug
+        <div><dt>RNC registrado</dt><dd class="num">${esc(org.rncMascara || '—')}</dd></div>
+        <div><dt>Estado de la solicitud</dt>
+          <dd><span class="pastilla ${revision.clase}">${esc(revision.rotulo)}</span></dd></div>
+        <div><dt>Dirección pública</dt><dd>${aprobada && org.slug
           ? `<a href="dealer.html?d=${encodeURIComponent(org.slug)}">/dealer.html?d=${esc(org.slug)}</a>`
-          : '—'}</dd></div>
-        <div><dt>Visible en el directorio</dt><dd>${org.perfilPublico ? 'Sí' : 'Al contratar un plan Dealer'}</dd></div>
+          : 'Al aprobarse la cuenta'}</dd></div>
+        <div><dt>Visible en el directorio</dt><dd>${aprobada
+          ? (org.perfilPublico ? 'Sí' : 'Al contratar un plan Dealer')
+          : 'No, hasta que se apruebe'}</dd></div>
       </dl>
-      <p class="panel__nota">El RNC queda asociado de forma permanente a esta cuenta. Para cambiar la razón social o la descripción de la página pública, escríbanos desde <a href="contacto.html">contacto</a>.</p>`;
+      <p class="panel__nota">${revision.nota}</p>
+      <p class="panel__nota">Mostramos solo los últimos dígitos del RNC. Es un dato reservado: lo usamos para comprobar que la empresa existe y nunca aparece en su página pública ni en el directorio. Para cambiar la razón social o la descripción, escríbanos desde <a href="contacto.html">contacto</a>.</p>`;
     return;
   }
 
   caja.innerHTML = `
     <h2 class="panel__titulo" id="t-empresa"><em>¿Comercializa</em> maquinaria de forma habitual?</h2>
-    <p class="panel__texto">Registre el RNC de su empresa y su cuenta pasa a ser de dealer: se genera una página pública con todo su inventario y, al contratar un plan Dealer, aparece en el directorio. Los equipos que ya publicó se mantienen.</p>
-    <form class="form-rnc" id="formRnc" novalidate>
-      <div class="campos">
-        <label class="campo-v"><span>Razón social *</span>
-          <input type="text" id="rnc-empresa" placeholder="Ej. Sur Maquinarias, SRL" autocomplete="organization">
-        </label>
-        <label class="campo-v"><span>RNC *</span>
-          <input type="text" id="rnc-numero" inputmode="numeric" placeholder="9 dígitos (RNC) u 11 (cédula)">
-        </label>
-        <label class="campo-v campo-v--ancho"><span>Descripción de la empresa</span>
-          <textarea id="rnc-descripcion" placeholder="A qué se dedica, desde cuándo opera y qué marcas maneja. Se muestra en su página pública."></textarea>
-        </label>
-      </div>
+    <p class="panel__texto">Solicite la cuenta de empresa: revisamos los datos y, una vez aprobada, se genera su página pública con todo el inventario y aparece en el directorio al contratar un plan Dealer. Los equipos que ya publicó se mantienen.</p>
+    <form class="form-rnc solicitud" id="formRnc" novalidate>
+      <fieldset class="solicitud__bloque">
+        <legend class="solicitud__titulo">La empresa</legend>
+        <div class="campos">
+          <label class="campo-v"><span>Razón social *</span>
+            <input type="text" id="rnc-empresa" placeholder="Ej. Sur Maquinarias, SRL" autocomplete="organization">
+          </label>
+          <label class="campo-v"><span>RNC *</span>
+            <input type="text" id="rnc-numero" inputmode="numeric" maxlength="11" placeholder="9 dígitos">
+            <small class="campo-v__ayuda">Uso interno. No aparece en su página pública.</small>
+          </label>
+          <label class="campo-v"><span>Nombre comercial</span>
+            <input type="text" id="rnc-comercial" placeholder="Si opera con otro nombre">
+          </label>
+          <label class="campo-v"><span>Años operando</span>
+            <input type="number" id="rnc-anios" inputmode="numeric" min="0" max="120" placeholder="Ej. 8">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="solicitud__bloque">
+        <legend class="solicitud__titulo">Quién responde por la empresa</legend>
+        <div class="campos">
+          <label class="campo-v"><span>Encargado o representante *</span>
+            <input type="text" id="rnc-encargado" placeholder="Nombre y apellido">
+          </label>
+          <label class="campo-v"><span>Cargo</span>
+            <input type="text" id="rnc-cargo" placeholder="Ej. Gerente de ventas">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="solicitud__bloque">
+        <legend class="solicitud__titulo">Su operación</legend>
+        <div class="campos">
+          <label class="campo-v"><span>Equipos en inventario</span>
+            <input type="number" id="rnc-inventario" inputmode="numeric" min="0" placeholder="Ej. 24">
+          </label>
+          <label class="campo-v"><span>Equipos que desea publicar</span>
+            <input type="number" id="rnc-publicar" inputmode="numeric" min="0" placeholder="Ej. 12">
+          </label>
+          <label class="campo-v campo-v--ancho"><span>Tipos de equipo</span>
+            <input type="text" id="rnc-tipos" placeholder="Ej. excavadoras, retroexcavadoras, plantas eléctricas">
+          </label>
+          <label class="campo-v campo-v--ancho"><span>Descripción de la empresa</span>
+            <textarea id="rnc-descripcion" placeholder="A qué se dedica, desde cuándo opera y qué marcas maneja. Se muestra en su página pública."></textarea>
+          </label>
+        </div>
+      </fieldset>
+
       <p class="acceso__aviso" id="avisoRnc" role="alert" hidden></p>
-      <button class="btn btn--ambar btn--grande" type="submit">Registrar el RNC</button>
+      <button class="btn btn--ambar btn--grande" type="submit">Enviar la solicitud</button>
+      <p class="panel__nota">Al enviarla, su cuenta queda en revisión. Le escribimos al correo de la cuenta con el resultado.</p>
     </form>`;
 
   $('#formRnc').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const aviso = $('#avisoRnc');
     aviso.hidden = true;
+
+    const fallar = (mensaje) => {
+      aviso.hidden = false;
+      aviso.textContent = mensaje;
+    };
+
+    if ($('#rnc-numero').value.replace(/\D/g, '').length !== 9) {
+      return fallar('El RNC de la empresa tiene 9 dígitos.');
+    }
+    if (!$('#rnc-encargado').value.trim()) {
+      return fallar('Indique quién responde por la empresa.');
+    }
+
     try {
       const datos = await api('/dealer/registro', {
         metodo: 'POST',
@@ -246,6 +326,13 @@ function pintarEmpresa() {
           empresa: $('#rnc-empresa').value.trim(),
           rnc: $('#rnc-numero').value.trim(),
           descripcion: $('#rnc-descripcion').value.trim(),
+          nombreComercial: $('#rnc-comercial').value.trim(),
+          aniosOperando: $('#rnc-anios').value,
+          encargado: $('#rnc-encargado').value.trim(),
+          cargo: $('#rnc-cargo').value.trim(),
+          equiposInventario: $('#rnc-inventario').value,
+          equiposPublicar: $('#rnc-publicar').value,
+          tiposEquipo: $('#rnc-tipos').value.trim(),
         },
       });
       if (!datos) throw new Error('No hay conexión con el servidor.');
@@ -254,8 +341,7 @@ function pintarEmpresa() {
       pintarPlan(null);
       location.reload();
     } catch (e) {
-      aviso.hidden = false;
-      aviso.textContent = e.message;
+      fallar(e.message);
     }
   });
 }
@@ -419,8 +505,13 @@ async function montarPanel() {
 
   const org = SESION.organizacion || {};
   $('#panelTitulo').innerHTML = `<em>${esc((org.nombre || SESION.usuario.nombre).split(/[\s,]+/)[0])}</em> ${esc((org.nombre || '').replace(/^\S+\s*/, ''))}`;
+  // Atajo a la cola de revisión para quien la atiende. El permiso lo
+  // comprueba la API en cada llamada; esto solo evita teclear la URL.
+  if (SESION.usuario.esAdmin) $('#enlaceAdmin').hidden = false;
+
+  const estadoEmpresa = { pendiente: 'en revisión', rechazada: 'no aprobada' }[org.estadoRevision];
   $('#panelSub').textContent = org.tipo === 'dealer'
-    ? `Cuenta de empresa · RNC ${org.rnc || 'pendiente'} · ${SESION.usuario.correo}`
+    ? `Cuenta de empresa${estadoEmpresa ? ` (${estadoEmpresa})` : ''} · ${SESION.usuario.correo}`
     : `Cuenta particular · ${SESION.usuario.correo}`;
 
   pintarMetricas(datos.resumen || {});

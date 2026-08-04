@@ -57,17 +57,29 @@ function montarCuenta() {
 
   if (new URLSearchParams(location.search).get('crear') === '1') vista('formCrear');
 
-  // Los campos de empresa solo existen para la cuenta de dealer.
+  /* La solicitud de empresa solo existe para la cuenta de dealer. Se
+     oculta el bloque entero en vez de campo por campo: así el
+     formulario del particular queda en cuatro casillas y no en una
+     lista larga con huecos. */
   const tipo = el('tipoCuenta');
   function pintarTipo() {
     const dealer = (tipo.querySelector('input:checked') || {}).value === 'dealer';
-    document.querySelectorAll('.campo-v--empresa').forEach((c) => { c.hidden = !dealer; });
-    el('notaRnc').hidden = !dealer;
+    el('bloqueEmpresa').hidden = !dealer;
     el('new-telefono').closest('.campo-v').querySelector('span').textContent =
       dealer ? 'Teléfono principal *' : 'Teléfono';
+    // El dealer no crea la cuenta: pide que se la revisen. El botón lo
+    // dice, para que nadie espere entrar publicando.
+    el('btnCrear').textContent = dealer ? 'Enviar solicitud' : 'Crear cuenta';
   }
   tipo.addEventListener('change', pintarTipo);
   pintarTipo();
+
+  // El RNC son 9 dígitos: se limpia lo que se pegue con guiones o
+  // espacios para que el contador de abajo cuadre con lo que se envía.
+  const rnc = el('new-rnc');
+  rnc.addEventListener('input', () => {
+    rnc.value = rnc.value.replace(/\D/g, '').slice(0, 9);
+  });
 
   // Formato del teléfono y de los códigos mientras se escribe.
   const telefono = el('new-telefono');
@@ -142,6 +154,13 @@ function montarCuenta() {
 
     if (clave.length < 10) return mostrarAviso('La contraseña debe tener al menos 10 caracteres.');
     if (dealer) {
+      if (!el('new-empresa').value.trim()) return mostrarAviso('Escriba la razón social de la empresa.');
+      if (el('new-rnc').value.replace(/\D/g, '').length !== 9) {
+        return mostrarAviso('El RNC de la empresa tiene 9 dígitos.');
+      }
+      if (!el('new-encargado').value.trim()) {
+        return mostrarAviso('Indique el nombre del encargado o representante.');
+      }
       if (el('new-telefono').value.replace(/\D/g, '').length !== 10) {
         return mostrarAviso('Indique el teléfono principal de la empresa, de 10 dígitos.');
       }
@@ -151,18 +170,35 @@ function montarCuenta() {
       if (!el('new-provincia').value) return mostrarAviso('Elija la provincia de la oficina principal.');
     }
 
-    enviar(el('formCrear'), '/cuenta/registro', {
+    const cuerpo = {
       correo: el('new-correo').value.trim(),
       clave,
       nombre: el('new-nombre').value.trim(),
       telefono: el('new-telefono').value.trim(),
       tipo: dealer ? 'dealer' : 'particular',
+    };
+
+    // Los datos de empresa solo viajan si son de una empresa. Mandarlos
+    // vacíos en el alta de un particular no rompe nada, pero deja la
+    // petición contando cosas que no existen.
+    if (dealer) Object.assign(cuerpo, {
       empresa: el('new-empresa').value.trim(),
       rnc: el('new-rnc').value.trim(),
       direccion: el('new-direccion').value.trim(),
       provincia: el('new-provincia').value,
       municipio: el('new-municipio').value.trim(),
-    }, seguir);
+      nombreComercial: el('new-comercial').value.trim(),
+      aniosOperando: el('new-anios').value,
+      encargado: el('new-encargado').value.trim(),
+      cargo: el('new-cargo').value.trim(),
+      equiposInventario: el('new-inventario').value,
+      equiposPublicar: el('new-publicar').value,
+      tiposEquipo: el('new-tipos').value.trim(),
+      origen: el('new-origen').value,
+      comentario: el('new-comentario').value.trim(),
+    });
+
+    enviar(el('formCrear'), '/cuenta/registro', cuerpo, seguir);
   });
 
   // ── Código de verificación o de acceso ──

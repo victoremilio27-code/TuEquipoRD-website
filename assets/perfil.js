@@ -41,7 +41,10 @@ function pintarPerfil(datos) {
         <h1 class="perfil__nombre">${esc(d.nombre)}</h1>
         <p class="perfil__meta">
           ${d.verificada ? `<span class="pastilla pastilla--verde">${icono('i-check')} Anunciante verificado</span>` : ''}
-          <span>RNC <b class="num">${esc(d.rnc || '—')}</b></span>
+          <!-- Aquí se imprimía el RNC. Es un dato fiscal reservado: se
+               comprueba al aprobar la empresa y no se enseña a nadie.
+               Lo que el comprador necesita saber —que la empresa fue
+               revisada— lo dice el sello de verificada. -->
           <span>En TuEquipoRD desde ${desde}</span>
           <span><b class="num">${anuncios.length}</b> ${anuncios.length === 1 ? 'equipo publicado' : 'equipos publicados'}</span>
         </p>

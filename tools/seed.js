@@ -212,7 +212,13 @@ function sembrar() {
     porClave.set(a.clave, org);
 
     if (a.tipo === 'dealer') {
-      d.prepare('UPDATE organizaciones SET web = ?, descripcion = ?, verificada = ? WHERE id = ?')
+      // Los dealers de demostración nacen aprobados. `crearCuenta` los
+      // deja 'pendiente', que es lo correcto en el sitio real, pero una
+      // demostración con el directorio vacío no enseña nada: aquí se
+      // simula que ya pasaron la revisión.
+      d.prepare(`UPDATE organizaciones
+                 SET web = ?, descripcion = ?, verificada = ?, estado_revision = 'aprobada'
+                 WHERE id = ?`)
         .run(a.web || null, a.descripcion || null, a.verificada ? 1 : 0, org.id);
       (a.sucursales || []).forEach((s) => db.crearSucursal(org.id, s));
     }

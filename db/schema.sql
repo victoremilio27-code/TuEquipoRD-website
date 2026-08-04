@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
   clave_hash     TEXT NOT NULL,
   clave_sal      TEXT NOT NULL,
   correo_verificado INTEGER NOT NULL DEFAULT 0,
+  -- Personal de TuEquipoRD que revisa las solicitudes de dealer. No se
+  -- otorga desde ninguna pantalla: se pone a mano con tools/admin.js,
+  -- de modo que nadie pueda concedérselo registrándose.
+  es_admin       INTEGER NOT NULL DEFAULT 0,
   creado         TEXT NOT NULL,
   ultimo_acceso  TEXT
 );
@@ -64,6 +68,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- el mismo registro nacional. En SQLite y en PostgreSQL, UNIQUE deja
 -- pasar varios NULL, que es justo lo que hace falta para que los
 -- particulares no choquen entre sí.
+--
+-- El RNC es dato reservado: identifica fiscalmente a la empresa y solo
+-- se usa para comprobar que existe. No sale en ninguna respuesta
+-- pública; las consultas del directorio y del perfil no lo seleccionan
+-- siquiera, para que no pueda escaparse por un `SELECT *`.
 CREATE TABLE IF NOT EXISTS organizaciones (
   id             TEXT PRIMARY KEY,
   tipo           TEXT NOT NULL CHECK (tipo IN ('particular', 'dealer')),
@@ -77,11 +86,18 @@ CREATE TABLE IF NOT EXISTS organizaciones (
   logo           TEXT,
   verificada     INTEGER NOT NULL DEFAULT 0, -- sello, se otorga a mano
   perfil_publico INTEGER NOT NULL DEFAULT 0, -- el plan lo habilita
+  -- Segunda condición para salir publicado, independiente del plan.
+  -- Un particular no pasa por revisión y se queda en 'no_aplica'.
+  -- Son dos llaves separadas a propósito: así da igual el orden en que
+  -- ocurran el pago y la aprobación, y el directorio exige las dos.
+  estado_revision TEXT NOT NULL DEFAULT 'no_aplica'
+                  CHECK (estado_revision IN ('no_aplica', 'pendiente', 'aprobada', 'rechazada')),
   creada         TEXT NOT NULL,
   actualizada    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS ix_org_tipo ON organizaciones (tipo);
+CREATE INDEX IF NOT EXISTS ix_org_revision ON organizaciones (estado_revision);
 
 -- Rol de cada persona dentro de cada organización.
 --   propietario    — factura, contrata y puede eliminar la organización
@@ -115,6 +131,50 @@ CREATE TABLE IF NOT EXISTS sucursales (
 );
 
 CREATE INDEX IF NOT EXISTS ix_sucursales_org ON sucursales (organizacion_id);
+
+-- ── Alta de dealers ────────────────────────────────────────
+
+-- Lo que declara una empresa al pedir su cuenta de dealer. Existe
+-- aparte de `organizaciones` por dos razones: son datos de un momento
+-- concreto que no deben cambiar cuando la empresa edite su perfil, y
+-- así el administrador revisa lo que se declaró, no lo que se editó
+-- después.
+--
+-- El RNC no se copia aquí: vive solo en `organizaciones`. Un dato
+-- reservado guardado en dos sitios se filtra por el que se olvide.
+CREATE TABLE IF NOT EXISTS solicitudes_dealer (
+  id               TEXT PRIMARY KEY,
+  organizacion_id  TEXT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+  usuario_id       TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+
+  -- Identidad de la empresa
+  nombre_comercial TEXT,                    -- si opera con otro nombre
+  anios_operando   INTEGER,
+
+  -- Quién responde por la empresa
+  encargado        TEXT NOT NULL,
+  cargo            TEXT,
+
+  -- Operación: dimensiona el negocio y permite ver si el alta encaja
+  equipos_inventario INTEGER,
+  equipos_publicar   INTEGER,
+  tipos_equipo     TEXT,
+
+  -- Contexto libre
+  origen           TEXT,                    -- cómo llegó a TuEquipoRD
+  comentario       TEXT,
+
+  -- Revisión
+  estado           TEXT NOT NULL DEFAULT 'pendiente'
+                   CHECK (estado IN ('pendiente', 'aprobada', 'rechazada')),
+  creada           TEXT NOT NULL,
+  revisada         TEXT,
+  revisada_por     TEXT REFERENCES usuarios(id),
+  motivo           TEXT                     -- por qué se rechazó
+);
+
+CREATE INDEX IF NOT EXISTS ix_solicitudes_estado ON solicitudes_dealer (estado, creada);
+CREATE INDEX IF NOT EXISTS ix_solicitudes_org ON solicitudes_dealer (organizacion_id);
 
 -- Sesiones. Cookie con un testigo aleatorio; nada de estado en memoria
 -- para que el día que corran dos procesos no haya que cambiar nada.

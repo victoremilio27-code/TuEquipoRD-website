@@ -95,24 +95,6 @@
           <label class="campo-v"><span>Teléfono</span>
             <input type="tel" id="new-telefono" autocomplete="tel" placeholder="(809) 000-0000">
           </label>
-
-          <label class="campo-v campo-v--empresa"><span>Razón social *</span>
-            <input type="text" id="new-empresa" autocomplete="organization" placeholder="Ej. Sur Maquinarias, SRL">
-          </label>
-          <label class="campo-v campo-v--empresa"><span>RNC *</span>
-            <input type="text" id="new-rnc" inputmode="numeric" placeholder="9 dígitos (RNC) u 11 (cédula)">
-          </label>
-
-          <label class="campo-v campo-v--empresa campo-v--ancho"><span>Dirección de la oficina principal *</span>
-            <input type="text" id="new-direccion" autocomplete="street-address" placeholder="Ej. Av. Luperón km 12, nave 4, Zona Industrial">
-          </label>
-          <label class="campo-v campo-v--empresa"><span>Provincia *</span>
-            <select id="new-provincia" data-provincias><option value="">Elija una provincia</option></select>
-          </label>
-          <label class="campo-v campo-v--empresa"><span>Municipio o sector</span>
-            <input type="text" id="new-municipio" placeholder="Ej. Herrera">
-          </label>
-
           <label class="campo-v"><span>Correo electrónico *</span>
             <input type="email" id="new-correo" autocomplete="email" required>
           </label>
@@ -121,12 +103,107 @@
           </label>
         </div>
 
-        <p class="nota-rnc" id="notaRnc" hidden>
-          <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
-          <span>El RNC queda asociado de forma permanente a la cuenta y no puede reclamarlo otra empresa. La dirección y el teléfono forman su oficina principal; después puede añadir todas las sucursales que necesite desde el panel.</span>
-        </p>
+        <!-- Solicitud de empresa. Se despliega al elegir la cuenta de
+             dealer y va en bloques cortos: son datos que se buscan en
+             sitios distintos (el registro mercantil, la oficina, el
+             inventario) y agruparlos así evita saltar de uno a otro. -->
+        <div class="solicitud" id="bloqueEmpresa" hidden>
+          <p class="solicitud__intro">
+            Revisamos cada empresa antes de publicarla. Le pedimos solo lo necesario
+            para confirmar que existe y ponernos en contacto; la respuesta llega por
+            correo, normalmente en menos de 24 horas hábiles.
+          </p>
 
-        <button class="btn btn--ambar btn--bloque btn--grande" type="submit">Crear cuenta</button>
+          <fieldset class="solicitud__bloque">
+            <legend class="solicitud__titulo">La empresa</legend>
+            <div class="campos">
+              <label class="campo-v"><span>Razón social *</span>
+                <input type="text" id="new-empresa" autocomplete="organization" placeholder="Ej. Sur Maquinarias, SRL">
+              </label>
+              <label class="campo-v"><span>RNC *</span>
+                <input type="text" id="new-rnc" inputmode="numeric" maxlength="11" placeholder="9 dígitos">
+                <small class="campo-v__ayuda">Uso interno. Nunca aparece en su página pública.</small>
+              </label>
+              <label class="campo-v"><span>Nombre comercial</span>
+                <input type="text" id="new-comercial" placeholder="Si opera con otro nombre">
+              </label>
+              <label class="campo-v"><span>Años operando</span>
+                <input type="number" id="new-anios" inputmode="numeric" min="0" max="120" placeholder="Ej. 8">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="solicitud__bloque">
+            <legend class="solicitud__titulo">Quién responde por la empresa</legend>
+            <div class="campos">
+              <label class="campo-v"><span>Encargado o representante *</span>
+                <input type="text" id="new-encargado" placeholder="Nombre y apellido">
+              </label>
+              <label class="campo-v"><span>Cargo</span>
+                <input type="text" id="new-cargo" placeholder="Ej. Gerente de ventas">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="solicitud__bloque">
+            <legend class="solicitud__titulo">Oficina principal</legend>
+            <div class="campos">
+              <label class="campo-v campo-v--ancho"><span>Dirección *</span>
+                <input type="text" id="new-direccion" autocomplete="street-address" placeholder="Ej. Av. Luperón km 12, nave 4, Zona Industrial">
+              </label>
+              <label class="campo-v"><span>Provincia *</span>
+                <select id="new-provincia" data-provincias><option value="">Elija una provincia</option></select>
+              </label>
+              <label class="campo-v"><span>Municipio o sector</span>
+                <input type="text" id="new-municipio" placeholder="Ej. Herrera">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="solicitud__bloque">
+            <legend class="solicitud__titulo">Su operación</legend>
+            <div class="campos">
+              <label class="campo-v"><span>Equipos en inventario</span>
+                <input type="number" id="new-inventario" inputmode="numeric" min="0" placeholder="Ej. 24">
+              </label>
+              <label class="campo-v"><span>Equipos que desea publicar</span>
+                <input type="number" id="new-publicar" inputmode="numeric" min="0" placeholder="Ej. 12">
+              </label>
+              <label class="campo-v campo-v--ancho"><span>Tipos de equipo</span>
+                <input type="text" id="new-tipos" placeholder="Ej. excavadoras, retroexcavadoras, plantas eléctricas">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="solicitud__bloque">
+            <legend class="solicitud__titulo">Para terminar</legend>
+            <div class="campos">
+              <label class="campo-v"><span>¿Cómo nos conoció?</span>
+                <select id="new-origen">
+                  <option value="">Prefiero no decirlo</option>
+                  <option>Búsqueda en internet</option>
+                  <option>Redes sociales</option>
+                  <option>Recomendación de un colega</option>
+                  <option>Ya soy cliente de TuEquipoRD</option>
+                  <option>Otro</option>
+                </select>
+              </label>
+              <label class="campo-v campo-v--ancho"><span>Algo más que debamos saber</span>
+                <textarea id="new-comentario" rows="3" placeholder="Opcional"></textarea>
+              </label>
+            </div>
+          </fieldset>
+
+          <p class="nota-rnc">
+            <svg class="ico" aria-hidden="true"><use href="#i-candado"/></svg>
+            <span>El RNC se usa únicamente para comprobar que la empresa está constituida.
+              Queda asociado de forma permanente a la cuenta, no puede reclamarlo otra
+              empresa y no se muestra en el directorio, en su página pública ni a
+              ningún comprador.</span>
+          </p>
+        </div>
+
+        <button class="btn btn--ambar btn--bloque btn--grande" type="submit" id="btnCrear">Crear cuenta</button>
         <p class="acceso__legal">Al crear la cuenta acepta las <a href="legal.html">condiciones de uso</a> y la política de privacidad.</p>
       </form>
 

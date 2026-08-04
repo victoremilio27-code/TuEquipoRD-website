@@ -1275,7 +1275,10 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 
 .campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .campos--uno { grid-template-columns: minmax(0, 1fr); }
-.campo-v { display: grid; gap: 5px; }
+/* `align-content: start` mantiene rótulo y campo pegados arriba. Sin
+   esto, un campo con texto de ayuda debajo estira su fila y el campo
+   vecino, que no lo tiene, queda descolgado unos píxeles. */
+.campo-v { display: grid; gap: 5px; align-content: start; }
 .campo-v--ancho { grid-column: 1 / -1; }
 .campo-v > span { font-size: 12.5px; font-weight: 600; color: var(--gris-acero); }
 .campo-v input, .campo-v textarea, .campo-v select {
@@ -2421,4 +2424,111 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Solicitud de cuenta de empresa y revisión
+   ═══════════════════════════════════════════════════════════ */
+
+/* Bloques cortos con un título tenue. Sin cajas ni sombras: lo que
+   ordena el formulario es el espacio entre grupos y una línea fina,
+   no un marco alrededor de cada uno. */
+.solicitud { margin-top: 18px; }
+
+.solicitud__intro {
+  margin: 0 0 18px;
+  padding: 11px 13px;
+  background: var(--hueso, #F7F5EF);
+  border-left: 3px solid var(--ambar);
+  border-radius: var(--r);
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--gris-acero, #33475A);
+}
+
+.solicitud__bloque {
+  margin: 0 0 20px; padding: 0 0 18px;
+  border: 0; border-bottom: 1px solid var(--linea-suave);
+}
+.solicitud__bloque:last-of-type { border-bottom: 0; padding-bottom: 4px; }
+
+.solicitud__titulo {
+  padding: 0; margin-bottom: 11px;
+  font-family: var(--display); font-size: 12px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ambar-hondo);
+}
+
+/* Ayuda bajo un campo: el sitio donde se explica que el RNC no se
+   publica, justo donde se escribe. */
+.campo-v__ayuda {
+  display: block; margin-top: 4px;
+  font-size: 11.5px; line-height: 1.5;
+  color: var(--texto-claro, #60717D);
+}
+
+.pastilla--roja { background: rgba(179, 38, 30, .1); color: #B3261E; }
+
+/* ── Cola de revisión ───────────────────────────────────── */
+
+.revision__filtros { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+
+.revision__vacio {
+  padding: 34px 20px; text-align: center;
+  font-size: 13.5px; color: var(--texto-claro, #60717D);
+}
+
+.solicitudes { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+
+.sol {
+  display: grid; gap: 3px;
+  padding: 15px 17px;
+  background: var(--blanco); border: 1px solid var(--linea);
+  border-left: 3px solid var(--ambar);
+  border-radius: var(--r);
+}
+.sol--aprobada { border-left-color: var(--verde); }
+.sol--rechazada { border-left-color: #B3261E; }
+
+.sol__cabeza { display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px; }
+.sol__nombre { font-family: var(--display); font-size: 15.5px; font-weight: 700; color: var(--azul); }
+.sol__meta { font-size: 12.5px; color: var(--gris-acero, #33475A); }
+.sol__fecha { margin-left: auto; font-size: 11.5px; color: var(--texto-claro, #60717D); }
+
+.sol__acciones { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+
+/* Expediente desplegado. El RNC va en tabular para poder cotejarlo
+   dígito a dígito contra el registro mercantil. */
+.sol__detalle {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--linea-suave);
+}
+.sol__datos {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 11px 18px; margin: 0;
+}
+.sol__datos dt {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--texto-claro, #60717D);
+}
+.sol__datos dd { margin: 2px 0 0; font-size: 13.5px; color: var(--azul); }
+.sol__datos dd.num { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+.sol__reservado {
+  margin-top: 12px; padding: 9px 12px;
+  background: rgba(179, 38, 30, .05);
+  border: 1px dashed rgba(179, 38, 30, .3);
+  border-radius: var(--r);
+  font-size: 11.5px; line-height: 1.55; color: #7A1B15;
+}
+
+.sol__motivo { margin-top: 11px; }
+.sol__motivo textarea {
+  width: 100%; min-height: 62px; padding: 9px 11px;
+  background: var(--blanco); border: 1px solid var(--linea); border-radius: 4px;
+  font-family: var(--cuerpo); font-size: 13px; color: var(--azul); resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .sol__fecha { margin-left: 0; width: 100%; }
+  .sol__acciones .btn { flex: 1 1 auto; }
 }

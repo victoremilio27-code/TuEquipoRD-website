@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión de dealers · TuEquipoRD</title>
+<meta name="description" content="Cola interna de revisión de solicitudes de cuenta de empresa.">
+<meta name="theme-color" content="#071A2B">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="panel.html">Mi panel</a>
+        <a href="dealers.html">Directorio</a>
+        <a href="equipos.html">Equipos</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <!-- Quien no es administrador no ve que esta página trata de algo:
+       la API responde 404 a esa sesión y aquí se dice lo mismo. -->
+  <div class="panel-vacio" id="adminSinAcceso" hidden>
+    <h1 class="vacio__titulo">Página no encontrada</h1>
+    <p class="vacio__texto">La dirección que abrió no existe o no tiene acceso a ella.</p>
+    <div class="vacio__acciones">
+      <a class="btn btn--ambar" href="index.html">Ir al inicio</a>
+    </div>
+  </div>
+
+  <div id="adminCargando" class="panel-cargando">Cargando la cola de revisión...</div>
+
+  <div id="adminContenido" hidden>
+    <header class="pagina pagina--panel">
+      <div>
+        <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Revisión</span></nav>
+        <h1 class="pagina__titulo"><em>Solicitudes</em> de dealer</h1>
+        <p class="pagina__sub" id="adminSub"></p>
+      </div>
+    </header>
+
+    <section class="panel" aria-labelledby="t-cola">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-cola"><em>Cola</em> de revisión</h2>
+      </div>
+
+      <div class="revision__filtros" role="tablist" aria-label="Estado de las solicitudes">
+        <button type="button" class="btn btn--ambar btn--chico" data-estado="pendiente" role="tab" aria-selected="true">Pendientes</button>
+        <button type="button" class="btn btn--linea btn--chico" data-estado="aprobada" role="tab" aria-selected="false">Aprobadas</button>
+        <button type="button" class="btn btn--linea btn--chico" data-estado="rechazada" role="tab" aria-selected="false">Rechazadas</button>
+      </div>
+
+      <p class="acceso__aviso" id="avisoAdmin" role="alert" hidden></p>
+
+      <ul class="solicitudes" id="listaSolicitudes"></ul>
+      <p class="revision__vacio" id="colaVacia" hidden></p>
+    </section>
+  </div>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>
