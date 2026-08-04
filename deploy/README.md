@@ -1,6 +1,6 @@
 # Despliegue de TuEquipoRD en un VPS
 
-Ubuntu 24.04. Sustituye `DOMINIO` por el dominio real en todos los pasos.
+Ubuntu 24.04. El dominio ya está puesto en todos los archivos: `tuequipord.com`.
 
 El sitio corre como un proceso Node en el puerto 8080, escuchando solo
 en local. Nginx lo publica hacia fuera en los puertos 80 y 443 y se
@@ -61,9 +61,9 @@ TUEQUIPO_SECRETO=<el valor generado arriba>
 
 TUEQUIPO_CORREO=brevo
 BREVO_API_KEY=<la clave de Brevo>
-TUEQUIPO_REMITENTE=TuEquipoRD <no-responder@DOMINIO>
-TUEQUIPO_REVISION=dealers@DOMINIO
-TUEQUIPO_SITIO=https://DOMINIO
+TUEQUIPO_REMITENTE=TuEquipoRD <no-responder@tuequipord.com>
+TUEQUIPO_REVISION=dealers@tuequipord.com
+TUEQUIPO_SITIO=https://tuequipord.com
 ```
 
 Ciérralo para que solo root lo lea:
@@ -99,7 +99,7 @@ curl -I http://127.0.0.1:8080/
 
 ```bash
 cp /var/www/tuequipord/deploy/nginx.conf /etc/nginx/sites-available/tuequipord
-sed -i 's/DOMINIO/tudominio.com/g' /etc/nginx/sites-available/tuequipord
+# El archivo ya trae tuequipord.com; no hace falta sustituir nada
 ln -s /etc/nginx/sites-available/tuequipord /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
@@ -116,13 +116,13 @@ En el panel del registrador, apuntando a la IP del VPS:
 
 Espera a que propague antes del paso siguiente; certbot falla si el
 dominio todavía no resuelve al servidor. Verifica con
-`dig +short tudominio.com`.
+`dig +short tuequipord.com`.
 
 ## 7. HTTPS
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d tudominio.com -d www.tudominio.com
+certbot --nginx -d tuequipord.com -d www.tuequipord.com
 ```
 
 Certbot reescribe la configuración de nginx para servir por HTTPS y

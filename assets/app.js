@@ -1339,7 +1339,7 @@ function montarCotizaciones() {
         <dl class="resumen__lista">
           ${datos.map((d) => `<div><dt>${esc(etiquetaDe(d.clave))}</dt><dd>${esc(d.valor)}</dd></div>`).join('')}
         </dl>
-        <p class="resumen__nota">Copie este resumen y remítalo por WhatsApp al <a href="https://wa.me/18090000000" rel="noopener">(809) 000-0000</a> o al correo <a href="mailto:hola@tuequipord.do">hola@tuequipord.do</a>. Le respondemos con precio y disponibilidad.</p>`;
+        <p class="resumen__nota">Copie este resumen y remítalo por WhatsApp al <a href="https://wa.me/18090000000" rel="noopener">(809) 000-0000</a> o al correo <a href="mailto:hola@tuequipord.com">hola@tuequipord.com</a>. Le respondemos con precio y disponibilidad.</p>`;
       destino.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   });

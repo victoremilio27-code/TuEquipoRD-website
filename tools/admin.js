@@ -1,8 +1,8 @@
 /**
  * admin.js — concede o retira el permiso de revisar solicitudes.
  *
- *   node tools/admin.js conceder victor@tuequipord.do
- *   node tools/admin.js retirar  victor@tuequipord.do
+ *   node tools/admin.js conceder victor@tuequipord.com
+ *   node tools/admin.js retirar  victor@tuequipord.com
  *   node tools/admin.js listar
  *
  * Deliberadamente fuera del sitio: no hay pantalla, ruta ni formulario

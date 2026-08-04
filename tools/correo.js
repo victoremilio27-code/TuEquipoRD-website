@@ -9,10 +9,10 @@
  *     consola. Se puede probar el flujo entero sin cuenta de correo
  *     ni riesgo de escribirle a una dirección real por error.
  *
- *   · 'smtp' — el hueco para producción. Se implementa aquí y ni la
- *     API ni las pantallas se enteran del cambio.
+ *   · 'brevo' — producción. Correo transaccional por la API HTTPS de
+ *     Brevo. Ni la API ni las pantallas se enteran del cambio.
  *
- * Elegir con TUEQUIPO_CORREO=smtp.
+ * Elegir con TUEQUIPO_CORREO=brevo y definir BREVO_API_KEY.
  */
 
 const fs = require('fs');
@@ -21,7 +21,7 @@ const path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const BANDEJA = path.join(RAIZ, '.tmp', 'correos');
 
-const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'TuEquipoRD <no-responder@tuequipord.do>';
+const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'TuEquipoRD <no-responder@tuequipord.com>';
 const TRANSPORTE = process.env.TUEQUIPO_CORREO || 'archivo';
 
 /* Escapa lo que venga del usuario antes de meterlo en el HTML del
@@ -214,7 +214,7 @@ function enviarAvisoCambioClave({ para, nombre }) {
       nombre ? `Hola, ${nombre}:` : 'Hola:', '',
       'La contraseña de su cuenta de TuEquipoRD acaba de cambiar y se cerraron todas las sesiones abiertas.', '',
       'Si fue usted, no hay nada que hacer.',
-      'Si no fue usted, escriba de inmediato a hola@tuequipord.do.', '',
+      'Si no fue usted, escriba de inmediato a hola@tuequipord.com.', '',
       'TuEquipoRD',
     ].join('\n'),
   });
@@ -223,7 +223,7 @@ function enviarAvisoCambioClave({ para, nombre }) {
 /* ── Alta de dealers ────────────────────────────────────── */
 
 /* Buzón del equipo que revisa las solicitudes de empresa. */
-const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@tuequipord.do';
+const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@tuequipord.com';
 
 /* Expediente para quien revisa. Va en texto plano y ordenado por
    bloques: se lee entero desde el teléfono y se compara contra el
@@ -284,7 +284,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       `Revisamos los datos de ${empresa} y su cuenta de dealer quedó aprobada.`, '',
       'Ya puede publicar equipos y su página de empresa aparecerá en el directorio',
       'en cuanto contrate un plan que la incluya.',
-      slug ? `Su dirección será: https://tuequipord.do/dealer.html?d=${slug}` : null,
+      slug ? `Su dirección será: https://tuequipord.com/dealer.html?d=${slug}` : null,
       '',
       'TuEquipoRD',
     ]
@@ -293,7 +293,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       `Revisamos la solicitud de ${empresa} y por ahora no podemos aprobarla.`, '',
       motivo ? `Motivo: ${motivo}` : 'No pudimos confirmar los datos de la empresa.',
       '',
-      'Su cuenta sigue activa y puede escribirnos a dealers@tuequipord.do con la',
+      'Su cuenta sigue activa y puede escribirnos a dealers@tuequipord.com con la',
       'documentación corregida para que la revisemos de nuevo.',
       '',
       'TuEquipoRD',
@@ -310,7 +310,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
 
 /* ── Ciclo de vida del anuncio ──────────────────────────── */
 
-const SITIO = process.env.TUEQUIPO_SITIO || 'https://tuequipord.do';
+const SITIO = process.env.TUEQUIPO_SITIO || 'https://tuequipord.com';
 const fecha = (iso) => (iso
   ? new Date(iso).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
   : null);
