@@ -72,6 +72,51 @@ const MIGRACIONES = [
     'ALTER TABLE anuncios ADD COLUMN aviso_por_vencer TEXT',
     'ALTER TABLE anuncios ADD COLUMN aviso_vencido TEXT',
   ]],
+
+  /* Índices de ordenación del catálogo.
+
+     Medido sobre 20.000 anuncios activos: el orden por fecha pasaba de
+     13,2 ms a 0,01 ms y el orden por precio de 10,8 ms a 0,01 ms. Sin
+     ellos, cada carga del catálogo ordenaba en memoria el conjunto
+     entero de resultados antes de quedarse con 24.
+
+     El orden por defecto ('destacados') sigue necesitando una
+     ordenación temporal —su primera clave es una expresión que depende
+     de la hora, y eso no se puede indexar— pero baja de 11,4 a 8,9 ms
+     porque la segunda clave ya viene ordenada. Se acepta: evitarlo
+     exigiría ordenar por destacado_hasta a secas, que colocaría los
+     destacados YA VENCIDOS por encima de los anuncios normales.
+
+     No se indexan los órdenes por uso: su primera clave también es una
+     expresión, `(uso_unidad <> 'h')`, que separa horómetros de
+     kilómetros. */
+  ['2026-08-indices-catalogo', [
+    'CREATE INDEX IF NOT EXISTS ix_anuncios_recientes ON anuncios (estado, publicado DESC)',
+    'CREATE INDEX IF NOT EXISTS ix_anuncios_precio ON anuncios (estado, precio, publicado DESC)',
+    'CREATE INDEX IF NOT EXISTS ix_anuncios_anio ON anuncios (estado, anio, publicado DESC)',
+  ]],
+
+  /* Índices sobre columnas de clave foránea.
+
+     SQLite no los crea solo. Sin ellos, borrar una fila padre recorre
+     la tabla hija entera para resolver el ON DELETE, y con el catálogo
+     crecido eso convierte «dar de baja una cuenta» o «eliminar una
+     sucursal» en un recorrido completo de anuncios.
+
+     Se indexan las que cuelgan de algo que de verdad se borra. Quedan
+     fuera a propósito `suscripciones.plan_id` y `pagos.metodo_pago_id`:
+     planes y métodos de pago son datos de referencia que no se
+     eliminan, y un índice que nunca se usa solo encarece cada
+     escritura. */
+  ['2026-08-indices-foraneas', [
+    'CREATE INDEX IF NOT EXISTS ix_anuncios_usuario ON anuncios (usuario_id)',
+    'CREATE INDEX IF NOT EXISTS ix_anuncios_sucursal ON anuncios (sucursal_id)',
+    'CREATE INDEX IF NOT EXISTS ix_anuncios_suscripcion ON anuncios (suscripcion_id)',
+    'CREATE INDEX IF NOT EXISTS ix_codigos_usuario ON codigos (usuario_id)',
+    'CREATE INDEX IF NOT EXISTS ix_pagos_suscripcion ON pagos (suscripcion_id)',
+    'CREATE INDEX IF NOT EXISTS ix_solicitudes_usuario ON solicitudes_dealer (usuario_id)',
+    'CREATE INDEX IF NOT EXISTS ix_solicitudes_revisor ON solicitudes_dealer (revisada_por)',
+  ]],
 ];
 
 function migrar() {

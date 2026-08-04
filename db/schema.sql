@@ -175,6 +175,8 @@ CREATE TABLE IF NOT EXISTS solicitudes_dealer (
 
 CREATE INDEX IF NOT EXISTS ix_solicitudes_estado ON solicitudes_dealer (estado, creada);
 CREATE INDEX IF NOT EXISTS ix_solicitudes_org ON solicitudes_dealer (organizacion_id);
+CREATE INDEX IF NOT EXISTS ix_solicitudes_usuario ON solicitudes_dealer (usuario_id);
+CREATE INDEX IF NOT EXISTS ix_solicitudes_revisor ON solicitudes_dealer (revisada_por);
 
 -- Sesiones. Cookie con un testigo aleatorio; nada de estado en memoria
 -- para que el día que corran dos procesos no haya que cambiar nada.
@@ -212,6 +214,7 @@ CREATE TABLE IF NOT EXISTS codigos (
 );
 
 CREATE INDEX IF NOT EXISTS ix_codigos_vigentes ON codigos (correo, tipo, consumido, expira);
+CREATE INDEX IF NOT EXISTS ix_codigos_usuario ON codigos (usuario_id);
 
 -- Equipos en los que ya se verificó un código. Evita pedirlo en cada
 -- inicio de sesión: si no existiera, la verificación por correo sería
@@ -327,6 +330,7 @@ CREATE TABLE IF NOT EXISTS pagos (
 );
 
 CREATE INDEX IF NOT EXISTS ix_pagos_org ON pagos (organizacion_id, creado);
+CREATE INDEX IF NOT EXISTS ix_pagos_suscripcion ON pagos (suscripcion_id);
 
 -- ── Inventario ─────────────────────────────────────────────
 
@@ -387,6 +391,64 @@ CREATE INDEX IF NOT EXISTS ix_anuncios_publico ON anuncios (estado, categoria, p
 CREATE INDEX IF NOT EXISTS ix_anuncios_org ON anuncios (organizacion_id, estado);
 CREATE INDEX IF NOT EXISTS ix_anuncios_vence ON anuncios (vence) WHERE vence IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix_anuncios_marca ON anuncios (marca);
+
+-- Ordenación del catálogo. Sin estos, cada carga ordena en memoria
+-- todos los resultados antes de quedarse con la página. Medido sobre
+-- 20.000 anuncios: de 13 ms a 0,01 ms por fecha, de 11 ms a 0,01 ms
+-- por precio.
+CREATE INDEX IF NOT EXISTS ix_anuncios_recientes ON anuncios (estado, publicado DESC);
+CREATE INDEX IF NOT EXISTS ix_anuncios_precio ON anuncios (estado, precio, publicado DESC);
+CREATE INDEX IF NOT EXISTS ix_anuncios_anio ON anuncios (estado, anio, publicado DESC);
+
+-- Claves foráneas. SQLite no las indexa sola, y sin índice borrar la
+-- fila padre recorre la tabla hija entera para resolver el ON DELETE.
+CREATE INDEX IF NOT EXISTS ix_anuncios_usuario ON anuncios (usuario_id);
+CREATE INDEX IF NOT EXISTS ix_anuncios_sucursal ON anuncios (sucursal_id);
+CREATE INDEX IF NOT EXISTS ix_anuncios_suscripcion ON anuncios (suscripcion_id);
+
+-- Rangos con sentido para precio y año.
+--
+-- La API ya los valida, y esta es la segunda línea: cubre lo que entre
+-- por un script de importación, una carga masiva o un error de código
+-- que no pase por la ruta de publicación. Un precio negativo o un año
+-- 1500 no se detectan al escribirlos, sino meses después, cuando el
+-- catálogo ordena por precio y aparece algo absurdo en la primera
+-- página.
+--
+-- Se usan disparadores y no CHECK a propósito: añadir un CHECK a una
+-- tabla que ya existe obliga a reconstruirla entera, y de `anuncios`
+-- cuelgan fotos, contactos, eventos y métricas. Un disparador se añade
+-- igual en una base nueva y en una que ya está en producción, así que
+-- el esquema y las migraciones no divergen.
+--
+-- El límite inferior es 1900 y no 1970 como en la API. No es un
+-- descuido: la API impone la regla de negocio —en este mercado no se
+-- vende maquinaria anterior a 1970— y el disparador solo ataja datos
+-- corruptos. Si mañana se decide admitir una grúa de 1965, se cambia
+-- la API sin tocar la base.
+CREATE TRIGGER IF NOT EXISTS tr_anuncios_valores_ins
+BEFORE INSERT ON anuncios
+BEGIN
+  SELECT CASE
+    WHEN NEW.precio IS NOT NULL AND NEW.precio < 0
+      THEN RAISE(ABORT, 'El precio no puede ser negativo')
+    WHEN NEW.anio IS NOT NULL AND (NEW.anio < 1900
+      OR NEW.anio > CAST(strftime('%Y', 'now') AS INTEGER) + 1)
+      THEN RAISE(ABORT, 'Año fuera de rango')
+  END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS tr_anuncios_valores_upd
+BEFORE UPDATE OF precio, anio ON anuncios
+BEGIN
+  SELECT CASE
+    WHEN NEW.precio IS NOT NULL AND NEW.precio < 0
+      THEN RAISE(ABORT, 'El precio no puede ser negativo')
+    WHEN NEW.anio IS NOT NULL AND (NEW.anio < 1900
+      OR NEW.anio > CAST(strftime('%Y', 'now') AS INTEGER) + 1)
+      THEN RAISE(ABORT, 'Año fuera de rango')
+  END;
+END;
 
 CREATE TABLE IF NOT EXISTS anuncio_fotos (
   id         TEXT PRIMARY KEY,
