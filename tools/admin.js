@@ -40,6 +40,7 @@ Uso:
   node tools/admin.js retirar  <correo>
   node tools/admin.js eximir   <correo>          publica sin pagar
   node tools/admin.js cobrar   <correo>
+  node tools/admin.js rnc      <correo> <numero>  fija o corrige el RNC
   node tools/admin.js crear    <correo> "<Nombre>" [opciones]
 
 Opciones de crear:
@@ -115,7 +116,12 @@ if (accion === 'crear') {
 
   const empresa = opcion('empresa');
   const rnc = opcion('rnc');
-  if (empresa && !rnc) uso('Con --empresa hace falta --rnc.');
+
+  /* El RNC es opcional aquí, a diferencia del registro público.
+     Estas cuentas las crea el equipo desde el servidor y no pasan por
+     revisión: el RNC sirve para comprobar que una empresa ajena
+     existe, no para dar de alta la propia. Se puede añadir después
+     con `node tools/admin.js rnc <correo> <numero>`. */
   if (rnc && String(rnc).replace(/\D/g, '').length !== 9) uso('El RNC tiene 9 dígitos.');
 
   const clave = opcion('clave') || claveSegura();
@@ -174,7 +180,7 @@ if (accion === 'crear') {
 /* ── permisos sobre una cuenta existente ────────────────── */
 
 const correo = args[1];
-if (!['conceder', 'retirar', 'eximir', 'cobrar'].includes(accion)) uso();
+if (!['conceder', 'retirar', 'eximir', 'cobrar', 'rnc'].includes(accion)) uso();
 if (!correo) uso('Falta el correo.');
 
 const usuario = db.usuarioPorCorreo(correo);
@@ -197,6 +203,23 @@ const org = db.organizacionDe(usuario.id);
 if (!org) {
   console.error(`\n${correo} no tiene organización asociada.\n`);
   process.exit(1);
+}
+
+if (accion === 'rnc') {
+  const numero = String(args[2] || '').replace(/\D/g, '');
+  if (numero.length !== 9) uso('El RNC tiene 9 dígitos.');
+
+  const dueno = d.prepare('SELECT nombre FROM organizaciones WHERE rnc = ? AND id <> ?')
+    .get(numero, org.id);
+  if (dueno) {
+    console.error(`\nEse RNC ya está registrado por ${dueno.nombre}.\n`);
+    process.exit(1);
+  }
+
+  d.prepare('UPDATE organizaciones SET rnc = ?, actualizada = ? WHERE id = ?')
+    .run(numero, db.ahora(), org.id);
+  console.log(`\nRNC de ${org.nombre} actualizado.\n`);
+  process.exit(0);
 }
 
 const eximir = accion === 'eximir';
