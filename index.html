@@ -245,42 +245,18 @@
     </section>
   </div>
 
-  <!-- ==== FILA 2: financia · vende ==== -->
+  <!-- ==== FILA 2: publicidad · vende ====
+       Aquí vivía la calculadora de financiamiento. La herramienta no se
+       ha retirado: sigue completa en financiamiento.html, con su enlace
+       en el menú y en el pie. Lo que se retira es el sitio que ocupaba
+       en la portada, que rinde más vendido.
+
+       El bloque va sin campaña por defecto. Si no hay ninguna vigente,
+       app.js lo deja oculto y la fila se vuelve de una sola columna:
+       la portada nunca enseña un recuadro de «espacio disponible». -->
   <div class="fila fila--dos">
 
-    <section class="panel" id="financia" aria-labelledby="t-fin">
-      <h2 class="panel__titulo" id="t-fin"><em>Financiamiento</em> de maquinaria</h2>
-      <p class="panel__texto">Calcule la cuota mensual antes de negociar. Indique el valor del equipo y el plazo para obtener un estimado con el que evaluar las ofertas de las entidades financieras.</p>
-
-      <form class="calc" id="calc">
-        <div class="calc__campo">
-          <span class="calc__prefijo">RD$</span>
-          <label class="visualmente-oculto" for="c-valor">Valor del equipo</label>
-          <input id="c-valor" type="text" inputmode="numeric" placeholder="Valor del equipo" value="8,750,000">
-        </div>
-        <label class="visualmente-oculto" for="c-plazo">Plazo</label>
-        <select id="c-plazo">
-          <option value="24">2 años / 24 meses</option>
-          <option value="36">3 años / 36 meses</option>
-          <option value="48">4 años / 48 meses</option>
-          <option value="60" selected>5 años / 60 meses</option>
-        </select>
-        <button class="btn btn--azul" type="submit">
-          <svg class="ico" aria-hidden="true"><use href="#i-calc"/></svg> Calcular cuota
-        </button>
-      </form>
-
-      <output class="calc__salida" for="c-valor c-plazo">
-        <span class="etiqueta">Cuota mensual estimada</span>
-        <strong class="num" id="calcCuota">&mdash;</strong>
-        <span class="calc__nota">Estimado a 14 % anual sobre el valor total. No es una oferta de crédito ni incluye seguro ni gastos de cierre.</span>
-      </output>
-
-      <a class="btn btn--ambar btn--bloque" href="financiamiento.html">
-        <svg class="ico" aria-hidden="true"><use href="#i-buscar"/></svg> Ver opciones de financiamiento
-      </a>
-      <p class="panel__nota">Entidades que financian maquinaria en el país, requisitos de cada una y datos de contacto.</p>
-    </section>
+    <aside class="panel pub pub--bloque" id="pubBloque" aria-label="Publicidad" hidden></aside>
 
     <section class="panel" id="vende" aria-labelledby="t-vende">
       <h2 class="panel__titulo" id="t-vende"><em>Publicación</em> de equipos</h2>

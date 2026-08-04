@@ -186,7 +186,7 @@ CREATE INDEX IF NOT EXISTS ix_flota_servicio ON flota (servicio, activo, orden);
 -- de apagarla un domingo.
 CREATE TABLE IF NOT EXISTS publicidad (
   id          TEXT PRIMARY KEY,
-  espacio     TEXT NOT NULL CHECK (espacio IN ('superior', 'lateral-izq', 'lateral-der')),
+  espacio     TEXT NOT NULL CHECK (espacio IN ('superior', 'lateral-izq', 'lateral-der', 'bloque')),
   nombre      TEXT NOT NULL,             -- para reconocerla en el panel
   anunciante  TEXT,                      -- quién la paga
   imagen      TEXT NOT NULL,             -- ruta en /fotos, subida como el resto

@@ -369,6 +369,7 @@ const NOMBRE_ESPACIO = {
   superior: 'Horizontal',
   'lateral-izq': 'Lateral izquierdo',
   'lateral-der': 'Lateral derecho',
+  bloque: 'Bloque de portada',
 };
 
 /* Una campaña puede estar encendida y aun así no verse: por eso el

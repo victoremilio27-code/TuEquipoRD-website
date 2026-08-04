@@ -2608,7 +2608,11 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   font-family: var(--cuerpo);
   font-size: 10px; font-weight: 600;
   letter-spacing: .12em; text-transform: uppercase;
-  color: var(--texto-claro);
+  /* No es decoración: es la advertencia de que lo de abajo es un
+     anuncio pagado, así que tiene que leerse. Con --texto-claro daba
+     1.96 de contraste sobre el fondo de la página, menos de la mitad
+     del mínimo. --gris-acero da 4.64. */
+  color: var(--gris-acero);
 }
 
 .pub > a,
@@ -2749,3 +2753,20 @@ main { position: relative; }
   color: #14532D; background: rgba(21, 122, 75, .07);
   border-color: rgba(21, 122, 75, .25); border-left-color: var(--verde);
 }
+
+/* Bloque de media columna en la portada, donde estaba la calculadora
+   de financiamiento. Se dimensiona para acompañar en altura al panel
+   de al lado sin imponerle su tamaño: la proporción reserva el alto
+   antes de que cargue la imagen, así la portada no salta.
+
+   Al ser `.panel` además de `.pub`, hereda el fondo y el borde de los
+   demás bloques: se lee como parte de la página y no como algo
+   incrustado. */
+.pub--bloque > a,
+.pub--bloque > img { aspect-ratio: 6 / 5; max-height: 520px; }
+
+/* Sin campaña vigente, el bloque queda oculto y la fila se encoge a
+   una sola columna. Sin esto, «Publicación de equipos» se quedaba a
+   media anchura con un vacío al lado, que se lee como algo que no
+   cargó. */
+.fila--dos:has(> .pub[hidden]) { grid-template-columns: minmax(0, 1fr); }

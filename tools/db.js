@@ -254,6 +254,45 @@ const MIGRACIONES = [
 
     'CREATE INDEX IF NOT EXISTS ix_susc_org_activa ON suscripciones (organizacion_id, estado, plan_id)',
   ]],
+
+  /* Un cuarto espacio publicitario: el bloque de la portada donde
+     estaba la calculadora de financiamiento. La herramienta sigue en
+     financiamiento.html, con su enlace en el menú; lo que se retira es
+     el sitio que ocupaba en la portada, que rinde más vendido.
+
+     `espacio` tiene un CHECK y SQLite no deja añadirle un valor con
+     ALTER TABLE, así que la tabla se rehace. Es la vía normal aquí:
+     no la referencia nadie y las campañas se copian tal cual. */
+  ['2026-08-espacio-bloque', [
+    `CREATE TABLE publicidad_nueva (
+       id          TEXT PRIMARY KEY,
+       espacio     TEXT NOT NULL CHECK (espacio IN ('superior', 'lateral-izq', 'lateral-der', 'bloque')),
+       nombre      TEXT NOT NULL,
+       anunciante  TEXT,
+       imagen      TEXT NOT NULL,
+       enlace      TEXT,
+       alt         TEXT NOT NULL,
+       desde       TEXT,
+       hasta       TEXT,
+       activo      INTEGER NOT NULL DEFAULT 1,
+       orden       INTEGER NOT NULL DEFAULT 0,
+       impresiones INTEGER NOT NULL DEFAULT 0,
+       clics       INTEGER NOT NULL DEFAULT 0,
+       creado      TEXT NOT NULL,
+       actualizado TEXT
+     )`,
+    `INSERT INTO publicidad_nueva
+       (id, espacio, nombre, anunciante, imagen, enlace, alt, desde, hasta,
+        activo, orden, impresiones, clics, creado, actualizado)
+     SELECT id, espacio, nombre, anunciante, imagen, enlace, alt, desde, hasta,
+        activo, orden, impresiones, clics, creado, actualizado FROM publicidad`,
+    'DROP TABLE publicidad',
+    'ALTER TABLE publicidad_nueva RENAME TO publicidad',
+    // DROP TABLE se llevó el índice por delante: se rehace igual que en
+    // schema.sql, para que una base migrada y una recién creada tengan
+    // exactamente los mismos índices.
+    'CREATE INDEX IF NOT EXISTS ix_publicidad_espacio ON publicidad (espacio, activo, orden)',
+  ]],
 ];
 
 function migrar() {

@@ -823,7 +823,7 @@ function montarCategoriasPagina() {
 
 /* ── Publicidad ─────────────────────────────────────────── */
 
-/* Rellena los tres espacios de la portada con lo que haya vigente.
+/* Rellena los cuatro espacios de la portada con lo que haya vigente.
  *
  * Un espacio sin campaña se queda con `hidden` y no ocupa nada. Un
  * recuadro que diga «espacio disponible» hace que el sitio parezca a
@@ -842,8 +842,9 @@ async function montarPublicidad() {
     superior: $('#pubSuperior'),
     'lateral-izq': $('#pubIzq'),
     'lateral-der': $('#pubDer'),
+    bloque: $('#pubBloque'),
   };
-  if (!espacios.superior && !espacios['lateral-izq']) return;
+  if (!espacios.superior && !espacios['lateral-izq'] && !espacios.bloque) return;
 
   const datos = await api('/publicidad', { silencioso: true });
   if (!datos) return;
@@ -851,7 +852,10 @@ async function montarPublicidad() {
   Object.entries(espacios).forEach(([espacio, caja]) => {
     if (!caja) return;
     const lista = datos.publicidad[espacio] || [];
-    if (!lista.length) return;                  // sin campaña, sin hueco
+    // Sin campaña no se dibuja nada. El bloque comparte fila con otro
+    // panel, y su fila se encoge sola a una columna: ver
+    // `.fila--dos:has(> .pub[hidden])` en styles.css.
+    if (!lista.length) return;
 
     // Con varias campañas en el mismo espacio se muestra una al azar:
     // así todas reciben impresiones sin necesidad de un rotador.

@@ -555,7 +555,7 @@ function verTaxonomia(req, res) {
 
 /* ── Rutas: publicidad ──────────────────────────────────── */
 
-const ESPACIOS = ['superior', 'lateral-izq', 'lateral-der'];
+const ESPACIOS = ['superior', 'lateral-izq', 'lateral-der', 'bloque'];
 
 /* Lo que ve el visitante, agrupado por espacio. La impresión se cuenta
    aquí y no en el navegador: un contador que depende de que el cliente
