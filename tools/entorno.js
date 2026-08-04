@@ -56,6 +56,47 @@ function cargar(ruta = RUTA) {
   return puestas;
 }
 
-cargar();
+/* En el servidor, las variables que definen dónde vive la base y las
+   fotos están en la unidad de systemd, no en ningún .env. Una
+   herramienta lanzada a mano no las recibe, y como db.js cae a una
+   ruta relativa por defecto, terminaba abriendo una base VACÍA en la
+   carpeta del código: `admin.js listar` respondía "no hay cuentas"
+   sobre un archivo que no era el del sitio.
 
-module.exports = { cargar, RUTA };
+   Así que si la unidad está instalada, se leen de ahí. La unidad es
+   la autoridad sobre cómo corre el servicio; que la herramienta mire
+   el mismo sitio es lo correcto, no un atajo. */
+const UNIDAD = '/etc/systemd/system/tuequipord.service';
+
+function cargarUnidad(ruta = UNIDAD) {
+  let crudo;
+  try {
+    crudo = fs.readFileSync(ruta, 'utf8');
+  } catch {
+    return 0;                         // fuera del servidor no existe
+  }
+
+  let puestas = 0;
+  for (const linea of crudo.split(/\r?\n/)) {
+    const m = linea.trim().match(/^Environment=(?:"(.*)"|(.*))$/);
+    if (!m) continue;
+
+    const par = m[1] || m[2] || '';
+    const corte = par.indexOf('=');
+    if (corte < 1) continue;
+
+    const clave = par.slice(0, corte).trim();
+    const valor = par.slice(corte + 1).trim();
+
+    if (process.env[clave] === undefined) {
+      process.env[clave] = valor;
+      puestas++;
+    }
+  }
+  return puestas;
+}
+
+cargar();
+cargarUnidad();
+
+module.exports = { cargar, cargarUnidad, RUTA, UNIDAD };
