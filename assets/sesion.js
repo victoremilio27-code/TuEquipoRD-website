@@ -65,6 +65,13 @@ async function cargarSesion() {
 const haySesion = () => !!(SESION.usuario);
 const esDealer = () => !!(SESION.organizacion && SESION.organizacion.tipo === 'dealer');
 
+/* Cuentas internas: publican sin pagar. La exención la concede el
+   servidor con tools/admin.js y viaja en la sesión solo para que la
+   pantalla no pida una tarjeta que nadie va a cobrar. Quien manda es
+   la base de datos: POST /api/anuncios vuelve a comprobarla ahí, así
+   que trucar esto en el navegador no regala ninguna publicación. */
+const cuentaExenta = () => !!(SESION.organizacion && SESION.organizacion.exentaPago);
+
 /* Enlace de cuenta en la cabecera. Se inyecta por script en vez de
    escribirlo en las doce páginas: así el estado de sesión se pinta en
    un solo sitio y no hay doce copias que se desincronicen. */

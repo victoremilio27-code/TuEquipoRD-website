@@ -1050,8 +1050,11 @@ const publicar = conSesion(async (req, res, ctx) => {
     financiamiento: !!c.financiamiento,
     video: texto(c.video, 300),
     ...tren,
-    // La membresía sostiene el anuncio: no se le pone caducidad.
-    vence: membresia ? null : db.sumarDias(Number(c.dias) === 60 ? 60 : 30),
+    /* La membresía sostiene el anuncio: no se le pone caducidad. Las
+       cuentas internas tampoco caducan — la vigencia es lo que se
+       compra, y aquí no se compra nada, así que hacerles renovar cada
+       30 días sería trabajo sin contrapartida. */
+    vence: membresia || exenta ? null : db.sumarDias(Number(c.dias) === 60 ? 60 : 30),
     destacadoHasta: plan.destacado ? db.sumarDias(membresia ? 7 : 15) : null,
     fotos,
     telefonos: telefonos.map((t) => ({ numero: t.numero, tipo: t.tipo, nota: t.nota })),

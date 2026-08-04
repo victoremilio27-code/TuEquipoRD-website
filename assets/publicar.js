@@ -132,14 +132,15 @@ const esMembresia = () => !!(planElegido() || {}).membresia;
 
 /* Desglose del cobro. Distingue los dos modelos: una compra puntual
    cobra una vigencia y se acaba; la membresía cobra un ciclo y vuelve
-   a cobrar solo al vencer. El plan gratuito de la promoción devuelve
-   cero en todo y el paso de pago se salta. */
+   a cobrar solo al vencer. El plan gratuito de la promoción y las
+   cuentas exentas devuelven cero en todo y el paso de pago se salta. */
 function pedido() {
   const plan = planElegido();
   if (!plan) return null;
 
+  const exenta = cuentaExenta();
   const membresia = !!plan.membresia;
-  const base = plan.enPromo ? 0
+  const base = exenta || plan.enPromo ? 0
     : membresia ? precioMembresia(plan, estado.plan.ciclo)
       : precioPlan(plan, estado.plan.dias);
   const itbis = Math.round(base * ITBIS);
@@ -147,6 +148,7 @@ function pedido() {
   return {
     plan,
     membresia,
+    exenta,
     ciclo: membresia ? cicloPorId(estado.plan.ciclo) : null,
     mensual: membresia ? mensualEquivalente(plan, estado.plan.ciclo) : null,
     renueva: membresia ? proximoCargo(estado.plan.ciclo) : null,
@@ -817,6 +819,14 @@ function distintivoPlan(plan) {
 /* Precio y periodo de la tarjeta. Es lo único que cambia entre los
    dos modelos de cobro; el resto de la tarjeta es idéntico. */
 function cifraPlan(plan) {
+  // Una cuenta interna ve lo que el plan le da, no lo que costaría.
+  if (cuentaExenta()) {
+    return {
+      precio: 'Sin costo',
+      periodo: plan.membresia ? 'cuenta interna, sin cuota' : `vigencia de ${estado.plan.dias} días`,
+      extra: null,
+    };
+  }
   if (plan.enPromo) {
     return { precio: 'Gratis', periodo: 'durante la promoción de lanzamiento', extra: null };
   }
@@ -841,9 +851,13 @@ function cifraPlan(plan) {
 function tarjetaPlanHTML(plan) {
   const elegido = plan.id === estado.plan.id;
   const cifra = cifraPlan(plan);
-  const comp = plan.enPromo || plan.membresia ? null : comparativa(plan, estado.plan.dias);
+  // "Ahorra un 12 %" no significa nada sobre un precio que no se cobra.
+  const comp = cuentaExenta() || plan.enPromo || plan.membresia
+    ? null : comparativa(plan, estado.plan.dias);
 
-  const cuantas = plan.publicaciones === null
+  // El cupo del plan es lo que se compra. Una cuenta exenta no compra
+  // cupo: el servidor le abre una publicación nueva cada vez.
+  const cuantas = cuentaExenta() || plan.publicaciones === null
     ? 'Anuncios ilimitados'
     : `${plan.publicaciones} ${plan.publicaciones === 1 ? 'anuncio activo' : 'anuncios activos'}`;
 
@@ -872,7 +886,8 @@ function tarjetaPlanHTML(plan) {
    control: se muestra el que aplica. */
 function pintarMandoCobro() {
   const membresia = esMembresia();
-  $('#duracionPublicacion').hidden = membresia;
+  // Sin cobro no hay vigencia que elegir: el anuncio no caduca.
+  $('#duracionPublicacion').hidden = membresia || cuentaExenta();
   $('#cicloMembresia').hidden = !membresia;
   $('#notaMembresiaPlan').hidden = !membresia;
 }
@@ -1012,7 +1027,9 @@ function pintarResumenPago() {
   // en el calendario y significa lo contrario, así que se rotula
   // distinto para que nadie confunda un corte con un cobro.
   let filaPeriodo;
-  if (ped.membresia) {
+  if (ped.exenta) {
+    filaPeriodo = '<div><dt>Vigencia</dt><dd>Sin caducidad</dd></div>';
+  } else if (ped.membresia) {
     filaPeriodo = `
       <div><dt>Ciclo de facturación</dt><dd>${esc(ped.ciclo.nombre)}</dd></div>
       <div><dt>Cuota mensual equivalente</dt><dd class="num">${pesos(ped.mensual)}</dd></div>
@@ -1023,18 +1040,27 @@ function pintarResumenPago() {
     filaPeriodo = `<div><dt>Vigencia</dt><dd class="num">${ped.dias} días · hasta el ${fechaCorta(vence)}</dd></div>`;
   }
 
+  // Una cuenta exenta no ve un cobro de cero: ve que no hay cobro.
+  const filasImporte = ped.exenta ? '' : `
+      <div><dt>Subtotal</dt><dd class="num">${pesos(ped.base)}</dd></div>
+      <div><dt>ITBIS (${Math.round(ITBIS * 100)} %)</dt><dd class="num">${pesos(ped.itbis)}</dd></div>
+      <div class="pedido__total"><dt>${ped.membresia ? 'Cargo de hoy' : 'Total a pagar'}</dt><dd class="num">${pesos(ped.total)}</dd></div>`;
+
   caja.innerHTML = `
-    <h3 class="pedido__titulo">${ped.membresia ? 'Detalle de la membresía' : 'Detalle del cobro'}</h3>
+    <h3 class="pedido__titulo">${ped.exenta ? 'Detalle de la publicación'
+      : ped.membresia ? 'Detalle de la membresía' : 'Detalle del cobro'}</h3>
     <dl class="pedido__lista">
       <div><dt>Plan</dt><dd>${esc(ped.plan.nombre)}${ped.membresia ? ' · membresía' : ''}</dd></div>
       ${filaPeriodo}
-      <div><dt>Subtotal</dt><dd class="num">${pesos(ped.base)}</dd></div>
-      <div><dt>ITBIS (${Math.round(ITBIS * 100)} %)</dt><dd class="num">${pesos(ped.itbis)}</dd></div>
-      <div class="pedido__total"><dt>${ped.membresia ? 'Cargo de hoy' : 'Total a pagar'}</dt><dd class="num">${pesos(ped.total)}</dd></div>
+      ${filasImporte}
+      ${ped.exenta ? '<div class="pedido__total"><dt>Total</dt><dd class="num">Sin costo</dd></div>' : ''}
     </dl>`;
 
   $('#bloquePago').hidden = ped.gratuito;
   $('#bloqueGratis').hidden = !ped.gratuito;
+  $('#textoGratis').textContent = ped.exenta
+    ? 'Su cuenta publica sin costo. Confirme para activar el anuncio.'
+    : 'El plan Estándar no tiene costo durante la promoción de lanzamiento. Confirme para activar el anuncio.';
   pintarBloquesMembresia(ped);
 
   $('#btnPublicar').textContent = ped.gratuito
@@ -1214,11 +1240,17 @@ function pintarConfirmacion(respuesta) {
          ${anuncio.vence ? `La vigencia vence el ${fechaCorta(new Date(anuncio.vence))}.` : ''}
        </p>`;
 
-  const filasCobro = cobro
+  /* El servidor anota un pago también cuando el importe es cero, para
+     que el anuncio tenga un plan detrás. Enseñar ahí "Monto liquidado
+     RD$0" con su número de comprobante hace pensar en un cobro que no
+     existió, así que solo se muestra cuando se cobró algo. */
+  const cobrado = !!(cobro && cobro.total > 0);
+  const filasCobro = cobrado
     ? `<div><dt>Comprobante de pago</dt><dd class="num">${esc(cobro.referencia)}</dd></div>
        <div><dt>Monto liquidado</dt><dd class="num">${pesos(cobro.total)}</dd></div>
        ${membresia ? `<div><dt>Próximo cargo</dt><dd class="num">${fechaCorta(new Date(susc.proximo_cargo))}</dd></div>` : ''}`
-    : `<div><dt>Costo</dt><dd>${membresia ? 'Incluido en su membresía activa' : 'Sin costo · promoción de lanzamiento'}</dd></div>`;
+    : `<div><dt>Costo</dt><dd>${ped.exenta ? 'Sin costo · cuenta interna'
+      : membresia ? 'Incluido en su membresía activa' : 'Sin costo · promoción de lanzamiento'}</dd></div>`;
 
   $('#publicar').hidden = true;
   const caja = $('#publicado');
@@ -1229,13 +1261,14 @@ function pintarConfirmacion(respuesta) {
 
     <dl class="publicado__datos">
       <div><dt>Referencia del anuncio</dt><dd class="num">${esc(anuncio.id.slice(0, 8).toUpperCase())}</dd></div>
-      <div><dt>Plan</dt><dd>${esc(ped.plan.nombre)}${membresia ? ` · facturación ${esc(ped.ciclo.nombre.toLowerCase())}` : ` · ${ped.dias} días`}</dd></div>
+      <div><dt>Plan</dt><dd>${esc(ped.plan.nombre)}${ped.exenta ? ' · sin caducidad'
+        : membresia ? ` · facturación ${esc(ped.ciclo.nombre.toLowerCase())}` : ` · ${ped.dias} días`}</dd></div>
       ${filasCobro}
       <div><dt>Fotografías publicadas</dt><dd class="num">${anuncio.fotos.length}</dd></div>
     </dl>
 
     <p class="publicado__nota">
-      Enviamos la confirmación y la factura a <b>${esc(estado.contacto.correo)}</b>.
+      Enviamos la confirmación${cobrado ? ' y la factura' : ''} a <b>${esc(estado.contacto.correo)}</b>.
       Desde <a href="panel.html">su panel</a> puede seguir las visitas del anuncio, pausarlo
       o marcarlo como vendido${membresia ? ', y administrar la membresía' : ''}.
     </p>
@@ -1336,13 +1369,15 @@ function pintarResumenPedido() {
   caja.innerHTML = `
     <h3 class="pedido__titulo">${ped.membresia ? 'Resumen de la membresía' : 'Resumen del pedido'}</h3>
     <dl class="pedido__lista">
-      <div><dt>${esc(ped.plan.nombre)}</dt><dd class="num">${ped.gratuito ? 'Gratis' : pesos(ped.base)}</dd></div>
-      ${ped.membresia
-        ? `<div><dt>Facturación</dt><dd>${esc(ped.ciclo.nombre)}</dd></div>
-           <div><dt>Próximo cargo</dt><dd class="num">${fechaCorta(ped.renueva)}</dd></div>`
-        : `<div><dt>Vigencia</dt><dd class="num">${ped.dias} días</dd></div>`}
+      <div><dt>${esc(ped.plan.nombre)}</dt><dd class="num">${ped.gratuito ? 'Sin costo' : pesos(ped.base)}</dd></div>
+      ${ped.exenta
+        ? '<div><dt>Vigencia</dt><dd>Sin caducidad</dd></div>'
+        : ped.membresia
+          ? `<div><dt>Facturación</dt><dd>${esc(ped.ciclo.nombre)}</dd></div>
+             <div><dt>Próximo cargo</dt><dd class="num">${fechaCorta(ped.renueva)}</dd></div>`
+          : `<div><dt>Vigencia</dt><dd class="num">${ped.dias} días</dd></div>`}
       ${ped.gratuito ? '' : `<div><dt>ITBIS</dt><dd class="num">${pesos(ped.itbis)}</dd></div>`}
-      <div class="pedido__total"><dt>${ped.membresia ? 'Cargo de hoy' : 'Total'}</dt><dd class="num">${ped.gratuito ? 'RD$0' : pesos(ped.total)}</dd></div>
+      <div class="pedido__total"><dt>${ped.membresia ? 'Cargo de hoy' : 'Total'}</dt><dd class="num">${ped.gratuito ? 'Sin costo' : pesos(ped.total)}</dd></div>
     </dl>`;
 }
 
