@@ -344,6 +344,15 @@ if (require.main === module) {
   if (process.argv.includes('--vaciar')) {
     const n = vaciar();
     console.log(n ? `Retirados ${n} anunciantes de demostración.` : 'No había nada de demostración.');
+  } else if (process.argv.includes('--solo-flota')) {
+    /* Lo que SÍ se ejecuta en producción: la flota de alquiler y las
+       camas de transporte son inventario real, no demostración. El
+       resto de este archivo crea anunciantes falsos y no debe tocar
+       jamás una base de producción. */
+    const nf = sembrarFlota();
+    console.log(nf
+      ? `Flota propia: ${nf} elementos sembrados (alquiler y transporte).`
+      : 'La flota ya estaba sembrada; no se toca.');
   } else {
     const nf = sembrarFlota();
     if (nf) console.log(`Flota propia: ${nf} elementos sembrados (alquiler y transporte).`);

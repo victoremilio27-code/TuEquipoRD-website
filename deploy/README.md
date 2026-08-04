@@ -26,8 +26,11 @@ node --version   # debe decir v24.x
 
 # Usuario sin privilegios para el sitio
 adduser --system --group --home /var/www/tuequipord tuequipord
-mkdir -p /var/lib/tuequipord
-chown tuequipord:tuequipord /var/lib/tuequipord
+
+# Base de datos y fotografías de los anuncios. Fuera del proyecto: así
+# un `git pull` no las toca y se respaldan aparte.
+mkdir -p /var/lib/tuequipord/fotos
+chown -R tuequipord:tuequipord /var/lib/tuequipord
 ```
 
 ## 2. Código
@@ -94,6 +97,45 @@ Comprueba que responde en local antes de seguir:
 ```bash
 curl -I http://127.0.0.1:8080/
 ```
+
+### Inventario de partida
+
+La base nace vacía. Hay que sembrar la flota propia —los equipos de
+alquiler y las camas de transporte—, que es inventario real y no
+demostración:
+
+```bash
+sudo -u tuequipord TUEQUIPO_DB=/var/lib/tuequipord/tuequipord.db \
+  node /var/www/tuequipord/tools/seed.js --solo-flota
+```
+
+**Nunca ejecutes `node tools/seed.js` sin `--solo-flota` en
+producción**: sin esa bandera crea cinco anunciantes falsos con sus
+anuncios, y limpiarlos después es una molestia evitable.
+
+Repetirlo no duplica nada: si la flota ya está, no la toca.
+
+### Cuentas del equipo
+
+Se crean desde el servidor, con el correo ya verificado:
+
+```bash
+cd /var/www/tuequipord
+
+sudo -u tuequipord node tools/admin.js crear principal@tuequipord.com \
+  "Administración TuEquipoRD" --admin --exenta --empresa "TuEquipoRD"
+
+sudo -u tuequipord node tools/admin.js crear <tu-correo> "<Tu nombre>" --exenta
+sudo -u tuequipord node tools/admin.js crear <correo-socio> "<Nombre>" --exenta
+```
+
+Cada comando imprime la contraseña generada **una sola vez**. Anótalas
+antes de cerrar la terminal.
+
+`--admin` da acceso a `/admin.html`; `--exenta` permite publicar sin
+pagar. Ninguna de las dos se puede conceder desde el sitio.
+
+Para ver quién tiene permisos internos: `node tools/admin.js listar`.
 
 ## 5. Nginx
 
@@ -202,7 +244,14 @@ protege del fallo que más importa, que es perder la máquina. Con
 
 ```bash
 rclone sync /var/backups/tuequipord remoto:tuequipord-respaldos
+rclone sync /var/lib/tuequipord/fotos remoto:tuequipord-fotos
 ```
+
+**Las fotos van en su propia línea a propósito.** La tarea de
+mantenimiento respalda la base, que es donde están las rutas, pero no
+las imágenes: son archivos y crecen mucho más rápido que la base.
+Restaurar solo la base dejaría cada anuncio apuntando a una foto que
+ya no existe.
 
 ## Actualizar el sitio
 
