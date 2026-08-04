@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Publicar un equipo · TuEquipoRD</title>
-<meta name="description" content="Publique su maquinaria en TuEquipoRD. Complete la ficha técnica, cargue las fotografías, seleccione el plan de publicación y active el anuncio en minutos.">
+<meta name="description" content="Publique su maquinaria en TuEquipoRD. Complete la ficha técnica, cargue las fotografías y publique en uno de sus cupos. Un cupo libre se reutiliza sin volver a pagar.">
 <meta name="theme-color" content="#071A2B">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,10 +44,10 @@
   <header class="pagina">
     <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Publicar un equipo</span></nav>
     <h1 class="pagina__titulo"><em>Publicar</em> un equipo</h1>
-    <p class="pagina__sub">Complete la ficha, cargue las fotografías y seleccione el plan. El anuncio queda activo en el catálogo al confirmarse la contratación, sin revisión previa ni intermediarios.</p>
+    <p class="pagina__sub">Complete la ficha y cargue las fotografías. Al final elige dónde se publica: en un cupo que ya tenga contratado, o contratando el nivel que prefiera. El anuncio queda activo enseguida, sin revisión previa ni intermediarios.</p>
     <p class="realce">
       <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
-      <span>Publicación <b>sin costo y sin límite de anuncios</b> con el plan Estándar hasta <b data-promo-hasta>fecha por definir</b></span>
+      <span>Los cupos del nivel <b>Estándar</b> no se cobran hasta <b data-promo-hasta>fecha por definir</b></span>
     </p>
   </header>
 
@@ -273,42 +273,58 @@
 
         <!-- Paso 5 · Plan -->
         <section class="paso" data-paso="plan" aria-labelledby="t-p5" hidden>
-          <div class="panel__cabeza">
-            <h2 class="panel__titulo panel__titulo--limpio" id="t-p5"><em>Plan</em> de publicación</h2>
-            <fieldset class="duracion" id="duracionPublicacion">
-              <legend class="visualmente-oculto">Vigencia del plan</legend>
-              <label class="duracion__op"><input type="radio" name="duracion" value="30" checked><span>30 días</span></label>
-              <label class="duracion__op"><input type="radio" name="duracion" value="60"><span>60 días <b id="ahorro60Plan"></b></span></label>
-            </fieldset>
+          <h2 class="panel__titulo" id="t-p5"><em>Dónde</em> se publica</h2>
 
-            <fieldset class="duracion" id="cicloMembresia" hidden>
-              <legend class="visualmente-oculto">Ciclo de facturación de la membresía</legend>
-              <label class="duracion__op"><input type="radio" name="ciclo" value="mensual" checked><span>Mensual</span></label>
-              <label class="duracion__op"><input type="radio" name="ciclo" value="anual"><span>Anual <b id="ahorroAnualPlan"></b></span></label>
-            </fieldset>
+          <!-- Cupos ya comprados. Si le queda alguno libre, publicar no
+               cuesta nada más: el sitio ya está pagado. -->
+          <div id="bloqueUsarCupo" hidden>
+            <p class="panel__texto">Un cupo es el sitio que ocupa un equipo publicado. Le quedan libres, así que este anuncio no tiene costo adicional.</p>
+            <ul class="cupos-op" id="cuposDisponibles"></ul>
+            <p class="panel__nota">
+              Puede cambiar el nivel de este equipo cuando quiera desde <a href="panel.html">su panel</a>,
+              sin volver a publicarlo.
+            </p>
+            <button type="button" class="btn btn--linea btn--chico" id="btnQuieroComprar">
+              Prefiero contratar otro nivel
+            </button>
           </div>
 
-          <p class="panel__texto">El plan define cuántos anuncios puede mantener activos, cuántas fotografías admite cada ficha y qué posición ocupa en los resultados y en la portada.</p>
+          <!-- Comprar capacidad. Se elige nivel, cuántos equipos y por
+               cuánto tiempo; el precio se calcula al momento. -->
+          <div id="bloqueComprar" hidden>
+            <p class="panel__texto" id="textoComprar">Elija el nivel con el que quiere publicar y para cuántos equipos. Un cupo es el sitio que ocupa un equipo; cuando venda uno, ese cupo queda libre y lo reutiliza sin volver a pagar.</p>
 
-          <ul class="planes-op" id="planesSeleccion"></ul>
+            <ul class="planes-op" id="planesSeleccion"></ul>
 
-          <p class="invitacion-dealer" id="invitacionDealer" hidden>
-            <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
-            <span>
-              <b>¿Comercializa maquinaria de forma habitual?</b>
-              Las membresías Dealer —hasta 20 anuncios, o sin límite con Dealer Premium— incluyen página
-              pública de la empresa y perfil en el directorio. Están disponibles para cuentas de empresa:
-              <a href="panel.html">registre el RNC</a> y aparecen aquí.
-            </span>
-          </p>
+            <div class="compra-cupos">
+              <label class="campo-v">
+                <span>¿Cuántos equipos quiere publicar?</span>
+                <input type="number" id="cuantosCupos" min="1" max="100" step="1" value="1" inputmode="numeric">
+                <small class="campo-v__ayuda" id="notaCantidad"></small>
+              </label>
 
-          <p class="panel__nota" id="notaMembresiaPlan" hidden>
-            La membresía Dealer no se compra por vigencia: es una cuota recurrente que mantiene sus
-            anuncios publicados mientras esté al día. Puede cambiar de ciclo o cancelar en cualquier
-            momento; al cancelar, los anuncios siguen activos hasta el final del ciclo ya pagado.
-          </p>
+              <fieldset class="duracion" id="duracionPublicacion">
+                <legend class="etiqueta etiqueta--bloque">Durante cuánto tiempo</legend>
+                <label class="duracion__op"><input type="radio" name="duracion" value="30" checked><span>30 días</span></label>
+                <label class="duracion__op"><input type="radio" name="duracion" value="60"><span>60 días <b id="ahorro60Plan"></b></span></label>
+              </fieldset>
+            </div>
 
-          <p class="panel__nota">Los planes múltiples cuestan menos que contratar las publicaciones por separado, y una vigencia de 60 días cuesta menos que renovar dos veces. Puede cambiar a un plan superior en cualquier momento pagando la diferencia.</p>
+            <p class="realce realce--regla" id="reglaCupos"></p>
+
+            <button type="button" class="btn btn--linea btn--chico" id="btnUsarLoQueTengo" hidden>
+              Usar un cupo que ya tengo
+            </button>
+
+            <p class="invitacion-dealer" id="invitacionDealer" hidden>
+              <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
+              <span>
+                <b>¿Comercializa maquinaria de forma habitual?</b>
+                El nivel Premium incluye la página pública de su empresa y el perfil en el directorio de
+                dealers. Se activa en cuentas de empresa aprobadas: <a href="panel.html">registre el RNC</a>.
+              </span>
+            </p>
+          </div>
         </section>
 
         <!-- Paso 6 · Pago -->
@@ -477,7 +493,7 @@
         <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
         <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
         <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
-        <li><a href="publicar.html"><b>Publicar un equipo:</b> planes y membresía Dealer</a></li>
+        <li><a href="publicar.html"><b>Publicar un equipo:</b> niveles, cupos y precios</a></li>
         <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
       </ul>
       <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
@@ -487,6 +503,7 @@
 
 <script src="assets/sesion.js"></script>
 <script src="assets/taxonomia.js"></script>
+<script src="assets/precios.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/publicar.js"></script>

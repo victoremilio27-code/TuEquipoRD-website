@@ -25,6 +25,7 @@
  */
 
 const db = require('./db');
+const precios = require('../assets/precios.js');
 
 const DOMINIO = 'demo.tuequipord.do';
 const CLAVE = 'demostracion2026';
@@ -67,12 +68,12 @@ function fotoDemo(categoria, texto, indice) {
 }
 
 /* ── Anunciantes ───────────────────────────────────────────
-   Tres empresas con membresía Dealer y dos particulares, que es la
-   mezcla que va a tener el catálogo de verdad. */
+   Tres empresas con capacidad Premium o Destacada y dos particulares:
+   la mezcla que va a tener el catálogo de verdad. */
 
 const ANUNCIANTES = [
   {
-    clave: 'caribe', tipo: 'dealer', plan: 'dealer', verificada: true,
+    clave: 'caribe', tipo: 'dealer', plan: 'premium', cupos: 10, verificada: true,
     empresa: 'Maquinarias del Caribe', rnc: '131245678', contacto: 'Ramón Peña',
     telefono: '8095551201', provincia: 'Santo Domingo', municipio: 'Santo Domingo Este',
     direccion: 'Autopista de San Isidro km 12, Nave 4',
@@ -86,7 +87,7 @@ const ANUNCIANTES = [
     ],
   },
   {
-    clave: 'cibao', tipo: 'dealer', plan: 'dealer-premium', verificada: true,
+    clave: 'cibao', tipo: 'dealer', plan: 'premium', cupos: 15, verificada: true,
     empresa: 'Cibao Equipos Pesados', rnc: '130998877', contacto: 'Luisa Fermín',
     telefono: '8295554410', provincia: 'Santiago', municipio: 'Santiago de los Caballeros',
     direccion: 'Av. Circunvalación Norte 210, Parque Industrial',
@@ -103,7 +104,7 @@ const ANUNCIANTES = [
     ],
   },
   {
-    clave: 'surmaq', tipo: 'dealer', plan: 'dealer', verificada: false,
+    clave: 'surmaq', tipo: 'dealer', plan: 'destacado', cupos: 5, verificada: false,
     empresa: 'Sur Maquinarias', rnc: '132667788', contacto: 'Andrés Matos',
     telefono: '8095557730', provincia: 'Barahona', municipio: 'Barahona',
     direccion: 'Av. Enriquillo 45, entrada a la zona franca',
@@ -112,11 +113,11 @@ const ANUNCIANTES = [
     sucursales: [],
   },
   {
-    clave: 'jperez', tipo: 'particular', plan: 'destacado',
+    clave: 'jperez', tipo: 'particular', plan: 'destacado', cupos: 2,
     nombre: 'Julio Pérez', telefono: '8296012244',
   },
   {
-    clave: 'mrosario', tipo: 'particular', plan: 'estandar',
+    clave: 'mrosario', tipo: 'particular', plan: 'estandar', cupos: 1,
     nombre: 'Marisol Rosario', telefono: '8095518890',
   },
 ];
@@ -226,28 +227,29 @@ function sembrar() {
     console.log(`✓ ${a.empresa || a.nombre} (${correo})`);
   }
 
-  // Cada anunciante contrata su plan una sola vez. El cobro va marcado
-  // como 'demo' en la tabla de pagos, igual que el simulado de la API.
+  /* Cada anunciante compra su capacidad una sola vez: un nivel y unos
+     cupos, por 60 días. El importe sale de precios.js, el mismo módulo
+     que usan la API y el navegador, para que el historial de pagos de
+     la demostración coincida con lo que habría cobrado el sitio. */
   for (const a of ANUNCIANTES) {
     const org = porClave.get(a.clave);
     if (!org || db.suscripcionActiva(org.id)) continue;
     const plan = db.planPorId(a.plan);
-    // El precio vigente ya trae aplicada la promoción que corra: así el
-    // historial de pagos de la demostración coincide con lo que habría
-    // cobrado la API.
-    const subtotal = plan.precio_vigente;
-    db.contratar({
+    if (!plan) continue;
+
+    const cupo = a.cupos || 1;
+    const importe = precios.precioCompra({
+      precioUnitario: plan.precio_vigente != null ? plan.precio_vigente : plan.precio,
+      cupo,
+      dias: 60,
+    });
+
+    db.comprarCupos({
       idOrg: org.id,
       idPlan: plan.id,
+      cupo,
       dias: 60,
-      ciclo: plan.modalidad === 'membresia' ? 'mensual' : null,
-      cobro: {
-        subtotal,
-        itbis: Math.round(subtotal * 0.18),
-        total: Math.round(subtotal * 1.18),
-        referencia: `TE-DEMO-${a.clave.toUpperCase()}`,
-        procesador: 'demo',
-      },
+      cobro: { ...importe, referencia: `TE-DEMO-${a.clave.toUpperCase()}`, procesador: 'demo' },
     });
   }
 
@@ -266,8 +268,9 @@ function sembrar() {
     // Se reparte el inventario entre las sucursales del dealer, que es
     // lo que permite comprobar que el perfil público las distingue.
     const sucursal = sucursales[creados % sucursales.length] || sucursales[0];
+    // El anuncio ocupa un cupo de la capacidad comprada arriba y
+    // hereda su fecha de fin: la vigencia es de la membresía.
     const susc = db.suscripcionActiva(org.id);
-    const membresia = susc && susc.modalidad === 'membresia';
 
     db.crearAnuncio({
       idOrg: org.id,
@@ -291,7 +294,7 @@ function sembrar() {
       moneda: 'DOP',
       modalidadPrecio: e.ofertas ? 'ofertas' : 'fijo',
       financiamiento: org.tipo === 'dealer',
-      vence: membresia ? null : db.sumarDias(60),
+      vence: susc ? susc.fin : db.sumarDias(60),
       destacadoHasta: e.destacado ? db.sumarDias(30) : null,
       fotos: [0, 1, 2, 3].map((i) => fotoDemo(e.categoria, titulo, i)),
       telefonos: [

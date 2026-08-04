@@ -187,6 +187,73 @@ const MIGRACIONES = [
     'CREATE INDEX IF NOT EXISTS ix_solicitudes_usuario ON solicitudes_dealer (usuario_id)',
     'CREATE INDEX IF NOT EXISTS ix_solicitudes_revisor ON solicitudes_dealer (revisada_por)',
   ]],
+
+  /* ── Se vende capacidad, no anuncios sueltos ──────────────
+     Antes el plan se pegaba al anuncio en el momento de publicarlo y
+     ahí se quedaba para siempre. Quien compraba "Múltiple Destacados"
+     y ya tenía un equipo en Estándar no podía moverlo: el cupo que
+     había pagado estaba al lado, libre, y era inalcanzable.
+
+     Ahora se compran CUPOS de un nivel. El cupo es de la organización
+     y el anunciante decide a qué equipo se lo pone.
+
+     El catálogo se reduce de seis planes a tres niveles. Los
+     "múltiples" eran el mismo nivel con otra cantidad, y la cantidad
+     pasa a ser un número que se elige al contratar.
+
+     NADA DE LO YA PAGADO SE PIERDE. Las suscripciones vivas se pasan
+     al nivel equivalente conservando su cupo y su fecha de fin:
+     quien compró cinco Destacados sigue con cinco Destacados. Los
+     planes viejos no se borran —las suscripciones apuntan a ellos y
+     guardan las condiciones que se pactaron—, solo se retiran del
+     catálogo con activo = 0. */
+  ['2026-08-membresias-por-cupos', [
+    'ALTER TABLE suscripciones ADD COLUMN dias_ciclo INTEGER',
+
+    // El nivel ya no trae cantidad: la cantidad es de la suscripción.
+    'UPDATE planes SET anuncios_incluidos = NULL WHERE id IN (\'estandar\', \'destacado\')',
+
+    `INSERT OR IGNORE INTO planes
+       (id, nombre, nivel, modalidad, precio, anuncios_incluidos, fotos_maximas,
+        destacado, perfil_publico, solo_dealer, orden)
+     VALUES ('premium', 'Premium', 'premium', 'vigencia', 5500, NULL, 30, 1, 1, 0, 3)`,
+
+    "UPDATE planes SET orden = 2 WHERE id = 'destacado'",
+
+    // Fuera del catálogo, no de la base.
+    `UPDATE planes SET activo = 0
+       WHERE id IN ('multi-estandar', 'multi-destacado', 'dealer', 'dealer-premium')`,
+
+    /* Las suscripciones vivas se llevan al nivel equivalente. El cupo
+       que ya tenían se respeta tal cual; el precio pactado tampoco se
+       toca, porque es lo que se cobró. */
+    `UPDATE suscripciones SET plan_id = 'estandar'
+       WHERE plan_id = 'multi-estandar' AND estado = 'activa'`,
+    `UPDATE suscripciones SET plan_id = 'destacado'
+       WHERE plan_id = 'multi-destacado' AND estado = 'activa'`,
+    `UPDATE suscripciones SET plan_id = 'premium'
+       WHERE plan_id IN ('dealer', 'dealer-premium') AND estado = 'activa'`,
+
+    /* Las que se vendieron sin límite se quedan SIN LÍMITE. Es lo que
+       se pagó. Ponerles como tope los anuncios que ya sostienen las
+       dejaría llenas el mismo día de la migración, sin sitio para
+       publicar nada más: sería quitarles algo que compraron. Cuando
+       ese ciclo termine, renovarán ya con cupos.
+
+       `anuncios_incluidos IS NULL` significa sin límite en todo el
+       código nuevo, así que no hay nada que convertir. */
+
+    /* Duración del ciclo, deducida de las fechas para las que ya
+       existen. Las de membresía no tenían fin; se les da 30 días para
+       que el prorrateo tenga contra qué calcular. */
+    `UPDATE suscripciones SET dias_ciclo = CASE
+        WHEN fin IS NULL THEN 30
+        WHEN CAST(julianday(fin) - julianday(inicio) AS INTEGER) > 45 THEN 60
+        ELSE 30 END
+       WHERE dias_ciclo IS NULL`,
+
+    'CREATE INDEX IF NOT EXISTS ix_susc_org_activa ON suscripciones (organizacion_id, estado, plan_id)',
+  ]],
 ];
 
 function migrar() {
@@ -917,59 +984,199 @@ const planes = () =>
 const planPorId = (idPlan) =>
   conPrecioVigente(abrir().prepare('SELECT * FROM planes WHERE id = ?').get(idPlan));
 
-function suscripcionActiva(idOrg) {
+/* Un cupo lo ocupa un anuncio publicado o pausado. Vendido y retirado
+   lo liberan, y ahí está el sentido de "marcar vendido": el sitio que
+   pagó vuelve a quedar disponible sin volver a pagarlo.
+
+   Pausar NO libera. Si lo hiciera, pausar y publicar en bucle daría
+   anuncios ilimitados por el precio de uno. */
+const ESTADOS_QUE_OCUPAN = "('activo', 'pausado')";
+
+/* Todas las membresías vivas de una organización, con lo que tienen
+   ocupado. Devuelve varias a propósito: quien compró cinco Destacados
+   y antes tenía un Estándar suelto tiene dos, y esconderle una era
+   justo el fallo que dejaba un cupo pagado fuera de su alcance. */
+function suscripcionesDe(idOrg) {
   return abrir().prepare(`
-    SELECT s.*, p.nombre AS plan_nombre, p.perfil_publico, p.fotos_maximas, p.destacado
+    SELECT s.*, p.nombre AS plan_nombre, p.nivel, p.precio AS precio_unitario,
+           p.perfil_publico, p.fotos_maximas, p.destacado,
+           (SELECT COUNT(*) FROM anuncios a
+             WHERE a.suscripcion_id = s.id
+               AND a.estado IN ${ESTADOS_QUE_OCUPAN}) AS ocupados
     FROM suscripciones s JOIN planes p ON p.id = s.plan_id
     WHERE s.organizacion_id = ? AND s.estado = 'activa'
-    ORDER BY s.creada DESC LIMIT 1`).get(idOrg);
+    ORDER BY p.orden DESC, s.creada DESC`).all(idOrg)
+    .map((s) => ({
+      ...s,
+      libres: s.anuncios_incluidos == null
+        ? null                          // sin límite, del modelo viejo
+        : Math.max(0, s.anuncios_incluidos - s.ocupados),
+    }));
 }
 
-/* Contrata un plan y, si ese plan trae perfil público, lo enciende en
-   la organización. Devuelve la suscripción y el pago. */
-function contratar({ idOrg, idPlan, dias, ciclo, cobro }) {
+const suscripcion = (idSusc, idOrg) =>
+  suscripcionesDe(idOrg).find((s) => s.id === idSusc) || null;
+
+/* La membresía con sitio libre que mejor sirve para publicar: el nivel
+   más alto disponible, que es el que más hace por el anuncio. Si no
+   hay ninguna con hueco devuelve null y quien llama decide si vender
+   un cupo o negarse. */
+const suscripcionConHueco = (idOrg, idPlan = null) =>
+  suscripcionesDe(idOrg).find((s) =>
+    (s.libres === null || s.libres > 0) && (!idPlan || s.plan_id === idPlan)) || null;
+
+/* Compatibilidad: quedaba usada por la sesión y por el panel viejo.
+   Devuelve la de nivel más alto, que es la que representa mejor a la
+   cuenta cuando hay que enseñar una sola. */
+function suscripcionActiva(idOrg) {
+  return suscripcionesDe(idOrg)[0] || null;
+}
+
+/* Anota un pago. Uno de importe cero se anota igual y como aprobado:
+   no hay nada que cobrar, y dejarlo 'pendiente' llenaría el historial
+   del anunciante de facturas que nadie va a pagar. */
+function anotarPago(d, { idOrg, idSusc, cobro, t }) {
+  d.prepare(`INSERT INTO pagos
+    (id, organizacion_id, suscripcion_id, subtotal, itbis, total, estado, referencia, procesador, creado)
+    VALUES (?, ?, ?, ?, ?, ?, 'aprobado', ?, ?, ?)`)
+    .run(id(), idOrg, idSusc, cobro.subtotal, cobro.itbis, cobro.total,
+      cobro.referencia, cobro.total > 0 ? (cobro.procesador || 'demo') : 'sin-costo', t);
+}
+
+/* La página pública de la empresa la trae el nivel Premium, pero solo
+   se enciende si el RNC ya pasó por revisión. Pagar no salta la
+   comprobación: el directorio dejaría de significar nada si bastara
+   con contratar para aparecer en él. */
+function encenderPerfilSiProcede(d, idOrg, plan, t) {
+  if (!plan.perfil_publico) return false;
+  const org = d.prepare('SELECT tipo, estado_revision FROM organizaciones WHERE id = ?').get(idOrg);
+  if (!org || org.tipo !== 'dealer' || org.estado_revision !== 'aprobada') return false;
+  d.prepare('UPDATE organizaciones SET perfil_publico = 1, actualizada = ? WHERE id = ?').run(t, idOrg);
+  return true;
+}
+
+/* ── Comprar capacidad ──────────────────────────────────────
+   Se compran `cupo` sitios de un nivel durante `dias`. El importe ya
+   viene calculado y comprobado por quien llama: aquí solo se guarda.
+   El precio pactado queda congelado en la suscripción, así que subir
+   la tarifa mañana no afecta a lo ya vendido. */
+function comprarCupos({ idOrg, idPlan, cupo, dias, cobro }) {
   const d = abrir();
   const plan = planPorId(idPlan);
   if (!plan) throw Object.assign(new Error('Plan inexistente'), { codigo: 400 });
 
-  const membresia = plan.modalidad === 'membresia';
-  const meses = ciclo === 'anual' ? 12 : 1;
   const idSusc = id();
   const t = ahora();
+  const duracion = Number(dias) === 60 ? 60 : 30;
 
   d.prepare('BEGIN').run();
   try {
     d.prepare(`INSERT INTO suscripciones
       (id, organizacion_id, plan_id, modalidad, ciclo, estado, precio_pactado,
-       anuncios_incluidos, inicio, fin, proximo_cargo, creada)
-      VALUES (?, ?, ?, ?, ?, 'activa', ?, ?, ?, ?, ?, ?)`)
-      .run(idSusc, idOrg, idPlan, plan.modalidad, membresia ? ciclo : null,
-        cobro.subtotal, plan.anuncios_incluidos,
-        t,
-        membresia ? null : sumarDias(dias || 30),
-        membresia ? sumarMeses(meses) : null,
-        t);
+       anuncios_incluidos, dias_ciclo, inicio, fin, proximo_cargo, creada)
+      VALUES (?, ?, ?, 'vigencia', NULL, 'activa', ?, ?, ?, ?, ?, NULL, ?)`)
+      .run(idSusc, idOrg, idPlan, cobro.subtotal, Math.max(1, Math.trunc(cupo)),
+        duracion, t, sumarDias(duracion), t);
 
-    d.prepare(`INSERT INTO pagos
-      (id, organizacion_id, suscripcion_id, subtotal, itbis, total, estado, referencia, procesador, creado)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      // Un plan en promoción cobra cero. Se anota igualmente, y como
-      // aprobado: no hay nada que cobrar, y dejarlo 'pendiente' llenaría
-      // el historial del anunciante de facturas que nadie va a pagar.
-      .run(id(), idOrg, idSusc, cobro.subtotal, cobro.itbis, cobro.total,
-        'aprobado', cobro.referencia, cobro.total > 0 ? (cobro.procesador || 'demo') : 'promocion', t);
-
-    if (plan.perfil_publico) {
-      d.prepare('UPDATE organizaciones SET perfil_publico = 1, actualizada = ? WHERE id = ?').run(t, idOrg);
-    }
+    anotarPago(d, { idOrg, idSusc, cobro, t });
+    encenderPerfilSiProcede(d, idOrg, plan, t);
     d.prepare('COMMIT').run();
   } catch (e) {
     d.prepare('ROLLBACK').run();
     throw e;
   }
 
-  return abrir().prepare('SELECT * FROM suscripciones WHERE id = ?').get(idSusc);
+  return suscripcion(idSusc, idOrg);
 }
+
+/* ── Membresía de las cuentas internas ──────────────────────
+   Las cuentas del equipo no compran capacidad. Se les da una única
+   membresía Premium sin límite y sin fecha de fin, creada la primera
+   vez que publican.
+
+   Es una membresía de verdad y no un caso especial repartido por el
+   código: así el panel, el asistente y el cambio de plan funcionan
+   igual para ellas que para cualquiera, sin condicionales sueltos. */
+function membresiaInterna(idOrg) {
+  const d = abrir();
+  const ya = d.prepare(`SELECT id FROM suscripciones
+     WHERE organizacion_id = ? AND estado = 'activa' AND precio_pactado = 0
+       AND anuncios_incluidos IS NULL AND fin IS NULL
+     ORDER BY creada LIMIT 1`).get(idOrg);
+  if (ya) return suscripcion(ya.id, idOrg);
+
+  const plan = planPorId('premium') || planPorId('destacado');
+  const idSusc = id();
+  const t = ahora();
+
+  d.prepare(`INSERT INTO suscripciones
+    (id, organizacion_id, plan_id, modalidad, ciclo, estado, precio_pactado,
+     anuncios_incluidos, dias_ciclo, inicio, fin, proximo_cargo, creada)
+    VALUES (?, ?, ?, 'vigencia', NULL, 'activa', 0, NULL, NULL, ?, NULL, NULL, ?)`)
+    .run(idSusc, idOrg, plan.id, t, t);
+
+  encenderPerfilSiProcede(d, idOrg, plan, t);
+  return suscripcion(idSusc, idOrg);
+}
+
+/* ── Ampliar a mitad de ciclo ───────────────────────────────
+   Sube el cupo de una membresía viva sin mover su fecha de fin. El
+   importe lo calcula precios.js con los días que queden; aquí se
+   guarda y se anota el cobro contra la misma suscripción, para que la
+   factura del anunciante cuente la historia completa. */
+function ampliarCupos({ idSusc, idOrg, cupoNuevo, cobro }) {
+  const d = abrir();
+  const s = suscripcion(idSusc, idOrg);
+  if (!s) throw Object.assign(new Error('Esa membresía no existe'), { codigo: 404 });
+
+  const t = ahora();
+  d.prepare('BEGIN').run();
+  try {
+    d.prepare('UPDATE suscripciones SET anuncios_incluidos = ? WHERE id = ? AND organizacion_id = ?')
+      .run(Math.trunc(cupoNuevo), idSusc, idOrg);
+    anotarPago(d, { idOrg, idSusc, cobro, t });
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+
+  return suscripcion(idSusc, idOrg);
+}
+
+/* ── Mover un equipo de un cupo a otro ──────────────────────
+   Lo que el anunciante entiende como "cambiar este camión a
+   Destacado". El anuncio pasa a ocupar un cupo de la otra membresía y
+   hereda sus condiciones: hasta cuándo se publica y si sale destacado.
+
+   Esas dos fechas se recalculan aquí y solo aquí. Mantenerlas a mano
+   en cada sitio que toca un anuncio es de donde salen los anuncios
+   que caducan cuando no debían. */
+function moverAnuncioDeSuscripcion({ idAnuncio, idOrg, idSusc }) {
+  const d = abrir();
+  const s = suscripcion(idSusc, idOrg);
+  if (!s) throw Object.assign(new Error('Esa membresía no existe'), { codigo: 404 });
+
+  const t = ahora();
+  d.prepare(`UPDATE anuncios
+       SET suscripcion_id = ?, vence = ?, destacado_hasta = ?, actualizado = ?
+     WHERE id = ? AND organizacion_id = ?`)
+    .run(idSusc, s.fin, s.destacado ? (s.fin || sumarDias(15)) : null, t, idAnuncio, idOrg);
+
+  return anuncio(idAnuncio);
+}
+
+/* Rehace las fechas de todos los anuncios que sostiene una membresía.
+   Se llama al renovar: la suscripción estira su fin y los anuncios
+   tienen que estirarse con ella. */
+const refrescarAnunciosDe = (idSusc) => {
+  const d = abrir();
+  const s = d.prepare(`SELECT s.fin, p.destacado FROM suscripciones s
+    JOIN planes p ON p.id = s.plan_id WHERE s.id = ?`).get(idSusc);
+  if (!s) return 0;
+  return d.prepare('UPDATE anuncios SET vence = ?, destacado_hasta = ?, actualizado = ? WHERE suscripcion_id = ?')
+    .run(s.fin, s.destacado ? s.fin : null, ahora(), idSusc).changes;
+};
 
 /* ── Anuncios ───────────────────────────────────────────── */
 
@@ -1250,8 +1457,11 @@ function estadisticas() {
 function anunciosDeOrganizacion(idOrg) {
   return abrir().prepare(`
     SELECT a.id, a.marca, a.modelo, a.anio, a.categoria, a.estado, a.precio, a.moneda,
-           a.modalidad_precio, a.provincia, a.publicado, a.vence,
+           a.modalidad_precio, a.provincia, a.publicado, a.vence, a.suscripcion_id,
            (SELECT COALESCE(f.miniatura, f.url) FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
+           -- Cuántas fotos tiene, para poder avisar antes de mover el
+           -- anuncio a un nivel que admite menos.
+           (SELECT COUNT(*) FROM anuncio_fotos f WHERE f.anuncio_id = a.id) AS total_fotos,
            COALESCE(SUM(m.vistas), 0)         AS vistas,
            COALESCE(SUM(m.clics_telefono), 0) AS telefono,
            COALESCE(SUM(m.clics_whatsapp), 0) AS whatsapp,
@@ -1434,7 +1644,9 @@ module.exports = {
   publicidadVigente, publicidadCompleta, publicidadPorId,
   crearPublicidad, actualizarPublicidad, borrarPublicidad, sumarImpresiones, sumarClic,
   sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,
-  planes, planPorId, suscripcionActiva, contratar,
+  planes, planPorId, suscripcionActiva, suscripcionesDe, suscripcion,
+  suscripcionConHueco, comprarCupos, ampliarCupos, membresiaInterna,
+  moverAnuncioDeSuscripcion, refrescarAnunciosDe,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,
   cambiarEstadoAnuncio, caducarAnuncios,
   anunciosPorVencer, anunciosVencidosSinAvisar, marcarAviso, duenoDeAnuncio,

@@ -28,15 +28,73 @@ function diasHasta(iso) {
 
 function textoVigencia(a) {
   if (a.estado === 'vendido' || a.estado === 'retirado') return '—';
-  if (!a.vence) {
-    return '<span class="vigencia vigencia--membresia">Sin caducidad · membresía</span>';
-  }
+  // Sin fecha de fin: lo sostiene una membresía sin caducidad, que hoy
+  // solo tienen las cuentas internas. Antes decía "membresía" para
+  // cualquier anuncio sin `vence`, que era adivinar el motivo.
+  if (!a.vence) return '<span class="vigencia vigencia--membresia">Sin caducidad</span>';
+
   const dias = diasHasta(a.vence);
   if (dias < 0) return '<span class="vigencia vigencia--fin">Vencido</span>';
   // Cinco días es el margen con el que da tiempo a renovar sin que el
   // anuncio llegue a caerse del catálogo.
   const clase = dias <= 5 ? 'vigencia vigencia--pronto' : 'vigencia';
   return `<span class="${clase}">${dias} ${dias === 1 ? 'día' : 'días'}</span>`;
+}
+
+/* ── Membresías ─────────────────────────────────────────────
+   Lo que la cuenta tiene comprado. En plural: quien contrató cinco
+   Destacados y antes tenía un Estándar suelto tiene dos, y enseñar
+   solo una dejaba cupos pagados fuera de su vista. */
+let MEMBRESIAS = [];
+let EXENTA = false;
+
+const membresiaDe = (a) => MEMBRESIAS.find((m) => m.id === a.suscripcion_id) || null;
+
+const cupoTexto = (m) => (m.anuncios_incluidos == null
+  ? `${m.ocupados} publicados · sin límite`
+  : `${m.ocupados} de ${m.anuncios_incluidos} ${m.anuncios_incluidos === 1 ? 'cupo' : 'cupos'}`);
+
+/* Una barra que se lee de un vistazo: cuánto de lo pagado está en uso.
+   Sin límite no tiene barra, porque no hay nada que llenar. */
+function barraCupos(m) {
+  if (m.anuncios_incluidos == null) return '';
+  const pct = Math.min(100, Math.round((m.ocupados / m.anuncios_incluidos) * 100));
+  const lleno = m.libres === 0;
+  return `<span class="cupos" role="img" aria-label="${m.ocupados} de ${m.anuncios_incluidos} cupos en uso">
+    <span class="cupos__barra${lleno ? ' cupos__barra--lleno' : ''}" style="--uso:${pct}%"></span>
+  </span>`;
+}
+
+function tarjetaMembresia(m) {
+  const dias = diasHasta(m.fin);
+  const vigencia = !m.fin
+    ? 'Sin caducidad'
+    : dias > 0
+      ? `Quedan ${dias} ${dias === 1 ? 'día' : 'días'}`
+      : 'Vencida';
+
+  /* Lo que costaría el siguiente cupo. Cuando toca el gratis de la
+     regla se dice, porque es justo el dato que cambia la decisión de
+     ampliar hoy o esperar. */
+  const sig = m.siguiente;
+  const nota = !sig ? ''
+    : sig.gratuito
+      ? '<span class="membresia__gratis">El siguiente cupo no le cuesta nada</span>'
+      : `<span class="membresia__siguiente">Un cupo más: ${pesos(sig.total)} hasta su renovación</span>`;
+
+  return `<li class="membresia${m.libres === 0 ? ' membresia--llena' : ''}" data-membresia="${esc(m.id)}">
+    <span class="membresia__cabeza">
+      <b class="membresia__nivel">${esc(m.plan_nombre)}</b>
+      <span class="membresia__vigencia">${esc(vigencia)}</span>
+    </span>
+    <span class="membresia__cupo num">${esc(cupoTexto(m))}</span>
+    ${barraCupos(m)}
+    ${nota}
+    ${m.anuncios_incluidos == null ? '' : `
+      <button type="button" class="btn btn--linea btn--chico" data-ampliar="${esc(m.id)}">
+        Añadir cupos
+      </button>`}
+  </li>`;
 }
 
 /* ── Métricas de cabecera ───────────────────────────────── */
@@ -83,51 +141,91 @@ function pintarMetricas(resumen) {
 
 /* ── Estado del plan ────────────────────────────────────── */
 
-function pintarPlan(suscripcion) {
+function pintarPlan() {
   const caja = $('#panelPlan');
   const org = SESION.organizacion || {};
 
-  if (!suscripcion) {
+  if (!MEMBRESIAS.length) {
     caja.innerHTML = `
-      <h2 class="panel__titulo" id="t-plan"><em>Sin</em> plan contratado</h2>
-      <p class="panel__texto">Todavía no ha contratado ningún plan. Elija uno al publicar su primer equipo.</p>
+      <h2 class="panel__titulo" id="t-plan"><em>Sin</em> cupos contratados</h2>
+      <p class="panel__texto">Un cupo es el sitio que ocupa un equipo publicado. Elija el nivel y cuántos equipos quiere publicar; después reparte los cupos entre sus máquinas y los reutiliza cuando venda alguna.</p>
       <a class="btn btn--ambar" href="publicar.html">Publicar un equipo</a>`;
     return;
   }
 
-  const membresia = suscripcion.modalidad === 'membresia';
-  const cupo = suscripcion.anuncios_incluidos;
-  const activos = ANUNCIOS.filter((a) => a.estado === 'activo').length;
-  const dias = diasHasta(membresia ? suscripcion.proximo_cargo : suscripcion.fin);
+  const totalLibres = MEMBRESIAS.reduce((n, m) => (m.libres === null ? n : n + m.libres), 0);
+  const sinLimite = MEMBRESIAS.some((m) => m.libres === null);
 
   caja.innerHTML = `
     <div class="panel__cabeza">
       <h2 class="panel__titulo panel__titulo--limpio" id="t-plan">
-        <em>Plan</em> ${esc(suscripcion.plan_nombre)}
-        ${membresia ? '<span class="pastilla pastilla--azul">Membresía</span>' : ''}
+        <em>Sus</em> cupos
       </h2>
       <p class="panel__meta">
-        ${membresia
-          ? `Próximo cargo en ${dias} ${dias === 1 ? 'día' : 'días'} · facturación ${esc(suscripcion.ciclo || 'mensual')}`
-          : `Vigencia: ${dias > 0 ? `${dias} ${dias === 1 ? 'día' : 'días'} restantes` : 'vencida'}`}
+        ${sinLimite ? 'Puede publicar sin límite'
+          : totalLibres > 0
+            ? `${totalLibres} ${totalLibres === 1 ? 'cupo libre' : 'cupos libres'} para publicar`
+            : 'Sin cupos libres'}
       </p>
     </div>
+
+    <ul class="membresias">${MEMBRESIAS.map(tarjetaMembresia).join('')}</ul>
+
+    <p class="acceso__aviso" id="avisoPlan" role="alert" hidden></p>
+
     <dl class="plan-estado">
-      <div><dt>Anuncios activos</dt>
-        <dd class="num">${activos}${cupo != null ? ` de ${cupo}` : ' · sin límite'}</dd></div>
       <div><dt>Página pública</dt>
         <dd>${org.perfilPublico && org.slug
           ? `<a href="dealer.html?d=${encodeURIComponent(org.slug)}">Ver el perfil de la empresa</a>`
-          : 'No incluida en este plan'}</dd></div>
+          : org.tipo === 'dealer' ? 'Se activa con el nivel Premium' : 'Solo para cuentas de empresa'}</dd></div>
       <div><dt>Sello de verificación</dt>
         <dd>${org.verificada ? 'Otorgado' : 'Pendiente de comprobar documentación'}</dd></div>
     </dl>
-    ${cupo != null && activos >= cupo
-      ? `<p class="realce">${icono('i-aviso')} <span>Ha ocupado las ${cupo} publicaciones del plan. Para publicar otro equipo, suba de plan o marque uno como vendido.</span></p>`
-      : ''}`;
+
+    ${totalLibres === 0 && !sinLimite
+      ? `<p class="realce">${icono('i-aviso')} <span>No le quedan cupos libres. Añada cupos a una membresía —solo paga los días que le quedan— o marque un equipo como vendido para liberar el suyo.</span></p>`
+      : ''}
+
+    <div class="acciones acciones--pie">
+      <a class="btn btn--linea" href="publicar.html?comprar=1">Contratar más capacidad</a>
+    </div>`;
 }
 
 /* ── Tabla de anuncios ──────────────────────────────────── */
+
+/* El plan de un equipo, y cómo cambiarlo. Es lo que faltaba: el plan
+   se pegaba al anuncio al publicarlo y ahí se quedaba, así que quien
+   compraba cinco Destacados no podía llevarse a ellos un camión que
+   ya tenía publicado en Estándar. El cupo estaba pagado, libre y
+   fuera de su alcance.
+
+   Una membresía llena sigue apareciendo, deshabilitada y diciendo por
+   qué. Esconderla haría pensar que no existe. */
+function selectorPlan(a) {
+  const actual = membresiaDe(a);
+
+  // Vendido o retirado ya no ocupa cupo: no hay nada que mover.
+  if (a.estado === 'vendido' || a.estado === 'retirado') {
+    return `<span class="plan-celda__fijo">${esc(actual ? actual.plan_nombre : '—')}</span>`;
+  }
+  if (MEMBRESIAS.length < 2) {
+    return `<span class="plan-celda__fijo">${esc(actual ? actual.plan_nombre : '—')}</span>`;
+  }
+
+  const opciones = MEMBRESIAS.map((m) => {
+    const suya = actual && m.id === actual.id;
+    const lleno = m.libres === 0 && !suya;
+    const pocas = (a.fotos || a.total_fotos || 0) > m.fotos_maximas;
+    const motivo = lleno ? ' · sin cupos libres'
+      : pocas ? ` · admite ${m.fotos_maximas} fotos` : '';
+    return `<option value="${esc(m.id)}"${suya ? ' selected' : ''}${lleno || pocas ? ' disabled' : ''}>${esc(m.plan_nombre)}${motivo}</option>`;
+  }).join('');
+
+  return `<label class="plan-celda">
+    <span class="visualmente-oculto">Plan de ${esc(`${a.anio} ${a.marca} ${a.modelo}`)}</span>
+    <select class="plan-celda__sel" data-plan-de="${esc(a.id)}">${opciones}</select>
+  </label>`;
+}
 
 function filaAnuncio(a) {
   const estado = ESTADOS[a.estado] || ESTADOS.borrador;
@@ -149,6 +247,7 @@ function filaAnuncio(a) {
     <td><span class="estado ${estado.clase}">${estado.nombre}</span></td>
     <td class="col-num num">${miles(a.vistas || 0)}</td>
     <td class="col-num num">${miles(contactos)}</td>
+    <td>${selectorPlan(a)}</td>
     <td>${textoVigencia(a)}</td>
     <td class="col-acciones">
       ${a.estado === 'activo'
@@ -214,7 +313,7 @@ function pintarEmpresa() {
       aprobada: {
         clase: 'pastilla--verde',
         rotulo: 'Aprobada',
-        nota: 'Su empresa está aprobada. La página pública aparece en el directorio mientras tenga un plan Dealer activo.',
+        nota: 'Su empresa está aprobada. La página pública aparece en el directorio mientras tenga cupos Premium activos.',
       },
       rechazada: {
         clase: 'pastilla--roja',
@@ -236,7 +335,7 @@ function pintarEmpresa() {
           ? `<a href="dealer.html?d=${encodeURIComponent(org.slug)}">/dealer.html?d=${esc(org.slug)}</a>`
           : 'Al aprobarse la cuenta'}</dd></div>
         <div><dt>Visible en el directorio</dt><dd>${aprobada
-          ? (org.perfilPublico ? 'Sí' : 'Al contratar un plan Dealer')
+          ? (org.perfilPublico ? 'Sí' : 'Al contratar cupos Premium')
           : 'No, hasta que se apruebe'}</dd></div>
       </dl>
       <p class="panel__nota">${revision.nota}</p>
@@ -246,7 +345,7 @@ function pintarEmpresa() {
 
   caja.innerHTML = `
     <h2 class="panel__titulo" id="t-empresa"><em>¿Comercializa</em> maquinaria de forma habitual?</h2>
-    <p class="panel__texto">Solicite la cuenta de empresa: revisamos los datos y, una vez aprobada, se genera su página pública con todo el inventario y aparece en el directorio al contratar un plan Dealer. Los equipos que ya publicó se mantienen.</p>
+    <p class="panel__texto">Solicite la cuenta de empresa: revisamos los datos y, una vez aprobada, se genera su página pública con todo el inventario y aparece en el directorio al contratar cupos del nivel Premium. Los equipos que ya publicó se mantienen.</p>
     <form class="form-rnc solicitud" id="formRnc" novalidate>
       <fieldset class="solicitud__bloque">
         <legend class="solicitud__titulo">La empresa</legend>
@@ -338,7 +437,6 @@ function pintarEmpresa() {
       if (!datos) throw new Error('No hay conexión con el servidor.');
       SESION.organizacion = datos.organizacion;
       pintarEmpresa();
-      pintarPlan(null);
       location.reload();
     } catch (e) {
       fallar(e.message);
@@ -501,6 +599,8 @@ async function montarPanel() {
   }
 
   ANUNCIOS = datos.anuncios || [];
+  MEMBRESIAS = datos.membresias || [];
+  EXENTA = !!datos.exenta;
   $('#panelContenido').hidden = false;
 
   const org = SESION.organizacion || {};
@@ -515,11 +615,120 @@ async function montarPanel() {
     : `Cuenta particular · ${SESION.usuario.correo}`;
 
   pintarMetricas(datos.resumen || {});
-  pintarPlan(datos.suscripcion);
+  pintarPlan();
   pintarFiltros();
   pintarTabla();
   pintarEmpresa();
   await montarSucursales();
+
+  /* Vuelve a pedir las membresías y repinta. Se llama después de todo
+     lo que mueve un cupo —publicar no, que eso recarga la página, pero
+     sí vender, mover o ampliar—, porque los cupos libres cambian y la
+     tabla tiene que reflejarlo al momento. */
+  async function refrescarCupos() {
+    const r = await api('/membresias', { silencioso: true });
+    if (r) MEMBRESIAS = r.membresias || MEMBRESIAS;
+    pintarPlan();
+    pintarTabla();
+  }
+
+  function avisoPlan(mensaje, error = true) {
+    const el = $('#avisoPlan');
+    if (!el) return;
+    el.hidden = !mensaje;
+    el.textContent = mensaje || '';
+    el.classList.toggle('acceso__aviso--ok', !error);
+  }
+
+  /* Mover un equipo de una membresía a otra. El <select> se deja
+     deshabilitado mientras dura la llamada y, si el servidor la
+     rechaza, vuelve a marcar el plan que tenía: no se queda enseñando
+     un cambio que no ocurrió. */
+  $('#filasAnuncios').addEventListener('change', async (ev) => {
+    const sel = ev.target.closest('[data-plan-de]');
+    if (!sel) return;
+
+    const idAnuncio = sel.dataset.planDe;
+    const anuncio = ANUNCIOS.find((a) => a.id === idAnuncio);
+    const antes = anuncio && anuncio.suscripcion_id;
+
+    sel.disabled = true;
+    avisoPlan('');
+    try {
+      const r = await api(`/anuncios/${encodeURIComponent(idAnuncio)}/plan`, {
+        metodo: 'PATCH', cuerpo: { membresia: sel.value },
+      });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+
+      if (anuncio) {
+        anuncio.suscripcion_id = sel.value;
+        anuncio.vence = r.anuncio ? r.anuncio.vence : anuncio.vence;
+      }
+      const nombre = (MEMBRESIAS.find((m) => m.id === sel.value) || {}).plan_nombre || '';
+      await refrescarCupos();
+      avisoPlan(`${anuncio ? `${anuncio.anio} ${anuncio.marca} ${anuncio.modelo}` : 'El anuncio'} pasó a ${nombre}.`, false);
+    } catch (e) {
+      sel.value = antes || sel.value;
+      avisoPlan(e.message);
+    } finally {
+      sel.disabled = false;
+    }
+  });
+
+  /* Añadir cupos a una membresía viva. Se pregunta cuántos y se dice
+     lo que cuesta ANTES de cobrarlo: prorrateado por los días que
+     queden, que casi siempre es bastante menos de lo que la gente
+     espera. */
+  $('#panelPlan').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-ampliar]');
+    if (!btn) return;
+
+    const m = MEMBRESIAS.find((x) => x.id === btn.dataset.ampliar);
+    if (!m) return;
+
+    const cuantos = prompt(
+      `¿Cuántos equipos quiere poder publicar en total con su membresía ${m.plan_nombre}?\n\n`
+      + `Ahora tiene ${m.anuncios_incluidos}. Solo paga los días que le quedan, `
+      + `y cada quinto cupo no se cobra.`,
+      String(m.anuncios_incluidos + 1));
+    if (cuantos === null) return;
+
+    const cupo = Number(String(cuantos).replace(/\D+/g, ''));
+    if (!cupo || cupo <= m.anuncios_incluidos) {
+      avisoPlan(`Indique una cantidad mayor que ${m.anuncios_incluidos}.`);
+      return;
+    }
+
+    // La cifra se calcula aquí con el mismo módulo que usa el
+    // servidor, así que lo que se confirma es lo que se cobra.
+    const previo = precioAmpliacion({
+      precioUnitario: m.precio_unitario,
+      cupoActual: m.anuncios_incluidos,
+      cupoNuevo: cupo,
+      dias: m.dias_ciclo || 30,
+      diasRestantes: diasHasta(m.fin) ?? (m.dias_ciclo || 30),
+    });
+
+    const cuantoMas = cupo - m.anuncios_incluidos;
+    const texto = EXENTA || previo.total === 0
+      ? `Añadir ${cuantoMas} ${cuantoMas === 1 ? 'cupo' : 'cupos'} sin costo. ¿Confirma?`
+      : `Añadir ${cuantoMas} ${cuantoMas === 1 ? 'cupo' : 'cupos'} cuesta ${pesos(previo.total)} `
+        + `(${pesos(previo.subtotal)} + ITBIS ${pesos(previo.itbis)}) por los días que le quedan.\n\n¿Confirma?`;
+    if (!confirm(texto)) return;
+
+    btn.disabled = true;
+    try {
+      const r = await api(`/membresias/${encodeURIComponent(m.id)}/ampliar`, {
+        metodo: 'POST', cuerpo: { cupo },
+      });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      await refrescarCupos();
+      avisoPlan(`Su membresía ${m.plan_nombre} pasó a ${cupo} cupos.`, false);
+    } catch (e) {
+      avisoPlan(e.message);
+      btn.disabled = false;
+    }
+  });
 
   $('#filtrosPanel').addEventListener('click', (ev) => {
     const btn = ev.target.closest('[data-filtro]');
@@ -538,7 +747,13 @@ async function montarPanel() {
     const idAnuncio = fila.dataset.id;
     const estado = btn.dataset.accion;
 
-    if (estado === 'vendido' && !confirm('¿Marcar este equipo como vendido? El anuncio deja de aparecer en el catálogo.')) return;
+    // Vender libera el cupo, que es medio motivo para hacerlo. Se dice
+    // aquí para que nadie descubra después que podía haber publicado
+    // otro equipo sin pagar.
+    if (estado === 'vendido' && !confirm(
+      '¿Marcar este equipo como vendido?\n\n'
+      + 'El anuncio deja de aparecer en el catálogo y su cupo queda libre '
+      + 'para publicar otra máquina sin volver a pagar.')) return;
 
     btn.disabled = true;
     const r = await api(`/anuncios/${encodeURIComponent(idAnuncio)}`, {
@@ -549,9 +764,8 @@ async function montarPanel() {
     const anuncio = ANUNCIOS.find((a) => a.id === idAnuncio);
     if (anuncio) anuncio.estado = estado;
     pintarFiltros();
-    pintarTabla();
     pintarMetricas(datos.resumen || {});
-    pintarPlan(datos.suscripcion);
+    await refrescarCupos();
   });
 
   $('#btnSalir').addEventListener('click', async () => {

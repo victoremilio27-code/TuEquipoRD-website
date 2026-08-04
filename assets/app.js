@@ -374,7 +374,7 @@ async function montarDealers() {
   cont.innerHTML = lista.length
     ? lista.map(dealerHTML).join('')
     : `<li class="vacio-min vacio-min--ancho">Todavía no hay empresas con perfil publicado.
-        <a href="publicar.html?plan=dealer">Conozca la membresía Dealer</a></li>`;
+        <a href="publicar.html">Conozca el nivel Premium</a></li>`;
 
   const cuenta = $('#dealersCuenta');
   if (cuenta) cuenta.textContent = lista.length;
@@ -383,19 +383,6 @@ async function montarDealers() {
   // directorio vacío, así que se apaga entero.
   const enlace = cont.parentElement && cont.parentElement.querySelector('.panel__meta');
   if (enlace && !lista.length) enlace.hidden = true;
-}
-
-/* Rótulos de la promoción de lanzamiento. La fecha sale del servidor;
-   si no hay promoción viva, el aviso entero se retira en vez de
-   quedarse anunciando algo que ya no rige. */
-function montarPromo() {
-  const fin = finPromoEstandar();
-  $$('[data-promo-hasta]').forEach((el) => {
-    const aviso = el.closest('.realce') || el;
-    if (!fin) { aviso.hidden = true; return; }
-    aviso.hidden = false;
-    el.textContent = fechaLarga(fin);
-  });
 }
 
 /* Rellena los <select> de marca, categoría y provincia.
@@ -943,156 +930,50 @@ function montarFinanciadoras() {
   </li>`).join('');
 }
 
-/* ── Planes ─────────────────────────────────────────────── */
+/* ── Niveles ────────────────────────────────────────────── */
 
-const planPorId = (id) => PLANES.find((p) => p.id === id);
+/* EL PRECIO LO MANDA EL SERVIDOR, SIEMPRE.
 
-/* EL PRECIO LO MANDA EL SERVIDOR.
+   Los tres niveles —Estándar, Destacado y Premium— y lo que cuesta un
+   cupo de cada uno salen de la tabla `planes`, que es la misma fila
+   que después se cobra. Antes había además una copia en data.js, y por
+   ahí la página llegó a ofrecer el nivel Estándar sin costo mientras
+   el servidor cobraba RD$2,000 más ITBIS.
 
-   PLANES (assets/data.js) aporta lo que es texto de venta —el nombre,
-   la lista de prestaciones, con qué plan compararlo—, pero la cifra y
-   la promoción vigente vienen de /api/planes, que las lee de la misma
-   fila que después se cobra.
+   El cálculo del importe —descuento por cantidad, recargo de 60 días,
+   prorrateo— vive en assets/precios.js, que cargan las dos partes. */
+let NIVELES_SITIO = [];
 
-   Antes la promoción de lanzamiento estaba escrita solo aquí: la
-   página ofrecía el plan Estándar sin costo y el servidor cobraba
-   RD$2,000 más ITBIS igual. Con el precio en un solo sitio, esa
-   discrepancia no puede volver a existir. */
 async function cargarPlanes() {
   const datos = await api('/planes', { silencioso: true });
-  if (!datos || !Array.isArray(datos.planes)) return PLANES;
+  NIVELES_SITIO = (datos && datos.planes) || [];
+  return NIVELES_SITIO;
+}
 
-  datos.planes.forEach((p) => {
-    const local = PLANES.find((x) => x.id === p.id);
-    if (!local) return;
-    local.precio = p.precio_vigente;
-    local.precioNormal = p.precio_normal;
-    local.enPromo = !!p.en_promo;
-    local.promoHasta = p.promo_hasta;
-    // El cupo de anuncios también manda desde la base: es lo que el
-    // servidor comprueba al publicar.
-    local.publicaciones = p.anuncios_incluidos;
-    local.fotosMaximas = p.fotos_maximas;
+const nivelPorId = (id) => NIVELES_SITIO.find((p) => p.id === id) || null;
+
+/* Hay promoción mientras algún nivel la tenga viva. No se calcula
+   contra una fecha escrita en el cliente: se lee de lo que respondió
+   el servidor. */
+const promoActiva = () => NIVELES_SITIO.some((p) => p.en_promo);
+
+const finPromo = () => (NIVELES_SITIO.find((p) => p.en_promo) || {}).promo_hasta || null;
+
+/* Rótulos de la promoción de lanzamiento. Si no hay promoción viva, el
+   aviso entero se retira en vez de quedarse anunciando algo que ya no
+   rige. */
+function montarPromo() {
+  const fin = finPromo();
+  $$('[data-promo-hasta]').forEach((el) => {
+    const aviso = el.closest('.realce') || el;
+    if (!fin) { aviso.hidden = true; return; }
+    aviso.hidden = false;
+    el.textContent = fechaLarga(fin);
   });
-  return PLANES;
 }
 
-/* Hay promoción mientras algún plan del nivel Estándar la tenga viva.
-   No se calcula contra una fecha escrita en el cliente: se lee de lo
-   que respondió el servidor. */
-const promoEstandarActiva = () =>
-  PLANES.some((p) => p.nivel === 'estandar' && p.enPromo);
-
-const finPromoEstandar = () =>
-  (PLANES.find((p) => p.nivel === 'estandar' && p.enPromo) || {}).promoHasta || null;
-
-/* Durante la promoción, los dos planes Estándar se presentan como uno
-   solo: ofrecer "1 anuncio" y "5 anuncios" cuando ambos valen cero
-   sería ofrecer dos veces lo mismo. Terminada, vuelven los seis planes
-   con sus tarifas sin tocar una línea de código. */
-function planesVisibles() {
-  if (!promoEstandarActiva()) return PLANES;
-
-  const nivel = PLANES.filter((p) => p.nivel === 'estandar');
-  const resto = PLANES.filter((p) => p.nivel !== 'estandar');
-  const base = nivel[0];
-  if (!base) return PLANES;
-
-  const fusionado = {
-    ...base,
-    nombre: 'Estándar',
-    publicaciones: null,          // null = sin límite
-    enPromo: true,
-    incluye: [
-      'Anuncios activos sin límite mientras dure la promoción',
-      ...base.incluye.slice(1),
-    ],
-    // Lo que costará cuando la promoción termine, para que nadie se
-    // encuentre con una tarifa distinta a la que vio al registrarse.
-    despues: nivel.map((p) => ({
-      nombre: p.nombre,
-      publicaciones: p.publicaciones,
-      precio: p.precioNormal != null ? p.precioNormal : p.precio,
-    })),
-  };
-
-  return [fusionado, ...resto];
-}
-
-/* Precio del plan para la duración pedida. 60 días = 80 % más que 30.
-   No aplica a la membresía: esa se cobra por ciclo, no por vigencia. */
-const precioPlan = (plan, dias) => Math.round(plan.precio * (dias === 60 ? RECARGO_60 : 1));
-
-/* Ahorro de contratar 60 días de una vez en lugar de dos veces 30. */
-const ahorro60 = () => Math.round((1 - RECARGO_60 / 2) * 100);
-
-/* ── Membresía ──────────────────────────────────────────── */
-
-const cicloPorId = (id) =>
-  CICLOS_MEMBRESIA.find((c) => c.id === id) || CICLOS_MEMBRESIA[0];
-
-/* Lo que se cobra en un ciclo. El anual dura doce meses pero cobra
-   MESES_GRATIS_ANUAL menos: ahí está el incentivo a pagar por año. */
-function precioMembresia(plan, idCiclo) {
-  const ciclo = cicloPorId(idCiclo);
-  const cobrados = ciclo.meses === 12 ? ciclo.meses - MESES_GRATIS_ANUAL : ciclo.meses;
-  return Math.round(plan.precio * cobrados);
-}
-
-/* Cuota mensual equivalente del ciclo, para poder compararlos. */
-const mensualEquivalente = (plan, idCiclo) =>
-  Math.round(precioMembresia(plan, idCiclo) / cicloPorId(idCiclo).meses);
-
-const ahorroAnual = () => Math.round((MESES_GRATIS_ANUAL / 12) * 100);
-
-/* Fecha del próximo cargo de una membresía contratada hoy. */
-function proximoCargo(idCiclo, desde = new Date()) {
-  const d = new Date(desde);
-  d.setMonth(d.getMonth() + cicloPorId(idCiclo).meses);
-  return d;
-}
-
-/* Comparación de un plan múltiple contra comprar sus publicaciones sueltas.
-   Se calcula, no se escribe: si cambian los precios, el texto se ajusta. */
-function comparativa(plan, dias) {
-  if (!plan.compararCon || plan.publicaciones < 2) return null;
-  const base = planPorId(plan.compararCon);
-  if (!base) return null;
-
-  const suelto = precioPlan(base, dias) * plan.publicaciones;
-  const propio = precioPlan(plan, dias);
-  const diferencia = suelto - propio;
-
-  if (diferencia > 0) {
-    return {
-      clase: 'plan__ahorro',
-      texto: `Ahorro de ${pesos(diferencia)} · ${Math.round((diferencia / suelto) * 100)} %`,
-      detalle: `Por separado costarían ${pesos(suelto)}`,
-    };
-  }
-  if (diferencia === 0) {
-    return {
-      clase: 'plan__ahorro plan__ahorro--par',
-      texto: `Mismo precio que ${plan.publicaciones} planes ${esc(base.nombre)}`,
-      detalle: 'Con los destacados y el perfil corporativo incluidos',
-    };
-  }
-  return null;
-}
-
-function textoPortada(plan, dias) {
-  if (!plan.portada) return null;
-  if (plan.membresia) {
-    return `Cada anuncio, ${plan.portada.diasTodas} días en portada · ${plan.portada.permanentes} destacados de forma permanente`;
-  }
-  const factor = dias === 60 ? 2 : 1;
-  if (plan.portada.permanentes) {
-    return `Las ${plan.publicaciones} destacadas ${plan.portada.diasTodas} días · ${plan.portada.permanentes} destacadas los ${dias} días`;
-  }
-  return `${plan.portada.dias * factor} días en la portada`;
-}
-
-/* La portada también anuncia el ahorro; sale del mismo cálculo. */
+/* La portada anuncia el ahorro de contratar 60 días; sale del mismo
+   cálculo que se aplica al cobrar. */
 function montarAhorroPortada() {
   const el = $('#ahorroPortada');
   if (el) el.textContent = `ahorras ${ahorro60()} %`;

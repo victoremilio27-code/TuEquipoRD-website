@@ -8,10 +8,9 @@
    Aquí NO vive nada de lo siguiente, y no debe volver:
    · Inventario ni dealers  → los sirve /api desde la base de datos.
    · Precios ni promociones → los sirve /api/planes, que lee la misma
-     fila que después se cobra. `precio` de PLANES se sobreescribe al
-     arrancar con el precio vigente del servidor (ver cargarPlanes en
-     app.js). Con la promoción escrita aquí, la página llegó a ofrecer
-     el plan Estándar sin costo mientras el servidor lo cobraba.
+     fila que después se cobra. Con la promoción escrita aquí, la
+     página llegó a ofrecer el plan Estándar sin costo mientras el
+     servidor lo cobraba. El cálculo del importe está en precios.js.
    ═══════════════════════════════════════════════════════════ */
 
 /* La taxonomía —categorías, subcategorías, marcas y modelos— vive
@@ -60,10 +59,6 @@ const TIPOS_CONTACTO = [
   { id: 'whatsapp', nombre: 'WhatsApp' },
   { id: 'ambos',    nombre: 'Llamadas y WhatsApp' },
 ];
-
-/* ITBIS vigente sobre servicios de publicidad. Se aplica al precio del
-   plan en el resumen de pago; nunca se escribe a mano en la interfaz. */
-const ITBIS = 0.18;
 
 const PROVINCIAS = [
   'Distrito Nacional', 'Santo Domingo', 'Santiago', 'La Vega', 'San Cristóbal',
@@ -192,139 +187,13 @@ const FINANCIADORAS = [
   { id: 'dealer-a',  nombre: 'Financiamiento del dealer', tipo: 'Directo',        enfoque: 'Algunos dealers del directorio financian de su cartera, sobre todo en equipo nuevo.', requisitos: ['Varía por dealer', 'Inicial negociable'], telefono: null, correo: null, web: null },
 ];
 
-/* ── Planes de publicación ───────────────────────────────
-   Conviven dos modelos de cobro:
+/* Los planes ya no viven aquí.
 
-   · Compra puntual — Estándar, Destacado y sus múltiples. Se paga
-     una vigencia de 30 o 60 días y el anuncio caduca al vencer.
-     `precio` es siempre el de 30 días; el de 60 sale de RECARGO_60.
+   El nivel, su precio y cuántas fotos admite salen de la tabla
+   `planes`, y el cálculo del importe de assets/precios.js, que cargan
+   el navegador y el servidor. Tener el precio escrito también en este
+   archivo fue exactamente el fallo que hacía que la página anunciara
+   el plan Estándar sin costo mientras el servidor cobraba RD$2,000.
 
-   · Membresía — Dealer. Cuota recurrente, mensual o anual, con la
-     tarjeta tokenizada en el archivo del anunciante. No hay vigencia
-     por anuncio: las publicaciones siguen activas mientras la
-     membresía esté al día. `precio` es la cuota MENSUAL.
-
-   Lo distingue `membresia: true`. Ningún porcentaje se escribe a
-   mano: el ahorro de 60 días y el del ciclo anual se calculan.
-   ──────────────────────────────────────────────────────── */
-
-/* 60 días cuestan 80 % más que 30, no el doble. */
-const RECARGO_60 = 1.8;
-
-/* Meses que no se cobran al pagar la membresía por año adelantado. */
-const MESES_GRATIS_ANUAL = 2;
-
-/* Ciclos de facturación de la membresía. `meses` es lo que dura el
-   ciclo; lo que se cobra sale de restarle MESES_GRATIS_ANUAL al
-   anual, nunca de un precio escrito aparte. */
-const CICLOS_MEMBRESIA = [
-  { id: 'mensual', nombre: 'Mensual', meses: 1 },
-  { id: 'anual',   nombre: 'Anual',   meses: 12 },
-];
-
-const PLANES = [
-  {
-    id: 'estandar',
-    nombre: 'Estándar',
-    nivel: 'estandar',
-    precio: 2000,
-    publicaciones: 1,
-    portada: null,
-    incluye: [
-      'Un anuncio activo',
-      'Hasta 8 fotografías del equipo',
-      'Ficha técnica completa con horas y condición',
-      'Contacto directo por teléfono y WhatsApp',
-    ],
-  },
-  {
-    id: 'multi-estandar',
-    nombre: 'Múltiple Estándar',
-    nivel: 'estandar',
-    precio: 8000,
-    publicaciones: 5,
-    compararCon: 'estandar',
-    portada: null,
-    incluye: [
-      'Cinco anuncios activos de forma simultánea',
-      'Todas las prestaciones del plan Estándar en cada uno',
-      'Sustitución sin costo del equipo vendido por otro',
-      'Facturación única por los cinco anuncios',
-    ],
-  },
-  {
-    id: 'destacado',
-    nombre: 'Destacado',
-    nivel: 'destacado',
-    precio: 3500,
-    publicaciones: 1,
-    recomendado: true,
-    portada: { dias: 15 },
-    incluye: [
-      'Un anuncio activo',
-      'Hasta 20 fotografías y un video del equipo en operación',
-      'Distintivo "Destacado" en el catálogo',
-      'Posición preferente en los resultados de búsqueda',
-      'Documentación adjunta: factura, matrícula o certificado de importación',
-      'Estadísticas de visualizaciones y de clics en el teléfono',
-      'Difusión en las redes sociales de TuEquipoRD',
-    ],
-  },
-  {
-    id: 'multi-destacado',
-    nombre: 'Múltiple Destacados',
-    nivel: 'destacado',
-    precio: 14000,
-    publicaciones: 5,
-    compararCon: 'destacado',
-    portada: { dias: 15 },
-    incluye: [
-      'Cinco anuncios activos con todas las prestaciones de Destacado',
-      'Los cinco en el panel de Destacados de la portada',
-      'Sustitución sin costo del equipo vendido por otro',
-      'Estadísticas comparadas entre los cinco equipos',
-    ],
-  },
-  {
-    id: 'dealer',
-    nombre: 'Dealer',
-    nivel: 'dealer',
-    membresia: true,
-    soloDealer: true,
-    perfilPublico: true,
-    precio: 40000,          // cuota mensual, no compra de 30 días
-    publicaciones: 20,
-    fotosMaximas: 20,
-    portada: { diasTodas: 7, permanentes: 5 },
-    incluye: [
-      'Hasta 20 anuncios activos de forma simultánea',
-      'Sin vigencia por anuncio: permanecen publicados mientras la membresía esté al día',
-      'Página pública de la empresa y perfil en el directorio de dealers',
-      'Cada anuncio nuevo sale destacado durante sus primeros 7 días',
-      'Estadísticas de visualizaciones y llamadas por equipo',
-      'Sin permanencia mínima: puede cancelar en cualquier momento',
-    ],
-  },
-  {
-    id: 'dealer-premium',
-    nombre: 'Dealer Premium',
-    nivel: 'dealer',
-    membresia: true,
-    soloDealer: true,
-    perfilPublico: true,
-    precio: 60000,
-    publicaciones: null,    // sin límite
-    fotosMaximas: 30,
-    portada: { diasTodas: 7, permanentes: 5 },
-    incluye: [
-      'Anuncios activos sin límite',
-      'Sin vigencia por anuncio: permanecen publicados mientras la membresía esté al día',
-      'Página pública de la empresa con posición preferente en el directorio',
-      'Hasta 30 fotografías y video por equipo',
-      'Cada anuncio nuevo sale destacado durante sus primeros 7 días',
-      'Estadísticas por equipo, por sucursal y por vendedor',
-      'Varios usuarios administradores sobre la misma cuenta',
-      'Sin permanencia mínima: puede cancelar en cualquier momento',
-    ],
-  },
-];
+   El ITBIS, el recargo de 60 días y la regla del uno gratis por cada
+   cinco están en precios.js por el mismo motivo. */

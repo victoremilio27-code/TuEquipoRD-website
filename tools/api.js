@@ -15,9 +15,13 @@ const db = require('./db');
 const correo = require('./correo');
 const fotos = require('./fotos');
 
-const ITBIS = 0.18;
-const RECARGO_60 = 1.8;
-const MESES_GRATIS_ANUAL = 2;
+/* El cálculo del importe es el MISMO módulo que carga el navegador.
+   La cifra que se enseña y la que se cobra salen de la misma función:
+   ya pasó una vez que el precio viviera solo en el JavaScript y la
+   página anunciara un plan sin costo mientras el servidor cobraba. */
+const precios = require('../assets/precios.js');
+
+const { ITBIS } = precios;
 const COOKIE = 'te_sesion';
 const COOKIE_EQUIPO = 'te_equipo';
 
@@ -882,28 +886,161 @@ function verDealer(req, res, ctx, slug) {
 
 /* ── Rutas: planes y cobro ──────────────────────────────── */
 
-const listarPlanes = (req, res) => responder(res, 200, { planes: db.planes(), itbis: ITBIS });
+const listarPlanes = (req, res) => responder(res, 200, {
+  planes: db.planes(),
+  itbis: precios.ITBIS,
+  duraciones: precios.DURACIONES,
+  cuposPorUnoGratis: precios.CUPOS_POR_UNO_GRATIS,
+  cupoMaximo: precios.CUPO_MAXIMO,
+});
 
-/* Precio de un plan según cómo se contrate. Es la MISMA fórmula que
-   usa el navegador para pintar las tarjetas, pero la que manda es
-   esta: el importe no puede depender de lo que diga el cliente. */
-function calcularCobro(plan, { dias, ciclo }) {
-  // `precio_vigente` ya tiene aplicada la promoción que esté corriendo
-  // (ver conPrecioVigente en db.js). Nunca se toma `plan.precio` a
-  // secas: era la vía por la que la página anunciaba un plan sin costo
-  // y el cobro salía por la tarifa completa.
-  const base = plan.precio_vigente != null ? plan.precio_vigente : plan.precio;
+/* Lo que cuesta un cupo de este nivel durante treinta días.
+   `precio_vigente` ya trae aplicada la promoción que esté corriendo
+   (ver conPrecioVigente en db.js). Nunca se toma `plan.precio` a
+   secas: era la vía por la que la página anunciaba un nivel sin costo
+   y el cobro salía por la tarifa completa. */
+const precioUnitario = (plan) =>
+  plan.precio_vigente != null ? plan.precio_vigente : plan.precio;
 
-  let subtotal;
-  if (plan.modalidad === 'membresia') {
-    const meses = ciclo === 'anual' ? 12 - MESES_GRATIS_ANUAL : 1;
-    subtotal = Math.round(base * meses);
-  } else {
-    subtotal = Math.round(base * (Number(dias) === 60 ? RECARGO_60 : 1));
+const esExenta = (idUsuario) => !!(db.organizacionDe(idUsuario) || {}).exenta_pago;
+
+const SIN_COSTO = { subtotal: 0, itbis: 0, total: 0 };
+
+const referenciaCobro = () =>
+  `TE-${new Date().getFullYear()}-${db.id().slice(0, 6).toUpperCase()}`;
+
+/* ── Rutas: membresías ──────────────────────────────────────
+   Se compra capacidad y después se publica. Antes se publicaba y el
+   cobro salía al final, con el plan pegado a ese anuncio para
+   siempre: quien compraba cinco Destacados no podía mover a ellos un
+   equipo que ya tenía publicado en Estándar. */
+
+const misPlanes = conSesion((req, res, ctx) => {
+  const lista = db.suscripcionesDe(ctx.organizacion.id);
+  return responder(res, 200, {
+    membresias: lista.map((s) => ({
+      ...s,
+      // Qué costaría el siguiente cupo, para poder decirlo en el panel
+      // sin que haya que abrir el formulario. Cuando toca el gratis de
+      // la regla, saberlo cambia la decisión.
+      siguiente: s.anuncios_incluidos == null ? null : precios.siguienteCupo({
+        precioUnitario: s.precio_unitario,
+        cupoActual: s.anuncios_incluidos,
+        dias: s.dias_ciclo || 30,
+        diasRestantes: precios.diasRestantes(s.fin) ?? (s.dias_ciclo || 30),
+      }),
+    })),
+    exenta: esExenta(ctx.usuario.id),
+  });
+});
+
+const comprarMembresia = conSesion(async (req, res, ctx) => {
+  const c = await leerCuerpo(req);
+  const org = ctx.organizacion;
+
+  const plan = db.planPorId(String(c.plan || ''));
+  if (!plan || !plan.activo) return fallo(res, 400, 'Seleccione un nivel válido');
+
+  const cupo = Math.min(Math.max(entero(c.cupo) || 1, 1), precios.CUPO_MAXIMO);
+  const dias = Number(c.dias) === 60 ? 60 : 30;
+
+  /* La exención se comprueba contra la BASE y no contra `ctx`, para
+     que retirarla tenga efecto en la compra siguiente sin esperar a
+     que caduque ninguna sesión. */
+  const cobro = esExenta(ctx.usuario.id)
+    ? { ...SIN_COSTO, referencia: referenciaCobro(), procesador: 'interna' }
+    : {
+      ...precios.precioCompra({ precioUnitario: precioUnitario(plan), cupo, dias }),
+      referencia: referenciaCobro(),
+      procesador: 'demo',
+    };
+
+  const membresia = db.comprarCupos({ idOrg: org.id, idPlan: plan.id, cupo, dias, cobro });
+
+  if (cobro.total > 0) {
+    correo.enviarComprobante({
+      para: ctx.usuario.correo,
+      nombre: ctx.usuario.nombre,
+      plan: `${plan.nombre} · ${cupo} ${cupo === 1 ? 'cupo' : 'cupos'}`,
+      subtotal: cobro.subtotal,
+      itbis: cobro.itbis,
+      total: cobro.total,
+      referencia: cobro.referencia,
+      fin: membresia.fin,
+    });
   }
-  const itbis = Math.round(subtotal * ITBIS);
-  return { subtotal, itbis, total: subtotal + itbis };
-}
+
+  return responder(res, 201, { membresia, cobro, sesion: sesionPublica(ctx.usuario.id) });
+});
+
+const ampliarMembresia = conSesion(async (req, res, ctx, idSusc) => {
+  const c = await leerCuerpo(req);
+  const org = ctx.organizacion;
+
+  const s = db.suscripcion(idSusc, org.id);
+  if (!s) return fallo(res, 404, 'Esa membresía no es suya o no existe');
+  if (s.anuncios_incluidos == null) {
+    return fallo(res, 400, 'Esa membresía ya no tiene límite de equipos');
+  }
+
+  const cupoNuevo = Math.min(Math.max(entero(c.cupo) || 0, 1), precios.CUPO_MAXIMO);
+  if (cupoNuevo <= s.anuncios_incluidos) {
+    return fallo(res, 400, 'Indique una cantidad mayor a la que ya tiene');
+  }
+
+  const dias = s.dias_ciclo || 30;
+  const cobro = esExenta(ctx.usuario.id)
+    ? { ...SIN_COSTO, referencia: referenciaCobro(), procesador: 'interna' }
+    : {
+      ...precios.precioAmpliacion({
+        precioUnitario: s.precio_unitario,
+        cupoActual: s.anuncios_incluidos,
+        cupoNuevo,
+        dias,
+        diasRestantes: precios.diasRestantes(s.fin) ?? dias,
+      }),
+      referencia: referenciaCobro(),
+      procesador: 'demo',
+    };
+
+  const membresia = db.ampliarCupos({ idSusc, idOrg: org.id, cupoNuevo, cobro });
+  return responder(res, 200, { membresia, cobro });
+});
+
+/* Mover un equipo de una membresía a otra: lo que el anunciante
+   entiende como "pasar este camión a Destacado". */
+const cambiarPlanDeAnuncio = conSesion(async (req, res, ctx, idAnuncio) => {
+  const c = await leerCuerpo(req);
+  const org = ctx.organizacion;
+
+  const a = db.anuncio(idAnuncio);
+  if (!a || a.organizacion_id !== org.id) {
+    return fallo(res, 404, 'Ese anuncio no es suyo o no existe');
+  }
+
+  const destino = db.suscripcion(String(c.membresia || ''), org.id);
+  if (!destino) return fallo(res, 404, 'Esa membresía no es suya o no existe');
+
+  if (destino.id === a.suscripcion_id) {
+    return responder(res, 200, { anuncio: a, sinCambio: true });
+  }
+
+  // El cupo tiene que estar libre. Cuenta solo lo que ocupa sitio, así
+  // que un equipo vendido no bloquea el suyo.
+  if (destino.libres !== null && destino.libres < 1) {
+    return fallo(res, 409, `Su membresía ${destino.plan_nombre} no tiene cupos libres. Amplíela o libere uno marcando un equipo como vendido.`);
+  }
+
+  // Bajar de nivel puede dejar fuera fotografías ya publicadas. Se
+  // dice antes y no se recorta nada por sorpresa.
+  const fotos = (a.fotos || []).length;
+  if (fotos > destino.fotos_maximas) {
+    return fallo(res, 409, `Este anuncio tiene ${fotos} fotografías y ${destino.plan_nombre} admite ${destino.fotos_maximas}. Quite ${fotos - destino.fotos_maximas} antes de moverlo.`);
+  }
+
+  const movido = db.moverAnuncioDeSuscripcion({ idAnuncio, idOrg: org.id, idSusc: destino.id });
+  return responder(res, 200, { anuncio: movido, membresia: db.suscripcion(destino.id, org.id) });
+});
 
 /* ── Rutas: anuncios ────────────────────────────────────── */
 
@@ -913,17 +1050,42 @@ function calcularCobro(plan, { dias, ciclo }) {
    ofrecía otras. */
 const taxonomia = require('../assets/taxonomia.js');
 
-/* Publicar: valida, cobra el plan y crea el anuncio, en ese orden. El
-   anuncio no existe hasta que el cobro está aprobado. */
+/* Publicar: valida el equipo y lo pone en un cupo ya comprado.
+   Aquí NO se cobra. La capacidad se compra antes, en
+   POST /api/membresias, y publicar solo la ocupa. Esa separación es
+   la que permite mover después un equipo de un nivel a otro: el cupo
+   es de la organización, no del anuncio. */
 const publicar = conSesion(async (req, res, ctx) => {
   const c = await leerCuerpo(req);
   const org = ctx.organizacion;
 
-  const plan = db.planPorId(String(c.plan || ''));
-  if (!plan) return fallo(res, 400, 'Seleccione un plan válido');
-  if (plan.solo_dealer && org.tipo !== 'dealer') {
-    return fallo(res, 403, 'Los planes Dealer requieren una cuenta de empresa con RNC registrado');
+  /* Qué membresía sostiene este anuncio. Si el anunciante eligió una
+     se respeta; si no, la de nivel más alto con sitio libre, que es la
+     que más hace por el equipo. */
+  const exenta = esExenta(ctx.usuario.id);
+  const membresia = exenta
+    ? db.membresiaInterna(org.id)
+    : (c.membresia
+      ? db.suscripcion(String(c.membresia), org.id)
+      : db.suscripcionConHueco(org.id));
+
+  /* Sin sitio donde publicar. Se distingue no tener nada contratado de
+     tenerlo lleno: son dos situaciones distintas y la salida de cada
+     una también. Decirle "contrate un plan" a quien ya pagó cinco
+     cupos y los tiene ocupados es mandarlo a comprar de nuevo cuando
+     lo que necesita es ampliar o liberar uno. */
+  if (!membresia) {
+    const tiene = db.suscripcionesDe(org.id).length;
+    return fallo(res, 402, tiene
+      ? 'Sus cupos están ocupados. Añada cupos desde su panel —solo paga los días que le queden— o libere uno marcando un equipo como vendido.'
+      : 'Todavía no tiene cupos. Contrate un plan para publicar este equipo.');
   }
+  if (membresia.libres !== null && membresia.libres < 1) {
+    return fallo(res, 409, `Su membresía ${membresia.plan_nombre} no tiene cupos libres. Amplíela o libere uno marcando un equipo como vendido.`);
+  }
+
+  const plan = db.planPorId(membresia.plan_id);
+  if (!plan) return fallo(res, 400, 'La membresía apunta a un nivel que ya no existe');
 
   /* La cadena completa: categoría → subcategoría → marca. Se valida
      aquí y no solo en la pantalla porque el navegador puede mandar
@@ -982,50 +1144,16 @@ const publicar = conSesion(async (req, res, ctx) => {
     .slice(0, 5);
   if (!telefonos.length) return fallo(res, 400, 'Registre al menos un teléfono de 10 dígitos');
 
-  // El cupo del plan se cuenta contra los anuncios ya activos.
-  const activos = db.anunciosDeOrganizacion(org.id).filter((a) => a.estado === 'activo').length;
-  let suscripcion = db.suscripcionActiva(org.id);
-  const cubre = suscripcion
-    && suscripcion.plan_id === plan.id
-    && (suscripcion.anuncios_incluidos === null || activos < suscripcion.anuncios_incluidos);
-
-  /* Si lo que ya tiene contratado no cubre este anuncio, se cobra.
-     Salvo que la organización esté exenta: son las cuentas internas.
-     La exención se comprueba contra la BASE y no contra `ctx`, para
-     que quitarla tenga efecto en la siguiente publicación sin esperar
-     a que caduque ninguna sesión.
-
-     La suscripción se crea igual, con importe cero. Así el anuncio
-     tiene un plan detrás —con su cupo, sus fotos y su vigencia— y el
-     resto del código no necesita saber nada de esto. */
-  const exenta = !!(db.organizacionDe(ctx.usuario.id) || {}).exenta_pago;
-
-  let cobro = null;
-  if (!cubre) {
-    const importe = exenta
-      ? { subtotal: 0, itbis: 0, total: 0 }
-      : calcularCobro(plan, { dias: c.dias, ciclo: c.ciclo });
-    cobro = {
-      ...importe,
-      referencia: `TE-${new Date().getFullYear()}-${db.id().slice(0, 6).toUpperCase()}`,
-      procesador: exenta ? 'interna' : 'demo',
-    };
-    suscripcion = db.contratar({
-      idOrg: org.id, idPlan: plan.id, dias: Number(c.dias) || 30, ciclo: c.ciclo, cobro,
-    });
-  }
-
   // El anuncio se ancla a una sucursal. Si se pide una concreta se
   // comprueba que sea de esta organización; si no, va a la principal.
   const sucursal = (c.sucursal && db.sucursal(String(c.sucursal), org.id))
     || db.sucursalPrincipal(org.id);
-  const membresia = plan.modalidad === 'membresia';
 
   const idAnuncio = db.crearAnuncio({
     idOrg: org.id,
     idSucursal: sucursal && sucursal.id,
     idUsuario: ctx.usuario.id,
-    idSuscripcion: suscripcion && suscripcion.id,
+    idSuscripcion: membresia.id,
     categoria: String(c.categoria),
     subcategoria: texto(c.subcategoria, 80),
     marca: texto(c.marca, 60),
@@ -1050,20 +1178,23 @@ const publicar = conSesion(async (req, res, ctx) => {
     financiamiento: !!c.financiamiento,
     video: texto(c.video, 300),
     ...tren,
-    /* La membresía sostiene el anuncio: no se le pone caducidad. Las
-       cuentas internas tampoco caducan — la vigencia es lo que se
-       compra, y aquí no se compra nada, así que hacerles renovar cada
-       30 días sería trabajo sin contrapartida. */
-    vence: membresia || exenta ? null : db.sumarDias(Number(c.dias) === 60 ? 60 : 30),
-    destacadoHasta: plan.destacado ? db.sumarDias(membresia ? 7 : 15) : null,
+    /* Las dos fechas salen de la membresía, no de lo que pida el
+       navegador. El anuncio se publica mientras el cupo esté pagado;
+       si la membresía no tiene fin —una cuenta interna— el anuncio
+       tampoco caduca. Al mover el equipo a otra membresía se
+       recalculan las dos en db.moverAnuncioDeSuscripcion. */
+    vence: membresia.fin,
+    destacadoHasta: plan.destacado ? membresia.fin : null,
     fotos,
     telefonos: telefonos.map((t) => ({ numero: t.numero, tipo: t.tipo, nota: t.nota })),
   });
 
-  /* Confirmación al anunciante, y comprobante aparte si hubo cobro.
-     Van después de responder conceptualmente —el anuncio ya existe— y
-     ninguno puede fallar de forma que afecte a la publicación: `enviar`
-     nunca lanza. */
+  /* Confirmación al anunciante. Va después de responder
+     conceptualmente —el anuncio ya existe— y no puede fallar de forma
+     que afecte a la publicación: `enviar` nunca lanza.
+
+     El comprobante ya no sale aquí: se emitió al comprar el cupo.
+     Publicar no cobra nada. */
   const publicado = db.anuncio(idAnuncio);
   correo.enviarAnuncioPublicado({
     para: ctx.usuario.correo,
@@ -1074,23 +1205,9 @@ const publicar = conSesion(async (req, res, ctx) => {
     plan: plan.nombre,
   });
 
-  if (cobro && cobro.total > 0) {
-    correo.enviarComprobante({
-      para: ctx.usuario.correo,
-      nombre: ctx.usuario.nombre,
-      plan: plan.nombre,
-      subtotal: cobro.subtotal,
-      itbis: cobro.itbis,
-      total: cobro.total,
-      referencia: cobro.referencia,
-      fin: suscripcion && suscripcion.fin,
-    });
-  }
-
   return responder(res, 201, {
     anuncio: publicado,
-    cobro,
-    suscripcion,
+    membresia: db.suscripcion(membresia.id, org.id),
     sesion: sesionPublica(ctx.usuario.id),
   });
 });
@@ -1100,7 +1217,11 @@ const misAnuncios = conSesion((req, res, ctx) => {
   return responder(res, 200, {
     anuncios: db.anunciosDeOrganizacion(ctx.organizacion.id),
     resumen: db.resumenOrganizacion(ctx.organizacion.id),
-    suscripcion: db.suscripcionActiva(ctx.organizacion.id),
+    // En plural: una cuenta puede tener varias membresías vivas, y
+    // enseñar solo una era lo que dejaba cupos pagados fuera de la
+    // vista del anunciante.
+    membresias: db.suscripcionesDe(ctx.organizacion.id),
+    exenta: esExenta(ctx.usuario.id),
   });
 });
 
@@ -1212,7 +1333,13 @@ const RUTAS = [
   ['GET',  /^\/api\/anuncios$/,          catalogo],
   ['GET',  /^\/api\/mis-anuncios$/,      misAnuncios],
   ['GET',  /^\/api\/anuncios\/([\w-]+)$/, verAnuncio],
+  ['PATCH', /^\/api\/anuncios\/([\w-]+)\/plan$/, cambiarPlanDeAnuncio],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)$/, cambiarEstado],
+
+  // Capacidad: se compra antes de publicar y se amplía prorrateada.
+  ['GET',  /^\/api\/membresias$/,                    misPlanes],
+  ['POST', /^\/api\/membresias$/,                    comprarMembresia],
+  ['POST', /^\/api\/membresias\/([\w-]+)\/ampliar$/, ampliarMembresia],
   ['POST', /^\/api\/eventos$/,           evento],
   ['POST', /^\/api\/fotos$/,             subirFoto],
 

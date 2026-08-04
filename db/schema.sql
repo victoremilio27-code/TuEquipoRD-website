@@ -362,7 +362,15 @@ CREATE TABLE IF NOT EXISTS suscripciones (
   -- Condiciones congeladas al contratar: si mañana sube el precio del
   -- plan, esta suscripción sigue facturando lo que se pactó.
   precio_pactado     INTEGER NOT NULL,
+  -- Los cupos comprados. Cada anuncio publicado ocupa uno; al marcar
+  -- un equipo como vendido el cupo queda libre y se reutiliza sin
+  -- volver a pagar. NULL solo en las suscripciones sin límite que
+  -- quedaron del modelo anterior.
   anuncios_incluidos INTEGER,
+  -- 30 o 60. Hace falta para prorratear una ampliación a mitad de
+  -- ciclo: sin él habría que deducirlo restando fechas, y una
+  -- suscripción renovada ya no diría la duración que se contrató.
+  dias_ciclo      INTEGER,
   inicio          TEXT NOT NULL,
   fin             TEXT,                    -- NULL en membresía viva
   proximo_cargo   TEXT,
@@ -603,13 +611,21 @@ CREATE TABLE IF NOT EXISTS metricas_diarias (
 CREATE INDEX IF NOT EXISTS ix_metricas_dia ON metricas_diarias (dia);
 
 -- ── Catálogo inicial de planes ─────────────────────────────
--- Precios de 30 días para 'vigencia' y cuota mensual para 'membresia'.
+-- `precio` es lo que cuesta UN cupo durante treinta días. La cantidad
+-- de cupos no vive aquí: se elige al contratar y se guarda en la
+-- suscripción, porque es lo que distingue a un vendedor con un camión
+-- de un dealer con cuarenta. Antes había un plan por cada cantidad
+-- ("Múltiple Estándar", "Múltiple Destacados") y eso multiplicaba el
+-- catálogo sin añadir nada: eran el mismo nivel con otro número.
+--
+-- El descuento por cantidad y el de 60 días los calcula
+-- assets/precios.js, que usan el servidor y el navegador.
+--
+-- `anuncios_incluidos` queda en NULL a propósito: el cupo es de la
+-- suscripción, no del plan.
 
 INSERT OR IGNORE INTO planes
   (id, nombre, nivel, modalidad, precio, anuncios_incluidos, fotos_maximas, destacado, perfil_publico, solo_dealer, orden) VALUES
-  ('estandar',        'Estándar',            'estandar',  'vigencia',   2000,    1,  8, 0, 0, 0, 1),
-  ('multi-estandar',  'Múltiple Estándar',   'estandar',  'vigencia',   8000,    5,  8, 0, 0, 0, 2),
-  ('destacado',       'Destacado',           'destacado', 'vigencia',   3500,    1, 20, 1, 0, 0, 3),
-  ('multi-destacado', 'Múltiple Destacados', 'destacado', 'vigencia',  14000,    5, 20, 1, 0, 0, 4),
-  ('dealer',          'Dealer',              'dealer',    'membresia', 40000,   20, 20, 1, 1, 1, 5),
-  ('dealer-premium',  'Dealer Premium',      'dealer',    'membresia', 60000, NULL, 30, 1, 1, 1, 6);
+  ('estandar',  'Estándar',  'estandar',  'vigencia', 2000, NULL,  8, 0, 0, 0, 1),
+  ('destacado', 'Destacado', 'destacado', 'vigencia', 3500, NULL, 20, 1, 0, 0, 2),
+  ('premium',   'Premium',   'premium',   'vigencia', 5500, NULL, 30, 1, 1, 0, 3);

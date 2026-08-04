@@ -2704,3 +2704,48 @@ main { position: relative; }
 .flota-alta__abrir::before { content: '+ '; }
 .flota-alta[open] .flota-alta__abrir::before { content: '− '; }
 .flota-alta form { margin-top: 14px; }
+
+/* ── Membresías del panel ───────────────────────────────────
+   Lo que la cuenta tiene comprado. Una tarjeta por membresía, con la
+   barra de cupos como el dato que se lee primero: es la respuesta a
+   "¿puedo publicar otro equipo?". */
+.membresias {
+  display: grid; gap: 10px; margin-top: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
+}
+.membresia {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 13px 15px;
+  background: var(--hueso); border: 1px solid var(--linea-suave);
+  border-radius: var(--r);
+}
+.membresia--llena { border-color: var(--linea); background: var(--blanco); }
+.membresia__cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.membresia__nivel { font-family: var(--display); font-size: 15px; font-weight: 700; }
+.membresia__vigencia { font-size: 11.5px; font-weight: 600; color: var(--gris-acero); }
+.membresia__cupo { font-size: 13px; font-weight: 600; color: var(--azul); }
+
+.cupos { display: block; height: 5px; border-radius: 99px; background: var(--gris-neutro); overflow: hidden; }
+.cupos__barra { display: block; height: 100%; width: var(--uso, 0%); border-radius: 99px; background: var(--verde); }
+.cupos__barra--lleno { background: var(--ambar-hondo); }
+
+.membresia__gratis { font-size: 11.5px; font-weight: 700; color: var(--verde); }
+.membresia__siguiente { font-size: 11.5px; color: var(--gris-acero); }
+.membresia .btn { align-self: flex-start; margin-top: 2px; }
+
+/* Selector de plan en la tabla: cambia el nivel de un equipo sin salir
+   de la lista, que es donde el anunciante los está comparando. */
+.plan-celda { display: block; }
+.plan-celda__sel {
+  width: 100%; min-width: 118px; padding: 5px 8px;
+  font-family: var(--cuerpo); font-size: 12.5px; font-weight: 600;
+  color: var(--azul); background: var(--blanco);
+  border: 1px solid var(--linea); border-radius: 7px; cursor: pointer;
+}
+.plan-celda__sel:disabled { opacity: .6; cursor: progress; }
+.plan-celda__fijo { font-size: 12.5px; font-weight: 600; color: var(--gris-acero); }
+
+.acceso__aviso--ok {
+  color: #14532D; background: rgba(21, 122, 75, .07);
+  border-color: rgba(21, 122, 75, .25); border-left-color: var(--verde);
+}
