@@ -293,6 +293,16 @@ const MIGRACIONES = [
     // exactamente los mismos índices.
     'CREATE INDEX IF NOT EXISTS ix_publicidad_espacio ON publicidad (espacio, activo, orden)',
   ]],
+
+  /* Ajustes del sitio: pares clave/valor que el equipo cambia desde
+     /admin.html. Nace para la fotografía del héroe de la portada. */
+  ['2026-08-ajustes', [
+    `CREATE TABLE IF NOT EXISTS ajustes (
+       clave       TEXT PRIMARY KEY,
+       valor       TEXT,
+       actualizado TEXT NOT NULL
+     )`,
+  ]],
 ];
 
 function migrar() {
@@ -764,6 +774,112 @@ const borrarFlota = (idFlota) =>
 
    Se comparan como texto: las fechas se guardan en ISO (AAAA-MM-DD),
    que ordena igual alfabéticamente que cronológicamente. */
+/* ── Ajustes del sitio ──────────────────────────────────────
+   Pocos y concretos. Cada clave que se admite está en esta lista: así
+   una petición manipulada no puede sembrar filas arbitrarias en la
+   tabla, y quien lea el código sabe de un vistazo qué es configurable
+   y qué no. */
+const AJUSTES = ['heroe_imagen', 'heroe_alt'];
+
+const ajustes = () => {
+  const filas = abrir().prepare('SELECT clave, valor FROM ajustes').all();
+  const salida = {};
+  filas.forEach((f) => { if (AJUSTES.includes(f.clave)) salida[f.clave] = f.valor; });
+  return salida;
+};
+
+function guardarAjuste(clave, valor) {
+  if (!AJUSTES.includes(clave)) {
+    throw Object.assign(new Error('Ajuste desconocido'), { codigo: 400 });
+  }
+  // Un valor vacío borra la fila en vez de guardar cadena vacía: "sin
+  // definir" y "definido como nada" son lo mismo aquí, y tenerlos como
+  // dos estados distintos obliga a comprobar los dos en cada lectura.
+  if (valor === null || valor === undefined || valor === '') {
+    abrir().prepare('DELETE FROM ajustes WHERE clave = ?').run(clave);
+    return null;
+  }
+  abrir().prepare(`INSERT INTO ajustes (clave, valor, actualizado) VALUES (?, ?, ?)
+     ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor, actualizado = excluded.actualizado`)
+    .run(clave, String(valor), ahora());
+  return String(valor);
+}
+
+/* ── Fotografías del catálogo para la portada ───────────────
+   Las tarjetas de categoría enseñaban un hexágono gris: `portada`
+   estaba en null para las dieciséis. Ahora enseñan una máquina de
+   verdad de esa misma categoría, y como vienen varias, la pantalla
+   rota entre ellas en cada visita.
+
+   Se toma la foto de portada de cada anuncio y se prefieren los
+   destacados y los más recientes: son los que el anunciante acaba de
+   cuidar, así que son los que mejor se ven.
+
+   `n` es deliberadamente bajo. Cada foto puede ser una ruta corta o
+   —en las sembradas para desarrollo— un data URI de más de un
+   kilobyte, y esto viaja en cada carga de la página. */
+function fotosPorCategoria(n = 4) {
+  const filas = abrir().prepare(`
+    WITH con_foto AS (
+      SELECT a.id, a.categoria, a.marca, a.modelo, a.anio,
+             (SELECT COALESCE(f.miniatura, f.url) FROM anuncio_fotos f
+               WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
+             a.destacado_hasta, a.publicado
+      FROM anuncios a
+      WHERE a.estado = 'activo'
+    )
+    SELECT id, categoria, marca, modelo, anio, foto FROM (
+      SELECT *, ROW_NUMBER() OVER (
+        PARTITION BY categoria
+        ORDER BY (destacado_hasta IS NOT NULL) DESC, publicado DESC) AS puesto
+      FROM con_foto WHERE foto IS NOT NULL
+    ) WHERE puesto <= ?`).all(Math.max(1, Math.min(n, 8)));
+
+  const salida = {};
+  filas.forEach((f) => {
+    (salida[f.categoria] ||= []).push({
+      id: f.id,
+      foto: f.foto,
+      titulo: `${f.anio} ${taxonomia.nombreMarca(f.marca) || f.marca} ${f.modelo}`,
+    });
+  });
+  return salida;
+}
+
+/* La fotografía del héroe de la portada.
+
+   `imagen` es la que fijó el equipo desde /admin.html y manda sobre
+   todo lo demás. Si no hay ninguna fijada se ofrecen candidatas del
+   catálogo —equipos publicados de verdad— y la pantalla elige una;
+   si tampoco hay catálogo, la portada se queda con su plano técnico,
+   que es el respaldo y nunca se ve roto. */
+function heroePortada(candidatas = 6) {
+  const a = ajustes();
+  const filas = abrir().prepare(`
+    SELECT a.marca, a.modelo, a.anio,
+           (SELECT f.url FROM anuncio_fotos f
+             WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto
+    FROM anuncios a
+    WHERE a.estado = 'activo'
+    ORDER BY (a.destacado_hasta IS NOT NULL) DESC, a.publicado DESC
+    LIMIT ?`).all(Math.max(1, Math.min(candidatas, 12)));
+
+  return {
+    imagen: a.heroe_imagen || null,
+    alt: a.heroe_alt || null,
+    opciones: filas.filter((f) => f.foto).map((f) => ({
+      imagen: f.foto,
+      alt: `${f.anio} ${taxonomia.nombreMarca(f.marca) || f.marca} ${f.modelo} publicado en TuEquipoRD`,
+      /* Fijable solo si es un archivo del propio sitio. Las fotos
+         antiguas guardadas como data URI sirven de fondo rotatorio,
+         pero no se pueden fijar: la ruta que se guarda en `ajustes`
+         tiene que apuntar a /fotos. El panel usa esta marca para no
+         ofrecer opciones que la API va a rechazar. */
+      fijable: String(f.foto).startsWith('/fotos/'),
+    })),
+  };
+}
+
 const publicidadVigente = () =>
   abrir().prepare(`
     SELECT id, espacio, imagen, enlace, alt
@@ -1495,8 +1611,12 @@ function estadisticas() {
    sumados desde la tabla agregada. */
 function anunciosDeOrganizacion(idOrg) {
   return abrir().prepare(`
-    SELECT a.id, a.marca, a.modelo, a.anio, a.categoria, a.estado, a.precio, a.moneda,
+    SELECT a.id, a.marca, a.modelo, a.anio, a.categoria, a.subcategoria,
+           a.estado, a.precio, a.moneda,
            a.modalidad_precio, a.provincia, a.publicado, a.vence, a.suscripcion_id,
+           -- El panel avisa cuando un camión no los tiene declarados y
+           -- deja rellenarlos ahí mismo.
+           a.motor_marca, a.motor_modelo, a.transmision_marca, a.transmision_modelo,
            (SELECT COALESCE(f.miniatura, f.url) FROM anuncio_fotos f WHERE f.anuncio_id = a.id ORDER BY f.orden LIMIT 1) AS foto,
            -- Cuántas fotos tiene, para poder avisar antes de mover el
            -- anuncio a un nivel que admite menos.
@@ -1512,6 +1632,16 @@ function anunciosDeOrganizacion(idOrg) {
     ORDER BY CASE a.estado WHEN 'activo' THEN 0 ELSE 1 END, a.publicado DESC`)
     .all(idOrg).map(conNombres);
 }
+
+/* Motor y transmisión de un anuncio ya publicado. La API valida las
+   marcas y los modelos contra la taxonomía antes de llamar aquí. */
+const guardarTrenMotriz = (idAnuncio, idOrg, t) =>
+  abrir().prepare(`UPDATE anuncios
+       SET motor_marca = ?, motor_modelo = ?,
+           transmision_marca = ?, transmision_modelo = ?, actualizado = ?
+     WHERE id = ? AND organizacion_id = ?`)
+    .run(t.motorMarca, t.motorModelo, t.transmisionMarca, t.transmisionModelo,
+      ahora(), idAnuncio, idOrg);
 
 const cambiarEstadoAnuncio = (idAnuncio, idOrg, estado) =>
   abrir().prepare('UPDATE anuncios SET estado = ?, actualizado = ? WHERE id = ? AND organizacion_id = ?')
@@ -1680,6 +1810,7 @@ module.exports = {
   registrarDealer, dealersPublicos, dealerPorSlug,
   solicitudes, solicitudCompleta, resolverSolicitud, contarPendientes, marcarAdmin,
   flotaPublica, flotaCompleta, flotaPorId, crearFlota, actualizarFlota, borrarFlota,
+  AJUSTES, ajustes, guardarAjuste, fotosPorCategoria, heroePortada,
   publicidadVigente, publicidadCompleta, publicidadPorId,
   crearPublicidad, actualizarPublicidad, borrarPublicidad, sumarImpresiones, sumarClic,
   sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,
@@ -1687,7 +1818,7 @@ module.exports = {
   suscripcionConHueco, comprarCupos, ampliarCupos, membresiaInterna,
   moverAnuncioDeSuscripcion, refrescarAnunciosDe,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,
-  cambiarEstadoAnuncio, caducarAnuncios,
+  cambiarEstadoAnuncio, guardarTrenMotriz, caducarAnuncios,
   anunciosPorVencer, anunciosVencidosSinAvisar, marcarAviso, duenoDeAnuncio,
   anotarEvento, resumenOrganizacion,
 };

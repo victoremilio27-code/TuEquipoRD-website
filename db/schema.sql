@@ -172,6 +172,21 @@ CREATE TABLE IF NOT EXISTS flota (
 
 CREATE INDEX IF NOT EXISTS ix_flota_servicio ON flota (servicio, activo, orden);
 
+-- ── Ajustes del sitio ──────────────────────────────────────
+
+-- Pares clave/valor que el equipo cambia desde /admin.html sin tocar
+-- código ni reiniciar. Deliberadamente pocos y concretos: esto NO es
+-- un baúl de configuración. Cada clave que entra aquí tiene una
+-- pantalla que la edita y un motivo escrito.
+--
+--   heroe_imagen  ruta en /fotos de la fotografía de la portada
+--   heroe_alt     qué se ve en ella, para quien no puede verla
+CREATE TABLE IF NOT EXISTS ajustes (
+  clave       TEXT PRIMARY KEY,
+  valor       TEXT,
+  actualizado TEXT NOT NULL
+);
+
 -- ── Publicidad ─────────────────────────────────────────────
 
 -- Espacios publicitarios de la portada. Se administran desde

@@ -111,11 +111,21 @@ function guardar(dataUri) {
   return `${RUTA_PUBLICA}/${mes}/${nombre}`;
 }
 
-/* Resuelve una ruta pública a un archivo real, o null si se sale de la
-   carpeta. Es la comprobación que impide que «/fotos/../../.env»
-   devuelva lo que no debe. */
+/* Resuelve una ruta pública a un archivo real, o null si no lo es. Es
+   la comprobación que impide que «/fotos/../../.env» devuelva lo que
+   no debe.
+
+   EXIGE el prefijo /fotos. Antes solo lo quitaba si estaba, y lo que
+   no lo llevara se trataba como ruta relativa: «https://otro.com/x.jpg»
+   resolvía dentro de la carpeta y la función respondía que sí. Para
+   servir archivos daba igual —ese archivo no existe—, pero en cuanto
+   se usó para validar de dónde sale una imagen, una URL de un tercero
+   pasaba el filtro. */
 function archivoDe(rutaPublica) {
-  const relativa = String(rutaPublica || '').replace(/^\/fotos\/?/, '');
+  const cruda = String(rutaPublica || '');
+  if (!cruda.startsWith(`${RUTA_PUBLICA}/`)) return null;
+
+  const relativa = cruda.slice(RUTA_PUBLICA.length + 1);
   if (!relativa) return null;
 
   const completa = path.resolve(CARPETA, relativa);
@@ -123,6 +133,14 @@ function archivoDe(rutaPublica) {
   if (!TIPOS_SERVIDOS[path.extname(completa).toLowerCase()]) return null;
 
   return completa;
+}
+
+/* ¿Está el archivo en disco? La ruta pasa antes por archivoDe, que
+   es quien impide salirse de la carpeta. Sirve para no ofrecer en la
+   portada una fotografía cuyo archivo ya no existe. */
+function rutaExiste(rutaPublica) {
+  const archivo = archivoDe(rutaPublica);
+  return !!archivo && fs.existsSync(archivo);
 }
 
 const tipoDe = (archivo) => TIPOS_SERVIDOS[path.extname(archivo).toLowerCase()] || 'application/octet-stream';
@@ -135,6 +153,6 @@ function borrar(rutaPublica) {
 }
 
 module.exports = {
-  guardar, archivoDe, borrar, tipoDe, bytesDeDataUri,
+  guardar, archivoDe, rutaExiste, borrar, tipoDe, bytesDeDataUri,
   CARPETA, RUTA_PUBLICA, TOPE_BYTES,
 };

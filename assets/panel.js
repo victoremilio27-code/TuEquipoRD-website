@@ -47,6 +47,7 @@ function textoVigencia(a) {
    solo una dejaba cupos pagados fuera de su vista. */
 let MEMBRESIAS = [];
 let EXENTA = false;
+let TREN_ABIERTO = null;      // id del anuncio con el editor desplegado
 
 const membresiaDe = (a) => MEMBRESIAS.find((m) => m.id === a.suscripcion_id) || null;
 
@@ -191,6 +192,61 @@ function pintarPlan() {
     </div>`;
 }
 
+/* ── Motor y transmisión ────────────────────────────────────
+   El asistente los preguntaba y no los mandaba, así que hay camiones
+   publicados con el hueco en blanco. Republicarlos costaría sus
+   visitas y su antigüedad por un fallo que no cometió el anunciante,
+   de modo que se editan aquí, en la misma fila.
+
+   Solo aparece en los equipos que lo llevan: en una excavadora no
+   significa nada. Y si falta el dato, el botón lo dice — en un
+   cabezote es lo primero que pregunta el comprador. */
+function filaTrenHTML(a) {
+  const opciones = (mapa, sel) => Object.entries(mapa)
+    .map(([id, m]) => `<option value="${esc(id)}"${id === sel ? ' selected' : ''}>${esc(m.nombre)}</option>`)
+    .join('');
+
+  const modelos = (mapa, marca, sel) => {
+    const lista = (mapa[marca] || {}).modelos || [];
+    return lista.map((m) => `<option value="${esc(m)}"${m === sel ? ' selected' : ''}>${esc(m)}</option>`).join('');
+  };
+
+  return `<tr class="tren-fila" data-tren-de="${esc(a.id)}">
+    <td colspan="7">
+      <div class="tren-edita">
+        <label class="campo-v"><span>Marca del motor</span>
+          <select data-campo="motorMarca">
+            <option value="">Sin especificar</option>
+            ${opciones(MOTORES, a.motor_marca)}
+          </select>
+        </label>
+        <label class="campo-v"><span>Modelo del motor</span>
+          <select data-campo="motorModelo"${a.motor_marca ? '' : ' disabled'}>
+            <option value="">Sin especificar</option>
+            ${a.motor_marca ? modelos(MOTORES, a.motor_marca, a.motor_modelo) : ''}
+          </select>
+        </label>
+        <label class="campo-v"><span>Marca de la transmisión</span>
+          <select data-campo="transmisionMarca">
+            <option value="">Sin especificar</option>
+            ${opciones(TRANSMISIONES, a.transmision_marca)}
+          </select>
+        </label>
+        <label class="campo-v"><span>Modelo de la transmisión</span>
+          <select data-campo="transmisionModelo"${a.transmision_marca ? '' : ' disabled'}>
+            <option value="">Sin especificar</option>
+            ${a.transmision_marca ? modelos(TRANSMISIONES, a.transmision_marca, a.transmision_modelo) : ''}
+          </select>
+        </label>
+        <div class="tren-edita__pie">
+          <button type="button" class="btn btn--ambar btn--chico" data-guardar-tren="${esc(a.id)}">Guardar</button>
+          <span class="tren-edita__aviso" data-aviso-tren="${esc(a.id)}"></span>
+        </div>
+      </div>
+    </td>
+  </tr>`;
+}
+
 /* ── Tabla de anuncios ──────────────────────────────────── */
 
 /* El plan de un equipo, y cómo cambiarlo. Es lo que faltaba: el plan
@@ -258,6 +314,11 @@ function filaAnuncio(a) {
       ${a.estado !== 'vendido'
         ? '<button type="button" class="btn-tabla btn-tabla--fuerte" data-accion="vendido">Marcar vendido</button>'
         : ''}
+      ${pideTrenMotriz(a.subcategoria)
+        ? `<button type="button" class="btn-tabla${a.motor_marca ? '' : ' btn-tabla--avisa'}" data-tren="${esc(a.id)}">
+             ${a.motor_marca ? 'Motor' : 'Falta el motor'}
+           </button>`
+        : ''}
     </td>
   </tr>`;
 }
@@ -269,7 +330,12 @@ function pintarTabla() {
       ? ANUNCIOS.filter((a) => a.estado === 'activo')
       : ANUNCIOS.filter((a) => a.estado !== 'activo');
 
-  $('#filasAnuncios').innerHTML = lista.map(filaAnuncio).join('');
+  // La fila del tren motriz se dibuja debajo de su anuncio y solo
+  // cuando está abierta: la tabla no carga cuatro selectores por cada
+  // camión que nadie ha pedido editar.
+  $('#filasAnuncios').innerHTML = lista
+    .map((a) => filaAnuncio(a) + (TREN_ABIERTO === a.id ? filaTrenHTML(a) : ''))
+    .join('');
 
   const vacia = $('#tablaVacia');
   vacia.hidden = lista.length > 0;
@@ -726,6 +792,76 @@ async function montarPanel() {
       avisoPlan(`Su membresía ${m.plan_nombre} pasó a ${cupo} cupos.`, false);
     } catch (e) {
       avisoPlan(e.message);
+      btn.disabled = false;
+    }
+  });
+
+  /* Abrir y cerrar el editor de motor y transmisión. */
+  $('#filasAnuncios').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-tren]');
+    if (!btn) return;
+    TREN_ABIERTO = TREN_ABIERTO === btn.dataset.tren ? null : btn.dataset.tren;
+    pintarTabla();
+  });
+
+  /* Los modelos dependen de la marca, igual que al publicar: una lista
+     con todos los modelos de todos los fabricantes deja meter un motor
+     Cummins con un modelo Detroit. */
+  $('#filasAnuncios').addEventListener('change', (ev) => {
+    const sel = ev.target.closest('[data-campo]');
+    if (!sel) return;
+    const campo = sel.dataset.campo;
+    if (campo !== 'motorMarca' && campo !== 'transmisionMarca') return;
+
+    const fila = sel.closest('.tren-fila');
+    const esMotor = campo === 'motorMarca';
+    const mapa = esMotor ? MOTORES : TRANSMISIONES;
+    const destino = fila.querySelector(`[data-campo="${esMotor ? 'motorModelo' : 'transmisionModelo'}"]`);
+
+    const modelos = (mapa[sel.value] || {}).modelos || [];
+    destino.innerHTML = '<option value="">Sin especificar</option>'
+      + modelos.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    destino.disabled = !sel.value;
+  });
+
+  $('#filasAnuncios').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-guardar-tren]');
+    if (!btn) return;
+
+    const id = btn.dataset.guardarTren;
+    const fila = btn.closest('.tren-fila');
+    const aviso = fila.querySelector('[data-aviso-tren]');
+    const valor = (campo) => (fila.querySelector(`[data-campo="${campo}"]`) || {}).value || '';
+
+    btn.disabled = true;
+    aviso.textContent = '';
+    aviso.classList.remove('tren-edita__aviso--error');
+    try {
+      const r = await api(`/anuncios/${encodeURIComponent(id)}/tren-motriz`, {
+        metodo: 'PATCH',
+        cuerpo: {
+          motorMarca: valor('motorMarca'),
+          motorModelo: valor('motorModelo'),
+          transmisionMarca: valor('transmisionMarca'),
+          transmisionModelo: valor('transmisionModelo'),
+        },
+      });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+
+      // Se refleja en memoria para que el botón de la fila deje de
+      // avisar sin tener que recargar la página.
+      const a = ANUNCIOS.find((x) => x.id === id);
+      if (a) Object.assign(a, {
+        motor_marca: r.anuncio.motor_marca,
+        motor_modelo: r.anuncio.motor_modelo,
+        transmision_marca: r.anuncio.transmision_marca,
+        transmision_modelo: r.anuncio.transmision_modelo,
+      });
+      aviso.textContent = 'Guardado. Ya se ve en el anuncio.';
+      setTimeout(() => { TREN_ABIERTO = null; pintarTabla(); }, 1200);
+    } catch (e) {
+      aviso.textContent = e.message;
+      aviso.classList.add('tren-edita__aviso--error');
       btn.disabled = false;
     }
   });

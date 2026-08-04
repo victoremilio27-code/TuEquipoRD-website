@@ -534,6 +534,55 @@ const subirFoto = conSesion(async (req, res, ctx) => {
   }
 });
 
+/* ── Rutas: portada ─────────────────────────────────────────
+   Lo que la portada y la página de categorías necesitan para enseñar
+   máquinas de verdad: la fotografía del héroe y unas cuantas de cada
+   categoría. Va aparte de /api/estadisticas porque las fotos pesan y
+   solo hacen falta en esas dos pantallas. */
+function verPortada(req, res) {
+  const heroe = db.heroePortada(10);
+
+  /* Se descarta lo que ya no está en disco. Un anuncio puede haber
+     perdido su archivo —una restauración a medias, una limpieza— y
+     entonces el navegador pide una imagen que da 404 y el héroe se
+     queda sin fondo. Comprobarlo aquí cuesta unos stat y evita
+     mandarle al visitante una foto rota.
+
+     Las guardadas como data URI se dejan pasar: no son archivos. */
+  const existe = (ruta) => !String(ruta).startsWith('/fotos/') || !!fotos.rutaExiste(ruta);
+
+  return responder(res, 200, {
+    heroe: {
+      ...heroe,
+      imagen: heroe.imagen && existe(heroe.imagen) ? heroe.imagen : null,
+      opciones: heroe.opciones.filter((o) => existe(o.imagen)),
+    },
+    categorias: db.fotosPorCategoria(4),
+  });
+}
+
+/* Fija —o quita— la fotografía del héroe. Solo administración.
+
+   La ruta tiene que ser una de /fotos, que es lo que sirve el propio
+   sitio. Aceptar una URL cualquiera dejaría la portada cargando una
+   imagen de un tercero: se la saltaría la política de contenido, y
+   quien la aloja podría cambiarla o retirarla cuando quisiera. */
+const editarPortada = conAdmin(async (req, res) => {
+  const c = await leerCuerpo(req);
+
+  if (c.imagen !== undefined) {
+    const ruta = String(c.imagen || '');
+    if (ruta && !fotos.archivoDe(ruta)) {
+      return fallo(res, 400, 'La imagen tiene que ser una que se haya subido al sitio');
+    }
+    db.guardarAjuste('heroe_imagen', ruta);
+  }
+
+  if (c.alt !== undefined) db.guardarAjuste('heroe_alt', texto(c.alt, 160) || '');
+
+  return responder(res, 200, { heroe: db.heroePortada() });
+});
+
 /* ── Rutas: taxonomía ───────────────────────────────────── */
 
 /* La jerarquía completa, para que la pantalla de publicación arme sus
@@ -1235,6 +1284,49 @@ const cambiarEstado = conSesion(async (req, res, ctx, idAnuncio) => {
   return responder(res, 200, { ok: true, estado: c.estado });
 });
 
+/* Motor y transmisión de un anuncio ya publicado.
+
+   Existe porque el asistente los preguntaba y no los mandaba: hay
+   anuncios de camión publicados con el hueco en blanco. Obligar a
+   republicarlos costaría sus visitas y su antigüedad por un fallo que
+   no cometió el anunciante.
+
+   Se valida igual que al publicar y contra las mismas listas: en un
+   equipo que no lleva tren motriz no se acepta, y una marca inventada
+   tampoco. */
+const editarTrenMotriz = conSesion(async (req, res, ctx, idAnuncio) => {
+  const c = await leerCuerpo(req);
+  const a = db.anuncio(idAnuncio);
+  if (!a || a.organizacion_id !== ctx.organizacion.id) {
+    return fallo(res, 404, 'Ese anuncio no es suyo o no existe');
+  }
+  if (!taxonomia.pideTrenMotriz(String(a.subcategoria))) {
+    return fallo(res, 400, 'Este tipo de equipo no lleva motor ni transmisión declarados');
+  }
+
+  const motor = taxonomia.MOTORES[String(c.motorMarca || '')];
+  const trans = taxonomia.TRANSMISIONES[String(c.transmisionMarca || '')];
+  if (c.motorMarca && !motor) return fallo(res, 400, 'Marca de motor no reconocida');
+  if (c.transmisionMarca && !trans) return fallo(res, 400, 'Marca de transmisión no reconocida');
+
+  if (c.motorModelo && motor && motor.modelos.length && !motor.modelos.includes(String(c.motorModelo))) {
+    return fallo(res, 400, 'Ese modelo de motor no es de esa marca');
+  }
+  if (c.transmisionModelo && trans && trans.modelos.length
+    && !trans.modelos.includes(String(c.transmisionModelo))) {
+    return fallo(res, 400, 'Ese modelo de transmisión no es de esa marca');
+  }
+
+  db.guardarTrenMotriz(idAnuncio, ctx.organizacion.id, {
+    motorMarca: motor ? String(c.motorMarca) : null,
+    motorModelo: motor ? texto(c.motorModelo, 60) : null,
+    transmisionMarca: trans ? String(c.transmisionMarca) : null,
+    transmisionModelo: trans ? texto(c.transmisionModelo, 60) : null,
+  });
+
+  return responder(res, 200, { anuncio: db.anuncio(idAnuncio) });
+});
+
 /* Catálogo. Busca, filtra, ordena y pagina en el servidor: el
    navegador ya no recibe el inventario entero para cribarlo, que era
    lo que iba a romperse al llegar a los miles de anuncios. */
@@ -1334,6 +1426,7 @@ const RUTAS = [
   ['GET',  /^\/api\/mis-anuncios$/,      misAnuncios],
   ['GET',  /^\/api\/anuncios\/([\w-]+)$/, verAnuncio],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)\/plan$/, cambiarPlanDeAnuncio],
+  ['PATCH', /^\/api\/anuncios\/([\w-]+)\/tren-motriz$/, editarTrenMotriz],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)$/, cambiarEstado],
 
   // Capacidad: se compra antes de publicar y se amplía prorrateada.
@@ -1346,6 +1439,10 @@ const RUTAS = [
   // Flota propia de alquiler y transporte. La lectura es pública;
   // todo lo que la modifica exige sesión con es_admin.
   ['GET',  /^\/api\/taxonomia$/,                        verTaxonomia],
+
+  // Portada: fotografía del héroe y fotos por categoría.
+  ['GET',   /^\/api\/portada$/,                         verPortada],
+  ['PATCH', /^\/api\/admin\/portada$/,                  editarPortada],
 
   // Publicidad. La lectura y el clic son públicos; la gestión, no.
   ['GET',  /^\/api\/publicidad$/,                       listarPublicidad],

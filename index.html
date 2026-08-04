@@ -48,7 +48,18 @@
      la promesa con cifras que salen de la base, no escritas a mano. -->
 <section class="heroe">
 
-  <!-- Ilustración de fondo.
+  <!-- Fotografía de fondo: una máquina de verdad, publicada en el
+       sitio. La pone app.js desde /api/portada — la que haya fijado el
+       equipo en /admin.html o, si no hay ninguna, una del catálogo,
+       rotando entre las últimas publicadas.
+
+       Empieza oculta y no reserva espacio: si la petición falla o la
+       base está vacía, la portada se queda con el plano técnico de
+       abajo y no se ve un hueco. -->
+  <div class="heroe__foto" id="heroeFoto" hidden aria-hidden="true"></div>
+
+  <!-- Ilustración de fondo. Es el RESPALDO, no el diseño principal:
+       se retira en cuanto hay una fotografía que enseñar.
 
        No es una fotografía de obra al atardecer, que es lo que hace
        todo el sector: es un PLANO TÉCNICO. Los equipos van dibujados

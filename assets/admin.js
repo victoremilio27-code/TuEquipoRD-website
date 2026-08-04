@@ -587,6 +587,122 @@ async function montarAdmin() {
   await cargar();
   montarFlota();
   montarPub();
+  montarHeroe();
+}
+
+/* ── Fotografía de la portada ───────────────────────────────
+   Dos caminos al mismo sitio: subir una imagen propia o tomar la de un
+   equipo ya publicado. El segundo existe porque casi siempre la mejor
+   foto disponible ya está en el catálogo, y volver a subirla sería
+   pedirle al equipo un trabajo que no hace falta. */
+
+let HEROE_SUBIDA = null;
+
+function pintarHeroe(heroe) {
+  const previa = $('#heroePrevia');
+  const fijada = heroe && heroe.imagen;
+
+  previa.innerHTML = fijada
+    ? `<img src="${esc(heroe.imagen)}" alt="${esc(heroe.alt || 'Fotografía de la portada')}">
+       <span class="heroe-ajuste__estado">Fijada por el equipo</span>`
+    : `<span class="heroe-ajuste__vacia">Sin fotografía fijada</span>
+       <span class="heroe-ajuste__estado">La portada rota entre las últimas máquinas publicadas</span>`;
+
+  $('#btnQuitarHeroe').hidden = !fijada;
+  if (heroe && heroe.alt) $('#heroe-alt').value = heroe.alt;
+
+  /* Solo se ofrecen las que la API puede fijar: archivos del propio
+     sitio. Poner en la lista una que va a rechazarse convierte el
+     desplegable en una trampa. */
+  const sel = $('#heroe-catalogo');
+  const candidatas = (heroe && heroe.opciones ? heroe.opciones : []).filter((o) => o.fijable);
+  sel.length = 1;
+  candidatas.forEach((o) => {
+    sel.add(new Option(o.alt.replace(' publicado en TuEquipoRD', ''), o.imagen));
+  });
+
+  sel.disabled = !candidatas.length;
+  sel.options[0].text = candidatas.length
+    ? 'Elija un equipo del catálogo'
+    : 'Todavía no hay equipos con fotografía propia';
+}
+
+async function montarHeroe() {
+  const form = $('#formHeroe');
+  if (!form) return;
+
+  const aviso = (mensaje, ok = false) => {
+    const el = $('#avisoHeroe');
+    el.hidden = !mensaje;
+    el.textContent = mensaje || '';
+    el.classList.toggle('acceso__aviso--ok', ok);
+  };
+
+  const recargar = async () => {
+    const datos = await api('/portada', { silencioso: true });
+    if (datos) pintarHeroe(datos.heroe);
+  };
+  await recargar();
+
+  const entrada = $('#heroe-imagen');
+  entrada.addEventListener('change', async () => {
+    const archivo = entrada.files && entrada.files[0];
+    const estado = $('#heroeEstadoImagen');
+    if (!archivo) { HEROE_SUBIDA = null; return; }
+
+    estado.textContent = 'Subiendo…';
+    try {
+      // 1920 de ancho: es el tope útil para un fondo a pantalla
+      // completa y evita mandar los 6 MB que sale de una cámara.
+      HEROE_SUBIDA = await reducirYSubir(archivo, 1920);
+      estado.textContent = 'Imagen lista. Pulse «Fijar esta fotografía».';
+      $('#heroe-catalogo').value = '';
+    } catch (e) {
+      HEROE_SUBIDA = null;
+      estado.textContent = `No se pudo subir: ${e.message}`;
+    }
+  });
+
+  // Elegir del catálogo descarta la subida a medias, y al revés: solo
+  // una de las dos puede acabar fijada.
+  $('#heroe-catalogo').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    HEROE_SUBIDA = null;
+    entrada.value = '';
+    $('#heroeEstadoImagen').textContent = 'JPG, PNG o WebP. Apaisada y de al menos 1600 px de ancho.';
+    const texto = e.target.options[e.target.selectedIndex].text;
+    if (!$('#heroe-alt').value) $('#heroe-alt').value = `${texto} publicado en TuEquipoRD`;
+  });
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    aviso('');
+
+    const imagen = HEROE_SUBIDA || $('#heroe-catalogo').value;
+    if (!imagen) return aviso('Suba una fotografía o elija un equipo del catálogo.');
+
+    try {
+      const r = await api('/admin/portada', {
+        metodo: 'PATCH', cuerpo: { imagen, alt: $('#heroe-alt').value.trim() },
+      });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      HEROE_SUBIDA = null;
+      entrada.value = '';
+      pintarHeroe(r.heroe);
+      aviso('Fotografía fijada. Ya se ve en la portada.', true);
+    } catch (e) { aviso(e.message); }
+  });
+
+  $('#btnQuitarHeroe').addEventListener('click', async () => {
+    if (!confirm('¿Quitar la fotografía fijada?\n\nLa portada volverá a rotar entre las últimas máquinas publicadas.')) return;
+    try {
+      const r = await api('/admin/portada', { metodo: 'PATCH', cuerpo: { imagen: '', alt: '' } });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      $('#heroe-alt').value = '';
+      pintarHeroe(r.heroe);
+      aviso('Quitada. La portada vuelve a rotar.', true);
+    } catch (e) { aviso(e.message); }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', montarAdmin);

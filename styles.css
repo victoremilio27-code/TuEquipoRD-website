@@ -2583,6 +2583,11 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   pointer-events: none;
 }
 
+/* El atributo `hidden` no basta en un <svg>: la regla del navegador que
+   lo oculta apunta a elementos HTML, y el plano seguía dibujándose
+   detrás de la fotografía. Se dice aquí y se acabó la duda. */
+.heroe__plano[hidden] { display: none; }
+
 /* Por debajo de 900 px el titular ocupa casi todo el ancho y el plano
    competiría con él. Se retira: es ambiente, no información. */
 @media (max-width: 900px) {
@@ -2770,3 +2775,74 @@ main { position: relative; }
    media anchura con un vacío al lado, que se lee como algo que no
    cargó. */
 .fila--dos:has(> .pub[hidden]) { grid-template-columns: minmax(0, 1fr); }
+
+/* ── Fotografía del héroe ───────────────────────────────────
+   Una máquina publicada de verdad, detrás del titular. Sustituye al
+   plano técnico cuando hay catálogo; el plano se queda de respaldo.
+
+   Todo el trabajo lo hace el VELO. Sin él, una foto clara deja el
+   titular blanco ilegible y una oscura se come la máquina. El velo
+   mantiene la izquierda en azul casi sólido —donde está el texto— y
+   deja respirar la derecha, que es la misma composición del plano al
+   que sustituye. */
+.heroe__foto {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.heroe__foto img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  /* Un poco por encima del centro: en una foto de maquinaria el equipo
+     suele estar en el tercio superior y el suelo ocupa el resto. */
+  object-position: center 42%;
+}
+.heroe__foto::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg,
+      rgba(7, 26, 43, .97) 0%,
+      rgba(7, 26, 43, .94) 30%,
+      rgba(7, 26, 43, .72) 62%,
+      rgba(7, 26, 43, .55) 100%),
+    linear-gradient(180deg, rgba(7, 26, 43, .45), rgba(7, 26, 43, .8));
+}
+
+/* Por debajo de 900 px el titular ocupa todo el ancho, así que el velo
+   deja de ser lateral y pasa a cubrir parejo. La foto sigue viéndose,
+   pero el texto manda. */
+@media (max-width: 900px) {
+  .heroe__foto::after {
+    background: linear-gradient(180deg, rgba(7, 26, 43, .84), rgba(7, 26, 43, .93));
+  }
+}
+
+/* Ajuste de la fotografía de la portada, en /admin.html. */
+.heroe-ajuste { display: grid; gap: 16px; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); align-items: start; margin-top: 14px; }
+.heroe-ajuste__previa {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 11px; background: var(--hueso); border-radius: var(--r);
+}
+.heroe-ajuste__previa img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 7px; }
+.heroe-ajuste__vacia {
+  display: grid; place-items: center; aspect-ratio: 16 / 9;
+  background: var(--azul); border-radius: 7px;
+  font-size: 12.5px; font-weight: 600; color: var(--texto-claro);
+}
+.heroe-ajuste__estado { font-size: 11.5px; color: var(--gris-acero); }
+
+@media (max-width: 720px) { .heroe-ajuste { grid-template-columns: minmax(0, 1fr); } }
+
+/* Editor de motor y transmisión, dentro de la tabla del panel. */
+.tren-fila > td { background: var(--hueso); padding: 14px 12px; }
+.tren-edita { display: grid; gap: 11px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: end; }
+.tren-edita__pie { display: flex; align-items: center; gap: 10px; }
+.tren-edita__aviso { font-size: 12px; font-weight: 600; color: var(--verde); }
+.tren-edita__aviso--error { color: #B3261E; }
+
+/* Un camión sin motor declarado se señala: en un cabezote es lo
+   primero que pregunta el comprador. */
+.btn-tabla--avisa { border-color: var(--ambar-hondo); color: var(--ambar-hondo); font-weight: 700; }

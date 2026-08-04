@@ -804,12 +804,28 @@ async function montarDetalle() {
 function montarCategoriasPagina() {
   const cont = $('#categoriasTodas');
   if (!cont) return;
+
+  // El número se cuenta, no se escribe: la página decía 'las ocho'
+  // cuando la taxonomía ya tenía dieciséis.
+  const total = $('#totalCategorias');
+  if (total) total.textContent = `las ${CATEGORIAS.length}`;
   cont.innerHTML = conteoCategorias().map((c) => {
     const hay = c.total > 0;
+
+    /* La miniatura es un equipo publicado de esta misma categoría, y
+       se elige entre varios en cada carga: así rota por el inventario
+       en vez de quedarse siempre con la misma máquina. Antes todas las
+       categorías enseñaban el mismo hexágono gris.
+
+       El texto alternativo nombra la máquina concreta, no la
+       categoría: quien no ve la imagen se entera de qué hay dentro. */
+    const fotos = FOTOS_CATEGORIA[c.id] || [];
+    const foto = fotos.length ? alAzar(fotos) : null;
+
     return `<li><a class="cat-tarjeta${hay ? '' : ' cat-tarjeta--vacia'}" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
       <span class="cat-tarjeta__foto">
-        ${c.portada
-          ? `<img src="${esc(c.portada)}" alt="${esc(c.nombre)}" loading="lazy">`
+        ${foto
+          ? `<img src="${esc(foto.foto)}" alt="${esc(foto.titulo)}, publicado en ${esc(c.nombre)}" loading="lazy" decoding="async">`
           : icono('i-hex-doble', 'fantasma')}
         <span class="cat-tarjeta__ico">${icono(c.icono)}</span>
       </span>
@@ -819,6 +835,81 @@ function montarCategoriasPagina() {
       </span>
     </a></li>`;
   }).join('');
+}
+
+/* ── Portada: fotografías del catálogo ──────────────────────
+   El héroe y las tarjetas de categoría enseñan máquinas de verdad,
+   publicadas en el sitio. Antes eran un plano técnico y un hexágono
+   gris repetido dieciséis veces. */
+
+let FOTOS_CATEGORIA = {};
+
+const alAzar = (lista) => lista[Math.floor(Math.random() * lista.length)];
+
+/* Solo la portada y la página de categorías usan estas fotos, y la
+   respuesta pesa. En el resto de las páginas la petición no se hace:
+   app.js es el mismo archivo para las quince, así que el ahorro hay
+   que pedirlo aquí. */
+async function cargarPortada() {
+  if (!$('#heroeFoto') && !$('#categoriasTodas')) return null;
+  const datos = await api('/portada', { silencioso: true });
+  if (!datos) return null;
+  FOTOS_CATEGORIA = datos.categorias || {};
+  return datos;
+}
+
+/* La fotografía del héroe.
+
+   Manda la que haya fijado el equipo. Si no hay ninguna se toma una de
+   las últimas publicadas, y como se elige en cada carga, la portada va
+   rotando entre el inventario real en vez de quedarse con una imagen
+   fija que envejece.
+
+   El plano técnico solo se retira cuando la imagen ha CARGADO. Si se
+   quitara antes, un archivo que falta dejaría el héroe en azul pelado
+   durante toda la visita. */
+function montarHeroeFoto(portada) {
+  const caja = $('#heroeFoto');
+  if (!caja || !portada || !portada.heroe) return;
+
+  const h = portada.heroe;
+
+  /* Orden de intento: primero la fijada, después el resto barajado.
+     Se prueban en cadena porque una fotografía puede haber
+     desaparecido del disco —un anuncio retirado, un archivo movido— y
+     entonces el héroe se quedaba en azul pelado para siempre en vez de
+     pasar a la siguiente. */
+  const cola = [];
+  if (h.imagen) cola.push({ imagen: h.imagen, alt: h.alt || '' });
+  (h.opciones || [])
+    .map((o) => ({ o, orden: Math.random() }))
+    .sort((a, b) => a.orden - b.orden)
+    .forEach(({ o }) => { if (o.imagen !== h.imagen) cola.push(o); });
+
+  const intentar = () => {
+    const siguiente = cola.shift();
+    if (!siguiente) return;               // ninguna cargó: se queda el plano
+
+    const img = new Image();
+    img.decoding = 'async';
+    img.fetchPriority = 'high';
+    img.alt = '';
+    img.addEventListener('error', intentar);
+    img.addEventListener('load', () => {
+      caja.replaceChildren(img);
+      caja.hidden = false;
+      /* `hidden` es una propiedad de HTMLElement, no de SVGElement:
+         asignarla a un <svg> crea un campo suelto en el objeto y no
+         toca el atributo, así que el plano seguía dibujado detrás de
+         la fotografía. Con setAttribute sí, y la regla de styles.css
+         lo remata. */
+      const plano = $('.heroe__plano');
+      if (plano) plano.setAttribute('hidden', '');
+    });
+    img.src = siguiente.imagen;
+  };
+
+  intentar();
 }
 
 /* ── Publicidad ─────────────────────────────────────────── */
@@ -1418,13 +1509,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   montarBuscador();
   montarPublicidad();
 
-  // Las cifras del catálogo las comparten varios bloques, así que se
-  // piden una sola vez y después se pinta todo en paralelo: cada
-  // sección hace su consulta sin esperar a la de al lado.
-  // Las tarifas y las cifras del catálogo las comparten varios bloques
-  // (y el asistente de publicación depende de las tarifas), así que se
-  // piden una vez, en paralelo, antes de pintar nada que las use.
-  await Promise.all([cargarPlanes(), cargarEstadisticas()]);
+  /* Las tarifas, las cifras del catálogo y las fotografías de la
+     portada las comparten varios bloques, así que se piden una vez, en
+     paralelo, antes de pintar nada que las use.
+
+     La del héroe se monta en cuanto llega y sin esperar al resto: es
+     lo primero que se ve de la página. */
+  const [, , portada] = await Promise.all([
+    cargarPlanes(), cargarEstadisticas(), cargarPortada(),
+  ]);
+  montarHeroeFoto(portada);
   montarPromo();
   refrescarMarcasActivas();
   montarCifrasPortada();

@@ -1219,6 +1219,20 @@ function anuncioParaApi() {
     condicion: e.condicion,
     usoValor: Number(soloDigitos(e.uso)) || null,
     usoUnidad: e.unidad,
+
+    /* Tren motriz. Se recogía en el paso 1, se guardaba en el borrador
+       y NO se mandaba: el formulario lo preguntaba, el anunciante lo
+       rellenaba y llegaba al servidor en blanco. En un cabezote es de
+       lo primero que pregunta el comprador, así que el anuncio salía
+       sin el dato que más pesa en la decisión.
+
+       El servidor los ignora en las categorías que no los piden, así
+       que mandarlos siempre no ensucia una excavadora. */
+    motorMarca: e.motorMarca || '',
+    motorModelo: e.motorModelo || '',
+    transmisionMarca: e.transmisionMarca || '',
+    transmisionModelo: e.transmisionModelo || '',
+
     serie: e.serie,
     potencia: e.potencia,
     peso: e.peso,

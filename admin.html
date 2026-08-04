@@ -133,6 +133,44 @@
       </details>
     </section>
 
+    <!-- Fotografía del héroe de la portada. Sin fijar, la portada toma
+         una de las últimas máquinas publicadas y va rotando. -->
+    <section class="panel" aria-labelledby="t-heroe">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-heroe"><em>Fotografía</em> de la portada</h2>
+        <p class="panel__meta">El fondo del banner azul</p>
+      </div>
+
+      <p class="acceso__aviso" id="avisoHeroe" role="alert" hidden></p>
+
+      <div class="heroe-ajuste">
+        <div class="heroe-ajuste__previa" id="heroePrevia"></div>
+
+        <form id="formHeroe" novalidate>
+          <div class="campos">
+            <label class="campo-v"><span>Subir una fotografía</span>
+              <input type="file" id="heroe-imagen" accept="image/jpeg,image/png,image/webp">
+              <small class="campo-v__ayuda" id="heroeEstadoImagen">JPG, PNG o WebP. Apaisada y de al menos 1600 px de ancho.</small>
+            </label>
+            <label class="campo-v"><span>O elegir un equipo ya publicado</span>
+              <select id="heroe-catalogo"><option value="">Elija un equipo del catálogo</option></select>
+              <small class="campo-v__ayuda">Se usa su fotografía de portada.</small>
+            </label>
+            <label class="campo-v campo-v--ancho"><span>Qué se ve en la fotografía</span>
+              <input type="text" id="heroe-alt" placeholder="Ej. Excavadora Caterpillar 320 trabajando en obra">
+              <small class="campo-v__ayuda">Lo lee quien no puede ver la imagen.</small>
+            </label>
+          </div>
+          <div class="acciones">
+            <button class="btn btn--ambar" type="submit">Fijar esta fotografía</button>
+            <button class="btn btn--linea" type="button" id="btnQuitarHeroe">Quitar y volver a rotar</button>
+          </div>
+        </form>
+      </div>
+
+      <p class="panel__nota">Sin fotografía fijada, la portada toma una de las últimas máquinas publicadas y cambia en cada visita. Si tampoco hay equipos publicados, se queda con la ilustración técnica.</p>
+    </section>
+
     <!-- Publicidad de la portada. Un espacio sin campaña vigente no se
          dibuja: la portada no muestra recuadros vacíos. -->
     <section class="panel" aria-labelledby="t-pub">
