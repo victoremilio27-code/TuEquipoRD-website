@@ -74,7 +74,11 @@ async function main() {
     // Enlaces internos.
     const hrefs = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')));
     hrefs.forEach((h) => {
-      if (!h || h.startsWith('#') || /^(https?:|mailto:|tel:)/.test(h)) return;
+      // Las rutas de /api no son páginas: unas devuelven JSON y otras
+      // redirigen fuera del sitio, como el contador de clics de la
+      // publicidad. Comprobarlas aquí solo genera falsos positivos.
+      if (!h || h.startsWith('#') || h.startsWith('/api/')
+        || /^(https?:|mailto:|tel:)/.test(h)) return;
       destinos.add(h.split('#')[0].split('?')[0]);
     });
 

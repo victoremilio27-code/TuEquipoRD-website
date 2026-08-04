@@ -549,6 +549,105 @@ function verTaxonomia(req, res) {
   });
 }
 
+/* ── Rutas: publicidad ──────────────────────────────────── */
+
+const ESPACIOS = ['superior', 'lateral-izq', 'lateral-der'];
+
+/* Lo que ve el visitante, agrupado por espacio. La impresión se cuenta
+   aquí y no en el navegador: un contador que depende de que el cliente
+   avise se pierde con cualquier bloqueador. */
+function listarPublicidad(req, res) {
+  const vigentes = db.publicidadVigente();
+  db.sumarImpresiones(vigentes.map((p) => p.id));
+
+  const porEspacio = {};
+  vigentes.forEach((p) => { (porEspacio[p.espacio] ||= []).push(p); });
+  return responder(res, 200, { publicidad: porEspacio });
+}
+
+/* Registra el clic y redirige. Se pasa por aquí en vez de enlazar
+   directo para poder decirle al anunciante cuántos clics recibió.
+
+   Se redirige con 302 y no se devuelve JSON para que el enlace siga
+   siendo un enlace: se abre en pestaña nueva, se copia y funciona sin
+   JavaScript. */
+function clicPublicidad(req, res, ctx, idPub) {
+  const p = db.publicidadPorId(idPub);
+  if (!p || !p.enlace) return fallo(res, 404, 'No existe');
+
+  db.sumarClic(idPub);
+  res.writeHead(302, { Location: p.enlace });
+  res.end();
+}
+
+function datosPublicidad(c, { parcial = false } = {}) {
+  const d = {};
+
+  if (c.espacio !== undefined || !parcial) {
+    if (!ESPACIOS.includes(String(c.espacio))) return { error: 'Espacio inválido' };
+    d.espacio = String(c.espacio);
+  }
+  if (c.nombre !== undefined || !parcial) {
+    if (!texto(c.nombre, 80)) return { error: 'Escriba un nombre para reconocer la campaña' };
+    d.nombre = texto(c.nombre, 80);
+  }
+  if (c.imagen !== undefined || !parcial) {
+    if (!texto(c.imagen, 300)) return { error: 'Cargue la imagen del anuncio' };
+    d.imagen = texto(c.imagen, 300);
+  }
+  if (c.alt !== undefined || !parcial) {
+    // Obligatorio: sin esto, quien usa lector de pantalla oye «imagen».
+    if (!texto(c.alt, 160)) return { error: 'Escriba qué dice la imagen, para quien no puede verla' };
+    d.alt = texto(c.alt, 160);
+  }
+  if (c.anunciante !== undefined) d.anunciante = texto(c.anunciante, 120);
+
+  if (c.enlace !== undefined) {
+    const url = texto(c.enlace, 300);
+    // Solo http(s): un `javascript:` en el enlace de un banner es un
+    // XSS servido desde la portada.
+    if (url && !/^https?:\/\//i.test(url)) return { error: 'El enlace debe empezar por http:// o https://' };
+    d.enlace = url;
+  }
+
+  const fecha = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
+  if (c.desde !== undefined) d.desde = fecha(c.desde);
+  if (c.hasta !== undefined) d.hasta = fecha(c.hasta);
+  if (d.desde && d.hasta && d.hasta < d.desde) return { error: 'La fecha de fin va después de la de inicio' };
+
+  if (c.activo !== undefined) d.activo = c.activo ? 1 : 0;
+  if (c.orden !== undefined) d.orden = entero(c.orden) ?? 0;
+
+  return { datos: d };
+}
+
+const listarPublicidadAdmin = conAdmin((req, res) =>
+  responder(res, 200, { publicidad: db.publicidadCompleta(), espacios: ESPACIOS }));
+
+const crearPublicidad = conAdmin(async (req, res) => {
+  const c = await leerCuerpo(req);
+  const { error, datos } = datosPublicidad(c);
+  if (error) return fallo(res, 400, error);
+  return responder(res, 201, { anuncio: db.crearPublicidad(datos) });
+});
+
+const editarPublicidad = conAdmin(async (req, res, ctx, idPub) => {
+  const c = await leerCuerpo(req);
+  const { error, datos } = datosPublicidad(c, { parcial: true });
+  if (error) return fallo(res, 400, error);
+  try {
+    return responder(res, 200, { anuncio: db.actualizarPublicidad(idPub, datos) });
+  } catch (e) {
+    return fallo(res, e.codigo || 500, e.message);
+  }
+});
+
+const eliminarPublicidad = conAdmin((req, res, ctx, idPub) => {
+  if (!db.publicidadPorId(idPub)) return fallo(res, 404, 'Ese anuncio no existe');
+  db.borrarPublicidad(idPub);
+  return responder(res, 200, { ok: true });
+});
+
 /* ── Rutas: flota propia ────────────────────────────────── */
 
 const SERVICIOS = ['alquiler', 'transporte'];
@@ -1117,6 +1216,14 @@ const RUTAS = [
   // Flota propia de alquiler y transporte. La lectura es pública;
   // todo lo que la modifica exige sesión con es_admin.
   ['GET',  /^\/api\/taxonomia$/,                        verTaxonomia],
+
+  // Publicidad. La lectura y el clic son públicos; la gestión, no.
+  ['GET',  /^\/api\/publicidad$/,                       listarPublicidad],
+  ['GET',  /^\/api\/publicidad\/([\w-]+)\/ir$/,         clicPublicidad],
+  ['GET',  /^\/api\/admin\/publicidad$/,                listarPublicidadAdmin],
+  ['POST', /^\/api\/admin\/publicidad$/,                crearPublicidad],
+  ['PATCH', /^\/api\/admin\/publicidad\/([\w-]+)$/,     editarPublicidad],
+  ['DELETE', /^\/api\/admin\/publicidad\/([\w-]+)$/,    eliminarPublicidad],
   ['GET',  /^\/api\/flota\/(\w+)$/,                     listarFlota],
   ['GET',  /^\/api\/admin\/flota\/(\w+)$/,              listarFlotaAdmin],
   ['POST', /^\/api\/admin\/flota\/(\w+)$/,              crearFlota],

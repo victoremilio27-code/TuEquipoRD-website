@@ -651,6 +651,76 @@ function actualizarFlota(idFlota, datos) {
 const borrarFlota = (idFlota) =>
   abrir().prepare('DELETE FROM flota WHERE id = ?').run(idFlota);
 
+/* ── Publicidad ─────────────────────────────────────────── */
+
+/* Lo que se muestra hoy: encendida y dentro de sus fechas. Las fechas
+   mandan sobre `activo`, así una campaña termina sola el día pactado.
+
+   Se comparan como texto: las fechas se guardan en ISO (AAAA-MM-DD),
+   que ordena igual alfabéticamente que cronológicamente. */
+const publicidadVigente = () =>
+  abrir().prepare(`
+    SELECT id, espacio, imagen, enlace, alt
+    FROM publicidad
+    WHERE activo = 1
+      AND (desde IS NULL OR desde <= :hoy)
+      AND (hasta IS NULL OR hasta >= :hoy)
+    ORDER BY espacio, orden, creado`).all({ hoy: hoy() });
+
+const publicidadCompleta = () =>
+  abrir().prepare('SELECT * FROM publicidad ORDER BY espacio, orden, creado').all();
+
+const publicidadPorId = (idPub) =>
+  abrir().prepare('SELECT * FROM publicidad WHERE id = ?').get(idPub);
+
+function crearPublicidad(datos) {
+  const idPub = id();
+  const t = ahora();
+  const ultimo = abrir().prepare('SELECT MAX(orden) AS n FROM publicidad WHERE espacio = ?')
+    .get(datos.espacio).n;
+
+  abrir().prepare(`INSERT INTO publicidad
+    (id, espacio, nombre, anunciante, imagen, enlace, alt, desde, hasta, activo, orden, creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
+    .run(idPub, datos.espacio, datos.nombre, datos.anunciante || null,
+      datos.imagen, datos.enlace || null, datos.alt,
+      datos.desde || null, datos.hasta || null, (ultimo || 0) + 1, t);
+
+  return publicidadPorId(idPub);
+}
+
+function actualizarPublicidad(idPub, datos) {
+  const actual = publicidadPorId(idPub);
+  if (!actual) throw Object.assign(new Error('Ese anuncio no existe'), { codigo: 404 });
+
+  const campos = ['espacio', 'nombre', 'anunciante', 'imagen', 'enlace', 'alt',
+    'desde', 'hasta', 'activo', 'orden'];
+  const cambios = campos.filter((c) => datos[c] !== undefined);
+  if (!cambios.length) return actual;
+
+  abrir().prepare(`UPDATE publicidad SET ${cambios.map((c) => `${c} = ?`).join(', ')}, actualizado = ?
+                   WHERE id = ?`)
+    .run(...cambios.map((c) => datos[c]), ahora(), idPub);
+
+  return publicidadPorId(idPub);
+}
+
+const borrarPublicidad = (idPub) =>
+  abrir().prepare('DELETE FROM publicidad WHERE id = ?').run(idPub);
+
+/* Contadores. Se suman con UPDATE directo y no leyendo antes: aguanta
+   escrituras concurrentes sin condición de carrera. */
+const sumarImpresiones = (ids) => {
+  if (!ids.length) return;
+  const d = abrir();
+  const upd = d.prepare('UPDATE publicidad SET impresiones = impresiones + 1 WHERE id = ?');
+  d.prepare('BEGIN').run();
+  try { ids.forEach((i) => upd.run(i)); d.prepare('COMMIT').run(); } catch (e) { d.prepare('ROLLBACK').run(); }
+};
+
+const sumarClic = (idPub) =>
+  abrir().prepare('UPDATE publicidad SET clics = clics + 1 WHERE id = ?').run(idPub);
+
 /* ── Revisión de solicitudes ────────────────────────────── */
 
 /* Expediente completo de una solicitud: lo declarado, con quién
@@ -1361,6 +1431,8 @@ module.exports = {
   registrarDealer, dealersPublicos, dealerPorSlug,
   solicitudes, solicitudCompleta, resolverSolicitud, contarPendientes, marcarAdmin,
   flotaPublica, flotaCompleta, flotaPorId, crearFlota, actualizarFlota, borrarFlota,
+  publicidadVigente, publicidadCompleta, publicidadPorId,
+  crearPublicidad, actualizarPublicidad, borrarPublicidad, sumarImpresiones, sumarClic,
   sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,
   planes, planPorId, suscripcionActiva, contratar,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,

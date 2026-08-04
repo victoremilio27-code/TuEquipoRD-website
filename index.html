@@ -47,6 +47,92 @@
      búsqueda por texto —lo primero que intenta cualquiera— y respalda
      la promesa con cifras que salen de la base, no escritas a mano. -->
 <section class="heroe">
+
+  <!-- Ilustración de fondo.
+
+       No es una fotografía de obra al atardecer, que es lo que hace
+       todo el sector: es un PLANO TÉCNICO. Los equipos van dibujados
+       como en una hoja de especificaciones, con líneas de cota y
+       marcas de medida, porque lo que distingue a este marketplace es
+       que cada anuncio publica horas, condición y ficha real. Una foto
+       bonita no dice eso; un plano sí.
+
+       SVG inline y no imagen: pesa unos 4 KB, no añade una petición,
+       escala a cualquier pantalla y usa los colores de la marca en vez
+       de aproximarlos. `aria-hidden` porque no aporta información:
+       todo lo que hay que leer está en el texto de al lado. -->
+  <svg class="heroe__plano" viewBox="0 0 1400 460" preserveAspectRatio="xMaxYMax slice" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="desvanece" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#071A2B" stop-opacity="1"/>
+        <stop offset=".42" stop-color="#071A2B" stop-opacity=".82"/>
+        <stop offset=".78" stop-color="#071A2B" stop-opacity="0"/>
+      </linearGradient>
+      <pattern id="retic" width="46" height="46" patternUnits="userSpaceOnUse">
+        <path d="M46 0H0V46" fill="none" stroke="#F2A900" stroke-opacity=".07" stroke-width="1"/>
+      </pattern>
+    </defs>
+
+    <rect width="1400" height="460" fill="url(#retic)"/>
+
+    <!-- Todo el dibujo comparte un trazo fino y el mismo ámbar: se lee
+         como una sola lámina, no como iconos pegados. -->
+    <g fill="none" stroke="#F2A900" stroke-opacity=".5" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round">
+
+      <!-- Línea de suelo, con sus ticks de medida -->
+      <path d="M60 392h1300" stroke-opacity=".35"/>
+      <g stroke-opacity=".22" stroke-width="1.5">
+        <path d="M120 392v12M260 392v12M400 392v12M540 392v12M680 392v12M820 392v12M960 392v12M1100 392v12M1240 392v12"/>
+      </g>
+
+      <!-- Excavadora: cuerpo, cabina, pluma y cucharón -->
+      <g transform="translate(700 150)">
+        <path d="M0 196h172a14 14 0 0 0 14-14v-30a14 14 0 0 0-14-14H0a14 14 0 0 0-14 14v30a14 14 0 0 0 14 14z"/>
+        <path d="M8 138V96a12 12 0 0 1 12-12h58a12 12 0 0 1 12 12v42"/>
+        <path d="M22 130V98h44v32z" stroke-opacity=".3"/>
+        <path d="M104 138 168 44l46 16"/>
+        <path d="m214 60 26 78-40 26"/>
+        <path d="m200 164-6 34 40 10 18-30z"/>
+        <!-- Tren de rodaje -->
+        <path d="M-6 196h180" stroke-opacity=".3"/>
+        <circle cx="18" cy="212" r="14" stroke-opacity=".4"/>
+        <circle cx="152" cy="212" r="14" stroke-opacity=".4"/>
+        <path d="M18 226h134" stroke-opacity=".4"/>
+      </g>
+
+      <!-- Cota de altura, la firma del plano -->
+      <g stroke-opacity=".3" stroke-width="1.5">
+        <path d="M646 194v198"/>
+        <path d="M638 194h16M638 392h16"/>
+      </g>
+
+      <!-- Volteo -->
+      <g transform="translate(1060 236)">
+        <path d="M0 110h96V48a10 10 0 0 1 10-10h44l26 40v32h34"/>
+        <path d="M4 46h88v62H4z" stroke-opacity=".35"/>
+        <path d="m4 46 12-22h64l12 22" stroke-opacity=".3"/>
+        <circle cx="132" cy="122" r="18" stroke-opacity=".45"/>
+        <circle cx="46" cy="122" r="18" stroke-opacity=".45"/>
+        <path d="M112 38h34v30h-34z" stroke-opacity=".3"/>
+      </g>
+
+      <!-- Grúa de celosía, al fondo y más tenue -->
+      <g stroke-opacity=".18" transform="translate(430 60)">
+        <path d="M40 332V60h18v272"/>
+        <path d="M49 60 250 24M49 88l186-34" stroke-opacity=".14"/>
+        <path d="M40 60h18M40 110h18M40 160h18M40 210h18M40 260h18M40 310h18" stroke-opacity=".14"/>
+        <path d="M212 30v58" stroke-opacity=".16"/>
+        <path d="M198 88h28v22h-28z" stroke-opacity=".16"/>
+      </g>
+    </g>
+
+    <!-- El velo va ENCIMA del dibujo, no debajo: así el texto de la
+         izquierda queda sobre azul plano y el plano solo asoma a la
+         derecha, donde no hay nada que leer. -->
+    <rect width="1400" height="460" fill="url(#desvanece)"/>
+  </svg>
+
   <div class="envoltura heroe__inner">
     <h1 class="heroe__titulo">Maquinaria y equipo pesado <em>en República Dominicana</em></h1>
     <p class="heroe__sub">Compre, venda y alquile excavadoras, cargadores, volteos y grúas.
@@ -67,6 +153,25 @@
     <ul class="heroe__cifras" id="heroeCifras" aria-label="Estado del catálogo"></ul>
   </div>
 </section>
+
+<!-- ==== PUBLICIDAD ====
+     Tres espacios que administra el equipo desde /admin.html. Los
+     rellena app.js con lo que devuelva /api/publicidad.
+
+     SI NO HAY CAMPAÑA, EL HUECO NO EXISTE. Nada de recuadros con
+     «espacio disponible»: un sitio con marcos vacíos parece a medio
+     hacer, y quien llega a comprar una excavadora no está buscando
+     dónde anunciarse.
+
+     Los laterales solo aparecen a partir de 1500 px, donde de verdad
+     sobra margen. Por debajo de eso no se muestran: robarle ancho al
+     catálogo para meter un banner es cambiar ventas por impresiones. -->
+<aside class="pub pub--lateral pub--izq" id="pubIzq" aria-label="Publicidad" hidden></aside>
+<aside class="pub pub--lateral pub--der" id="pubDer" aria-label="Publicidad" hidden></aside>
+
+<div class="envoltura">
+  <aside class="pub pub--superior" id="pubSuperior" aria-label="Publicidad" hidden></aside>
+</div>
 
 <div class="envoltura">
 

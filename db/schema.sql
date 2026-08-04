@@ -172,6 +172,42 @@ CREATE TABLE IF NOT EXISTS flota (
 
 CREATE INDEX IF NOT EXISTS ix_flota_servicio ON flota (servicio, activo, orden);
 
+-- ── Publicidad ─────────────────────────────────────────────
+
+-- Espacios publicitarios de la portada. Se administran desde
+-- /admin.html: alta, imagen, enlace, fechas y encendido.
+--
+-- `espacio` es una posición fija de la maqueta, no una medida libre:
+-- así el diseño no se rompe porque alguien suba una imagen de
+-- proporción rara. Cada espacio tiene su formato documentado abajo.
+--
+-- Las fechas mandan sobre `activo`: una campaña con fecha de fin deja
+-- de mostrarse sola el día que toca, sin que nadie tenga que acordarse
+-- de apagarla un domingo.
+CREATE TABLE IF NOT EXISTS publicidad (
+  id          TEXT PRIMARY KEY,
+  espacio     TEXT NOT NULL CHECK (espacio IN ('superior', 'lateral-izq', 'lateral-der')),
+  nombre      TEXT NOT NULL,             -- para reconocerla en el panel
+  anunciante  TEXT,                      -- quién la paga
+  imagen      TEXT NOT NULL,             -- ruta en /fotos, subida como el resto
+  enlace      TEXT,                      -- a dónde lleva; vacío = no enlaza
+  alt         TEXT NOT NULL,             -- lo que lee quien no ve la imagen
+
+  desde       TEXT,                      -- NULL = desde ya
+  hasta       TEXT,                      -- NULL = sin fecha de fin
+  activo      INTEGER NOT NULL DEFAULT 1,
+  orden       INTEGER NOT NULL DEFAULT 0, -- rota entre varias del mismo espacio
+
+  -- Para poder decirle al anunciante qué recibió por su dinero.
+  impresiones INTEGER NOT NULL DEFAULT 0,
+  clics       INTEGER NOT NULL DEFAULT 0,
+
+  creado      TEXT NOT NULL,
+  actualizado TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_publicidad_espacio ON publicidad (espacio, activo, orden);
+
 -- ── Alta de dealers ────────────────────────────────────────
 
 -- Lo que declara una empresa al pedir su cuenta de dealer. Existe

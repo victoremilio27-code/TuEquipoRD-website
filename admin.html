@@ -132,6 +132,66 @@
         </form>
       </details>
     </section>
+
+    <!-- Publicidad de la portada. Un espacio sin campaña vigente no se
+         dibuja: la portada no muestra recuadros vacíos. -->
+    <section class="panel" aria-labelledby="t-pub">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-pub"><em>Publicidad</em> de la portada</h2>
+        <p class="panel__meta">Un espacio sin campaña vigente no aparece en la portada</p>
+      </div>
+
+      <p class="acceso__aviso" id="avisoPub" role="alert" hidden></p>
+
+      <ul class="solicitudes" id="listaPub"></ul>
+
+      <details class="flota-alta" id="altaPub">
+        <summary class="flota-alta__abrir">Añadir una campaña</summary>
+        <form id="formPub" novalidate>
+          <div class="campos">
+            <label class="campo-v"><span>Nombre de la campaña *</span>
+              <input type="text" id="pub-nombre" placeholder="Ej. Repuestos Caribe · agosto">
+              <small class="campo-v__ayuda">Solo para reconocerla aquí. No se muestra.</small>
+            </label>
+            <label class="campo-v"><span>Anunciante</span>
+              <input type="text" id="pub-anunciante" placeholder="Quién la paga">
+            </label>
+
+            <label class="campo-v"><span>Espacio *</span>
+              <select id="pub-espacio">
+                <option value="superior">Horizontal, bajo el héroe · 1216 × 160</option>
+                <option value="lateral-izq">Lateral izquierdo · 160 × 600</option>
+                <option value="lateral-der">Lateral derecho · 160 × 600</option>
+              </select>
+              <small class="campo-v__ayuda">Los laterales solo se ven en pantallas de 1648 px o más.</small>
+            </label>
+            <label class="campo-v"><span>Imagen *</span>
+              <input type="file" id="pub-imagen" accept="image/jpeg,image/png,image/webp">
+              <small class="campo-v__ayuda" id="pubEstadoImagen">JPG, PNG o WebP.</small>
+            </label>
+
+            <label class="campo-v campo-v--ancho"><span>Enlace</span>
+              <input type="url" id="pub-enlace" placeholder="https://sitio-del-anunciante.com">
+              <small class="campo-v__ayuda">Déjelo vacío si la imagen no debe llevar a ningún sitio.</small>
+            </label>
+            <label class="campo-v campo-v--ancho"><span>Qué dice la imagen *</span>
+              <input type="text" id="pub-alt" placeholder="Ej. Repuestos Caribe, 20 % de descuento en filtros">
+              <small class="campo-v__ayuda">Lo lee quien no puede ver la imagen. Obligatorio.</small>
+            </label>
+
+            <label class="campo-v"><span>Desde</span>
+              <input type="date" id="pub-desde">
+              <small class="campo-v__ayuda">Vacío = empieza hoy.</small>
+            </label>
+            <label class="campo-v"><span>Hasta</span>
+              <input type="date" id="pub-hasta">
+              <small class="campo-v__ayuda">Vacío = sin fecha de fin. Al llegar el día se apaga sola.</small>
+            </label>
+          </div>
+          <button class="btn btn--ambar" type="submit">Publicar campaña</button>
+        </form>
+      </details>
+    </section>
   </div>
 
 </div>

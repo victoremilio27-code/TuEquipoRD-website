@@ -350,6 +350,181 @@ function montarFlota() {
   cargarFlota();
 }
 
+/* ═══ Publicidad de la portada ═══════════════════════════ */
+
+/* La imagen se sube antes de crear la campaña, por la misma ruta que
+   las fotos de los anuncios: se guarda en disco y aquí solo queda la
+   ruta. Se reduce en el navegador antes de mandarla, igual que en
+   publicar.js, para no subir un archivo de cámara de 6 MB. */
+let IMAGEN_PUB = null;
+
+function avisarPub(mensaje, bien = false) {
+  const aviso = $('#avisoPub');
+  aviso.hidden = !mensaje;
+  aviso.className = `acceso__aviso${bien ? ' acceso__aviso--bien' : ''}`;
+  aviso.textContent = mensaje || '';
+}
+
+const NOMBRE_ESPACIO = {
+  superior: 'Horizontal',
+  'lateral-izq': 'Lateral izquierdo',
+  'lateral-der': 'Lateral derecho',
+};
+
+/* Una campaña puede estar encendida y aun así no verse: por eso el
+   estado que se muestra es el REAL, no el valor de `activo`. */
+function estadoPub(p) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  if (!p.activo) return { texto: 'Apagada', clase: 'pastilla--roja' };
+  if (p.desde && p.desde > hoy) return { texto: `Empieza el ${p.desde}`, clase: 'pastilla--ambar' };
+  if (p.hasta && p.hasta < hoy) return { texto: `Terminó el ${p.hasta}`, clase: 'pastilla--roja' };
+  return { texto: 'En portada', clase: 'pastilla--verde' };
+}
+
+function pubHTML(p) {
+  const est = estadoPub(p);
+  const ctr = p.impresiones
+    ? `${miles(p.impresiones)} impresiones · ${miles(p.clics)} clics · ${((p.clics / p.impresiones) * 100).toFixed(1)} %`
+    : 'Sin impresiones todavía';
+
+  return `<li class="sol${est.clase === 'pastilla--verde' ? '' : ' sol--rechazada'}" data-id="${esc(p.id)}">
+    <div class="sol__cabeza">
+      <b class="sol__nombre">${esc(p.nombre)}</b>
+      <span class="pastilla ${est.clase}">${esc(est.texto)}</span>
+      <span class="sol__fecha">${esc(NOMBRE_ESPACIO[p.espacio] || p.espacio)}</span>
+    </div>
+    <p class="sol__meta">${p.anunciante ? `${esc(p.anunciante)} · ` : ''}${esc(ctr)}</p>
+    <div class="pub-previa"><img src="${esc(p.imagen)}" alt="${esc(p.alt)}" loading="lazy"></div>
+    <div class="sol__acciones">
+      <button type="button" class="btn btn--linea btn--chico" data-pub="alternar">
+        ${p.activo ? 'Apagar' : 'Encender'}
+      </button>
+      <button type="button" class="btn btn--linea btn--chico" data-pub="borrar">Eliminar</button>
+    </div>
+  </li>`;
+}
+
+async function cargarPub() {
+  avisarPub('');
+  try {
+    const datos = await api('/admin/publicidad');
+    if (!datos) return avisarPub('No hay conexión con el servidor.');
+    $('#listaPub').innerHTML = datos.publicidad.length
+      ? datos.publicidad.map(pubHTML).join('')
+      : '<li class="revision__vacio">No hay campañas. La portada se ve sin espacios publicitarios.</li>';
+  } catch (e) {
+    avisarPub(e.message);
+  }
+}
+
+/* Reduce la imagen en el navegador y la sube. Devuelve la ruta. */
+function reducirYSubir(archivo, anchoMax) {
+  return new Promise((resolver, rechazar) => {
+    if (!archivo.type.startsWith('image/')) return rechazar(new Error('No es una imagen'));
+    const lector = new FileReader();
+    lector.onerror = () => rechazar(new Error('No se pudo leer el archivo'));
+    lector.onload = () => {
+      const img = new Image();
+      img.onerror = () => rechazar(new Error('Imagen dañada'));
+      img.onload = async () => {
+        const escala = Math.min(1, anchoMax / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * escala);
+        c.height = Math.round(img.height * escala);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        try {
+          const r = await api('/fotos', { metodo: 'POST', cuerpo: { completa: c.toDataURL('image/jpeg', 0.85) } });
+          resolver(r.completa);
+        } catch (e) { rechazar(e); }
+      };
+      img.src = lector.result;
+    };
+    lector.readAsDataURL(archivo);
+  });
+}
+
+function montarPub() {
+  if (!document.getElementById('listaPub')) return;
+
+  $('#pub-imagen').addEventListener('change', async (ev) => {
+    const archivo = ev.target.files[0];
+    if (!archivo) return;
+    const estado = $('#pubEstadoImagen');
+    estado.textContent = 'Subiendo…';
+    try {
+      // El horizontal se ve a 1216 px; los laterales, a 160.
+      const ancho = $('#pub-espacio').value === 'superior' ? 1600 : 480;
+      IMAGEN_PUB = await reducirYSubir(archivo, ancho);
+      estado.textContent = 'Imagen lista.';
+    } catch (e) {
+      IMAGEN_PUB = null;
+      estado.textContent = `No se pudo subir: ${e.message}`;
+    }
+  });
+
+  $('#listaPub').addEventListener('click', async (ev) => {
+    const boton = ev.target.closest('button[data-pub]');
+    if (!boton) return;
+    const fila = boton.closest('.sol');
+    const id = fila.dataset.id;
+
+    try {
+      if (boton.dataset.pub === 'alternar') {
+        const encendida = boton.textContent.trim() === 'Apagar';
+        await api(`/admin/publicidad/${encodeURIComponent(id)}`, {
+          metodo: 'PATCH', cuerpo: { activo: !encendida },
+        });
+        await cargarPub();
+        avisarPub(encendida ? 'Campaña apagada.' : 'Campaña encendida.', true);
+      } else {
+        const nombre = fila.querySelector('.sol__nombre').textContent;
+        // eslint-disable-next-line no-alert
+        if (!confirm(`¿Eliminar la campaña «${nombre}»? Esto no se puede deshacer.`)) return;
+        await api(`/admin/publicidad/${encodeURIComponent(id)}`, { metodo: 'DELETE' });
+        await cargarPub();
+        avisarPub('Campaña eliminada.', true);
+      }
+    } catch (e) {
+      avisarPub(e.message);
+    }
+  });
+
+  $('#formPub').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!IMAGEN_PUB) return avisarPub('Cargue la imagen del anuncio.');
+
+    try {
+      const r = await api('/admin/publicidad', {
+        metodo: 'POST',
+        cuerpo: {
+          espacio: $('#pub-espacio').value,
+          nombre: $('#pub-nombre').value.trim(),
+          anunciante: $('#pub-anunciante').value.trim(),
+          imagen: IMAGEN_PUB,
+          enlace: $('#pub-enlace').value.trim(),
+          alt: $('#pub-alt').value.trim(),
+          desde: $('#pub-desde').value,
+          hasta: $('#pub-hasta').value,
+        },
+      });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      $('#formPub').reset();
+      $('#pubEstadoImagen').textContent = 'JPG, PNG o WebP.';
+      IMAGEN_PUB = null;
+      $('#altaPub').open = false;
+      await cargarPub();
+      avisarPub(`«${r.anuncio.nombre}» ya está en la portada.`, true);
+    } catch (e) {
+      avisarPub(e.message);
+    }
+  });
+
+  cargarPub();
+}
+
 /* ── Arranque ───────────────────────────────────────────── */
 
 async function montarAdmin() {
@@ -410,6 +585,7 @@ async function montarAdmin() {
 
   await cargar();
   montarFlota();
+  montarPub();
 }
 
 document.addEventListener('DOMContentLoaded', montarAdmin);

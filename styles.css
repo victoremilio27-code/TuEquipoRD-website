@@ -2562,3 +2562,145 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   letter-spacing: .07em; text-transform: uppercase;
   color: var(--ambar-hondo);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Ilustración del héroe y espacios publicitarios
+   ═══════════════════════════════════════════════════════════ */
+
+/* El héroe pasa a ser marco de posicionamiento del plano. */
+.heroe { position: relative; overflow: hidden; isolation: isolate; }
+
+/* Plano técnico de fondo.
+   Anclado abajo a la derecha, donde no hay texto. El degradado que
+   lleva dentro lo apaga hacia la izquierda, así que el titular queda
+   sobre azul plano y no pierde contraste. */
+.heroe__plano {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(72%, 1000px);
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Por debajo de 900 px el titular ocupa casi todo el ancho y el plano
+   competiría con él. Se retira: es ambiente, no información. */
+@media (max-width: 900px) {
+  .heroe__plano { display: none; }
+}
+
+/* ── Espacios publicitarios ─────────────────────────────── */
+
+/* Un espacio sin campaña lleva `hidden` y no ocupa nada. Estas reglas
+   solo describen cómo se ve cuando SÍ hay algo. */
+.pub[hidden] { display: none; }
+
+/* Rotulado como publicidad. No es decoración: quien entra a una página
+   de compraventa tiene derecho a saber qué es catálogo y qué está
+   pagado, y decirlo protege la credibilidad de lo demás.
+
+   El rótulo va FUERA del marco; el marco es el hijo. Dentro
+   descuadraba la proporción reservada para la imagen. */
+.pub::before {
+  content: 'Publicidad';
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--cuerpo);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--texto-claro);
+}
+
+.pub > a,
+.pub > img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--linea);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--gris-neutro);
+}
+.pub img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* Banner horizontal, entre el héroe y la búsqueda avanzada.
+   La proporción reserva el alto antes de que cargue la imagen, así la
+   página no da un salto cuando aparece. */
+.pub--superior { margin: clamp(16px, 2.4vw, 24px) 0 0; }
+.pub--superior > a,
+.pub--superior > img { aspect-ratio: 1216 / 160; max-height: 160px; }
+
+/* Rascacielos laterales, formato 160×600.
+   Solo aparecen cuando de verdad sobra margen a los lados del
+   contenido: 1280 px de envoltura + 2×160 de banner + 2×40 de aire =
+   1720. Por debajo no se muestran, porque estrechar el catálogo para
+   colocar un banner es cambiar ventas por impresiones.
+
+   Anclados al documento y no a la ventana: con `fixed` quedaban
+   flotando sobre el héroe azul nada más cargar y se leían como un
+   fallo de maquetación. app.js mide el alto del héroe y fija
+   --pub-arranque, porque ese alto cambia con el ancho de la ventana. */
+.pub--lateral {
+  position: absolute;
+  top: var(--pub-arranque, 560px);
+  width: 160px;
+  z-index: 5;
+}
+.pub--lateral > a,
+.pub--lateral > img { aspect-ratio: 160 / 600; }
+
+.pub--izq { left: calc(50% - 840px); }
+.pub--der { right: calc(50% - 840px); }
+
+@media (max-width: 1719px) {
+  .pub--lateral { display: none; }
+}
+
+/* <main> es el marco de referencia de los rieles. */
+main { position: relative; }
+
+/* Vista previa de una campaña en el panel. Fondo a cuadros para que se
+   note si la imagen trae transparencia donde no debe. */
+.pub-previa {
+  margin-top: 10px;
+  padding: 8px;
+  max-width: 340px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r);
+  background-color: var(--gris-neutro);
+  background-image:
+    linear-gradient(45deg, rgba(0,0,0,.05) 25%, transparent 25%, transparent 75%, rgba(0,0,0,.05) 75%),
+    linear-gradient(45deg, rgba(0,0,0,.05) 25%, transparent 25%, transparent 75%, rgba(0,0,0,.05) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+.pub-previa img { display: block; width: 100%; height: auto; border-radius: 3px; }
+
+/* Tren motriz: solo aparece en camiones y autobuses, así que se
+   presenta como bloque aparte para que no se lea como un campo más de
+   la ficha técnica. */
+.tren-motriz {
+  padding: 14px 16px;
+  background: var(--hueso);
+  border: 1px solid var(--linea);
+  border-left: 3px solid var(--ambar);
+  border-radius: var(--r);
+}
+.tren-motriz__titulo {
+  display: block; margin-bottom: 10px;
+  font-family: var(--display); font-size: 12px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ambar-hondo);
+}
+
+/* Alta de un elemento de la flota. Plegado por defecto: la pantalla se
+   usa mucho más para retirar y reordenar que para añadir. */
+.flota-alta { margin-top: 18px; border-top: 1px solid var(--linea-suave); padding-top: 16px; }
+.flota-alta__abrir {
+  cursor: pointer; list-style: none;
+  font-family: var(--display); font-size: 13px; font-weight: 700;
+  color: var(--ambar-hondo);
+}
+.flota-alta__abrir::-webkit-details-marker { display: none; }
+.flota-alta__abrir::before { content: '+ '; }
+.flota-alta[open] .flota-alta__abrir::before { content: '− '; }
+.flota-alta form { margin-top: 14px; }

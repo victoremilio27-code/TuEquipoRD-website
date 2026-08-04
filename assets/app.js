@@ -834,6 +834,68 @@ function montarCategoriasPagina() {
   }).join('');
 }
 
+/* ── Publicidad ─────────────────────────────────────────── */
+
+/* Rellena los tres espacios de la portada con lo que haya vigente.
+ *
+ * Un espacio sin campaña se queda con `hidden` y no ocupa nada. Un
+ * recuadro que diga «espacio disponible» hace que el sitio parezca a
+ * medio terminar, y quien entra a comprar una excavadora no viene a
+ * buscar dónde anunciarse.
+ *
+ * El enlace pasa por /api/publicidad/:id/ir para contar el clic. Sigue
+ * siendo un enlace de verdad: se abre en pestaña nueva, se copia y
+ * funciona sin JavaScript.
+ *
+ * `rel="sponsored"` porque es publicidad pagada: decírselo a Google es
+ * lo correcto y evita que el enlace se lea como una recomendación
+ * editorial del sitio. */
+async function montarPublicidad() {
+  const espacios = {
+    superior: $('#pubSuperior'),
+    'lateral-izq': $('#pubIzq'),
+    'lateral-der': $('#pubDer'),
+  };
+  if (!espacios.superior && !espacios['lateral-izq']) return;
+
+  const datos = await api('/publicidad', { silencioso: true });
+  if (!datos) return;
+
+  Object.entries(espacios).forEach(([espacio, caja]) => {
+    if (!caja) return;
+    const lista = datos.publicidad[espacio] || [];
+    if (!lista.length) return;                  // sin campaña, sin hueco
+
+    // Con varias campañas en el mismo espacio se muestra una al azar:
+    // así todas reciben impresiones sin necesidad de un rotador.
+    const p = lista[Math.floor(Math.random() * lista.length)];
+
+    const img = `<img src="${esc(p.imagen)}" alt="${esc(p.alt)}" loading="lazy" decoding="async">`;
+    caja.innerHTML = p.enlace
+      ? `<a class="pub__enlace" href="/api/publicidad/${esc(p.id)}/ir"
+             target="_blank" rel="sponsored noopener">${img}</a>`
+      : img;
+
+    caja.hidden = false;
+  });
+
+  /* Los rieles arrancan justo debajo del héroe. Se mide en vez de
+     fijarlo: el alto del héroe cambia con el ancho de la ventana, con
+     cuántas líneas ocupe el titular y con las cifras del catálogo, que
+     llegan de la API después de que esto se ejecute.
+
+     Por eso un ResizeObserver y no una medida única: al principio el
+     héroe todavía no tiene las cifras y sale más bajo de lo que
+     acabará siendo, y el riel se montaba encima. */
+  const heroe = document.querySelector('.heroe');
+  if (heroe && 'ResizeObserver' in window) {
+    new ResizeObserver(() => {
+      document.documentElement.style.setProperty(
+        '--pub-arranque', `${Math.round(heroe.offsetHeight + 28)}px`);
+    }).observe(heroe);
+  }
+}
+
 /* ── Alquiler, financiamiento, planes ───────────────────── */
 
 /* La flota de alquiler viene de la base, no del código: el equipo la
@@ -1388,10 +1450,21 @@ function anuncioDeApi(a) {
   return {
     id: a.id,
     anio: a.anio,
+    // `marca` guarda el id, que es lo que va en el enlace del filtro;
+    // `marca_nombre` es lo que se muestra. Los dos, o la tarjeta
+    // acabaría rotulando «2017 jcb 3CX».
     marca: a.marca,
+    marca_nombre: a.marca_nombre,
     modelo: a.modelo,
     categoria: a.categoria,
     subcategoria: a.subcategoria,
+    subcategoria_nombre: a.subcategoria_nombre,
+    motor_marca: a.motor_marca,
+    motor_marca_nombre: a.motor_marca_nombre,
+    motor_modelo: a.motor_modelo,
+    transmision_marca: a.transmision_marca,
+    transmision_marca_nombre: a.transmision_marca_nombre,
+    transmision_modelo: a.transmision_modelo,
     uso: { valor: a.uso_valor || 0, unidad: a.uso_unidad || 'h' },
     condicion: a.condicion,
     precio: a.precio,
@@ -1458,6 +1531,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   montarSeguimiento();
   montarCotizaciones();
   montarBuscador();
+  montarPublicidad();
 
   // Las cifras del catálogo las comparten varios bloques, así que se
   // piden una sola vez y después se pinta todo en paralelo: cada
