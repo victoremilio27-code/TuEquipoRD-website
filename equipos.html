@@ -32,6 +32,7 @@
         <a href="transporte.html">Transporte</a>
         <a href="importar.html">Importación</a>
         <a href="financiamiento.html">Financiamiento</a>
+        <a href="planes.html">Planes</a>
         <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
       </nav>
     </div>
@@ -47,10 +48,20 @@
     <p class="pagina__sub">Catálogo completo de maquinaria disponible. Cada ficha incluye horas de uso, condición, ubicación y precio publicado.</p>
   </header>
 
+  <div class="velo-filtros" id="veloFiltros" hidden></div>
+
   <div class="fila fila--resultados">
 
-    <section class="panel" aria-labelledby="t-filtros">
-      <h2 class="panel__titulo" id="t-filtros"><em>Filtros</em> de búsqueda</h2>
+    <!-- En móvil este panel vive detrás del botón «Filtros» de la barra
+         de resultados: antes se desplegaba entero entre la búsqueda y
+         los resultados y empujaba el catálogo dos pantallas hacia
+         abajo. En escritorio no cambia nada: sigue siendo la columna
+         izquierda de siempre. -->
+    <section class="panel panel--filtros" id="panelFiltros" aria-labelledby="t-filtros">
+      <div class="filtros__cabeza">
+        <h2 class="panel__titulo" id="t-filtros"><em>Filtros</em> de búsqueda</h2>
+        <button type="button" class="filtros__cerrar" id="cerrarFiltros" aria-label="Cerrar los filtros">&times;</button>
+      </div>
 
       <form class="form" id="filtros" action="equipos.html" method="get">
         <!-- Conserva el orden elegido al aplicar filtros. -->
@@ -122,20 +133,18 @@
         </div>
       </form>
 
-      <!-- Publicidad en la columna de filtros. Es el mejor espacio del
-           sitio: aquí el visitante ya declaró qué busca y con qué
-           presupuesto, y la columna quedaba vacía bajo el formulario en
-           todas las páginas largas. Acompaña el desplazamiento sin
-           taparle nada al comprador. -->
-      <aside class="anuncio anuncio--columna" aria-label="Espacio publicitario">
-        <span>Espacio publicitario<br>300 &times; 250</span>
-      </aside>
+
     </section>
 
     <section class="panel" aria-labelledby="t-res">
       <h2 class="visualmente-oculto" id="t-res">Resultados</h2>
 
       <div class="barra-resultados">
+        <button type="button" class="btn btn--linea btn--chico filtros__abrir" id="abrirFiltros"
+          aria-expanded="false" aria-controls="panelFiltros">
+          <svg class="ico" aria-hidden="true"><use href="#i-filtro"/></svg>
+          Filtros <span class="filtros__cuenta" id="cuentaFiltros" hidden></span>
+        </button>
         <p class="barra-resultados__cuenta" id="resumenBusqueda">&mdash;</p>
         <div class="chips" id="chipsFiltros"></div>
 
@@ -198,7 +207,7 @@
         <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
         <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
         <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
-        <li><a href="publicar.html"><b>Publicar un equipo:</b> niveles, cupos y precios</a></li>
+        <li><a href="planes.html"><b>Planes y precios:</b> cupos, niveles y beneficios</a></li>
         <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
       </ul>
       <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>

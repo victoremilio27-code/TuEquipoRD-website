@@ -1633,6 +1633,43 @@ function anunciosDeOrganizacion(idOrg) {
     .all(idOrg).map(conNombres);
 }
 
+/* Borra un anuncio y todo lo que cuelga de él.
+
+   Borrado de verdad, no un estado más: el anunciante que pulsa
+   «Eliminar» espera que desaparezca. Para dejar de vender sin perder
+   el historial ya están «vendido» y «retirado», que además conservan
+   las métricas.
+
+   Devuelve las rutas de las fotos para que quien llama borre los
+   archivos: las filas se van con el ON DELETE CASCADE, pero el disco
+   no se limpia solo. */
+function borrarAnuncio(idAnuncio, idOrg) {
+  const d = abrir();
+  const suyo = d.prepare('SELECT id FROM anuncios WHERE id = ? AND organizacion_id = ?')
+    .get(idAnuncio, idOrg);
+  if (!suyo) return null;
+
+  const fotos = d.prepare('SELECT url, miniatura FROM anuncio_fotos WHERE anuncio_id = ?')
+    .all(idAnuncio);
+
+  d.prepare('BEGIN').run();
+  try {
+    for (const t of ['anuncio_fotos', 'anuncio_contactos', 'eventos', 'metricas_diarias']) {
+      try { d.prepare(`DELETE FROM ${t} WHERE anuncio_id = ?`).run(idAnuncio); } catch (_) { /* tabla sin esa columna */ }
+    }
+    d.prepare('DELETE FROM anuncios WHERE id = ? AND organizacion_id = ?').run(idAnuncio, idOrg);
+    d.prepare('COMMIT').run();
+  } catch (e) {
+    d.prepare('ROLLBACK').run();
+    throw e;
+  }
+
+  // Rutas únicas: la miniatura puede ser la misma que la completa.
+  const rutas = new Set();
+  fotos.forEach((f) => { if (f.url) rutas.add(f.url); if (f.miniatura) rutas.add(f.miniatura); });
+  return [...rutas];
+}
+
 /* Motor y transmisión de un anuncio ya publicado. La API valida las
    marcas y los modelos contra la taxonomía antes de llamar aquí. */
 const guardarTrenMotriz = (idAnuncio, idOrg, t) =>
@@ -1818,7 +1855,7 @@ module.exports = {
   suscripcionConHueco, comprarCupos, ampliarCupos, membresiaInterna,
   moverAnuncioDeSuscripcion, refrescarAnunciosDe,
   crearAnuncio, anuncio, anunciosPublicos, buscarAnuncios, estadisticas, anunciosDeOrganizacion,
-  cambiarEstadoAnuncio, guardarTrenMotriz, caducarAnuncios,
+  cambiarEstadoAnuncio, guardarTrenMotriz, borrarAnuncio, caducarAnuncios,
   anunciosPorVencer, anunciosVencidosSinAvisar, marcarAviso, duenoDeAnuncio,
   anotarEvento, resumenOrganizacion,
 };

@@ -17,6 +17,7 @@ const PAGINAS = [
   'publicar.html', 'financiamiento.html', 'alquiler.html',
   'transporte.html', 'importar.html', 'dealers.html',
   'contacto.html', 'legal.html', 'cuenta.html', 'panel.html', 'dealer.html',
+  'planes.html',
 ];
 
 /* Contenedores que el render debe llenar, por página. */
@@ -25,7 +26,8 @@ const ESPERADO = {
   'equipos.html': ['#resultados'],
   'categorias.html': ['#categoriasTodas'],
   // El asistente pinta los pasos y las tarjetas de plan al arrancar.
-  'publicar.html': ['#pasosNav', '#planesSeleccion', '#vistaPrevia'],
+  'publicar.html': ['#pasosNav', '#vistaPrevia'],
+  'planes.html': ['#nivelesLista', '#tablaPlanes'],
   'financiamiento.html': ['#financiadoras'],
   'alquiler.html': ['#alquilerLista'],
   'transporte.html': ['#mapaEnvio', '#seguimientoDatos', '#flotaLista'],

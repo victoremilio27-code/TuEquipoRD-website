@@ -2033,19 +2033,26 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 
 /* ── Enlace de cuenta en la cabecera ────────────────────── */
 
+/* Enlace de cuenta de la cabecera. Es un botón como los demás: misma
+   altura, mismo radio y mismo borde que `.btn--linea`. La píldora que
+   llevaba antes era la única forma redondeada del sitio y se leía como
+   un componente de otro sistema. */
 .cab__cuenta {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   margin-left: auto;
-  padding: 5px 11px;
+  height: 32px;
+  padding: 0 13px;
   border: 1px solid var(--linea-dark);
-  border-radius: 99px;
+  border-radius: var(--r);
+  font-family: var(--cuerpo);
   font-size: 12.5px; font-weight: 600;
   color: var(--texto-claro);
-  transition: color .15s ease, border-color .15s ease;
+  white-space: nowrap;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
-.cab__cuenta:hover { color: var(--blanco); border-color: var(--ambar); }
+.cab__cuenta:hover { background: var(--azul-2); color: var(--blanco); border-color: var(--ambar); }
 .cab__cuenta .ico { width: 15px; height: 15px; }
-.cab__cuenta--activa { color: var(--blanco); border-color: var(--ambar); }
+.cab__cuenta--activa { color: var(--blanco); border-color: var(--linea-dark); }
 
 /* ── Acceso ─────────────────────────────────────────────── */
 
@@ -2650,17 +2657,35 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
    --pub-arranque, porque ese alto cambia con el ancho de la ventana. */
 .pub--lateral {
   position: absolute;
+  /* Del final del héroe al final de la página: así el riel tiene
+     recorrido y el banner de dentro puede acompañar la lectura. */
   top: var(--pub-arranque, 560px);
-  width: 160px;
+  bottom: 40px;
+  /* Se adapta al hueco que de verdad sobra. Con un ancho fijo de 160 px
+     el riel solo aparecía por encima de 1720, y en un portátil de 1440
+     o 1536 —que es casi todo el mundo— los lados quedaban vacíos sin
+     nada que los ocupara. */
+  width: clamp(120px, calc((100vw - var(--envoltura) - 72px) / 2), 160px);
   z-index: 5;
+  /* El contenedor no intercepta el ratón; el enlace de dentro sí. */
+  pointer-events: none;
 }
 .pub--lateral > a,
-.pub--lateral > img { aspect-ratio: 160 / 600; }
+.pub--lateral > img {
+  position: sticky;
+  top: 90px;                       /* por debajo de la cabecera */
+  pointer-events: auto;
+  aspect-ratio: 160 / 600;
+}
 
-.pub--izq { left: calc(50% - 840px); }
-.pub--der { right: calc(50% - 840px); }
+/* Pegados al borde de la envoltura, no al de la ventana: en una
+   pantalla de 2560 px quedarían a medio metro del contenido. */
+.pub--izq { left: calc(50% - var(--envoltura) / 2 - 16px); transform: translateX(-100%); }
+.pub--der { left: calc(50% + var(--envoltura) / 2 + 16px); }
 
-@media (max-width: 1719px) {
+/* Por debajo de 1600 px no cabe un riel sin estrechar el catálogo, y
+   cambiar ventas por impresiones es mal negocio. En móvil, fuera. */
+@media (max-width: 1599px) {
   .pub--lateral { display: none; }
 }
 
@@ -2846,3 +2871,105 @@ main { position: relative; }
 /* Un camión sin motor declarado se señala: en un cabezote es lo
    primero que pregunta el comprador. */
 .btn-tabla--avisa { border-color: var(--ambar-hondo); color: var(--ambar-hondo); font-weight: 700; }
+
+/* Eliminar un anuncio. Va en rojo y el último de la fila: es la única
+   acción del panel que no se puede deshacer. */
+.btn-tabla--borrar { color: #B3261E; border-color: rgba(179, 38, 30, .3); }
+.btn-tabla--borrar:hover { background: #FDF3F3; border-color: #B3261E; }
+.btn-tabla--borrar:disabled { opacity: .6; cursor: progress; }
+
+/* Par de acciones al pie de cada bloque de servicio de la portada.
+   La portada resume y la página de cada servicio desarrolla: por eso
+   una acción directa (cotizar) y una de lectura (más información),
+   en vez de un botón a ancho completo y un párrafo debajo. */
+.servicio__acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.servicio__acciones .btn { flex: 1 1 auto; min-width: 0; }
+
+/* Tabla comparativa de la página de planes. */
+.tabla-planes { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tabla-planes th, .tabla-planes td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--linea-suave); }
+.tabla-planes thead th { font-family: var(--display); font-size: 13px; font-weight: 700; background: var(--hueso); }
+.tabla-planes thead th:first-child { font-family: var(--cuerpo); font-weight: 600; color: var(--gris-acero); }
+.tabla-planes tbody th { font-weight: 600; }
+.tabla-planes td { text-align: center; }
+.tabla-planes__si { color: var(--verde); font-weight: 700; }
+.tabla-planes__no { color: var(--gris-acero); }
+
+.planes-op--pagina { margin-top: 14px; }
+.compra-cupos--pagina { display: grid; gap: 16px; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); align-items: start; margin-top: 14px; }
+@media (max-width: 720px) { .compra-cupos--pagina { grid-template-columns: minmax(0, 1fr); } }
+
+/* Preguntas frecuentes de la página de planes. */
+.faq { display: grid; gap: 12px; margin-top: 14px; }
+.faq > div { padding: 12px 14px; background: var(--hueso); border-radius: var(--r); }
+.faq dt { font-family: var(--display); font-size: 14px; font-weight: 700; }
+.faq dd { margin: 5px 0 0; font-size: 13.5px; color: var(--gris-acero); }
+
+.realce--aviso { border-left-color: var(--ambar-hondo); }
+.pedido__nota { margin-top: 10px; font-size: 12px; color: var(--gris-acero); }
+.pedido__nota a { color: var(--ambar-hondo); font-weight: 600; }
+
+/* ── Filtros en móvil ───────────────────────────────────────
+   En escritorio los filtros son la columna izquierda de siempre. En
+   móvil se retiran detrás de un botón: antes se desplegaban enteros
+   entre la búsqueda y los resultados, y el catálogo —que es a lo que
+   se viene— quedaba dos pantallas más abajo.
+
+   Panel lateral y no acordeón: el acordeón sigue empujando la página
+   hacia abajo al abrirse, que es justo el problema. */
+.filtros__abrir { display: none; }
+.filtros__cerrar { display: none; }
+.velo-filtros { display: none; }
+
+.filtros__cuenta {
+  display: inline-grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: var(--ambar); border-radius: 99px;
+  font-size: 11px; font-weight: 700; color: var(--azul);
+}
+
+@media (max-width: 860px) {
+  .filtros__abrir { display: inline-flex; margin-top: 0; }
+  .filtros__cerrar {
+    display: inline-grid; place-items: center;
+    width: 32px; height: 32px; flex: none;
+    background: transparent; border: 1px solid var(--linea); border-radius: var(--r);
+    font-size: 20px; line-height: 1; color: var(--azul); cursor: pointer;
+  }
+  .filtros__cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+  /* El selector lleva :first-child a propósito. Más arriba hay dos
+     reglas responsive sobre `.fila--resultados > .panel:first-child`
+     —una lo pone sticky y otra static— con esa misma especificidad;
+     sin igualarla, el panel se quedaba en el flujo y empujaba los
+     resultados una pantalla hacia abajo, que es justo lo que se venía
+     a arreglar. Al empatar, gana esta por ir después. */
+  .fila--resultados > .panel--filtros:first-child {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    width: min(88vw, 340px);
+    z-index: 60;
+    margin: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+  }
+  .fila--resultados > .panel--filtros:first-child.abierto { transform: translateX(0); }
+
+  .velo-filtros {
+    display: block;
+    position: fixed; inset: 0;
+    z-index: 55;
+    background: rgba(7, 26, 43, .5);
+  }
+
+  /* Quien pidió menos movimiento no recibe el deslizamiento. */
+  @media (prefers-reduced-motion: reduce) {
+    .fila--resultados > .panel--filtros:first-child { transition: none; }
+  }
+}
+
+/* Bloquea el fondo mientras hay un panel abierto encima. */
+body.sin-scroll { overflow: hidden; }

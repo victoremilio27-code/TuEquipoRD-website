@@ -1,0 +1,366 @@
+/* ═══════════════════════════════════════════════════════════
+   TuEquipoRD · Planes y precios
+
+   EL ÚNICO SITIO DONDE SE COMPRA CAPACIDAD. Antes el cobro vivía
+   dentro del asistente de publicación: el anunciante montaba la ficha
+   entera y al final se encontraba un formulario de tarjeta. Quien ya
+   tenía cupos pagados veía ese mismo paso otra vez y parecía que se le
+   cobraba dos veces por lo mismo.
+
+   Ahora el asistente no cobra nunca. Publicar ocupa un cupo; comprar
+   cupos se hace aquí, y solo cuando hacen falta.
+
+   ── Lo que se le enseña a cada quien ────────────────────────
+   · Sin cuenta        → los niveles y sus precios.
+   · Con cupos libres  → primero cuántos le quedan, y un atajo a
+                         publicar. Nada de empujarle a comprar lo que
+                         ya tiene.
+   · Sin cupos libres  → ampliar los que ya tiene, prorrateado, o
+                         contratar otro nivel. Nunca empezar de cero.
+   ═══════════════════════════════════════════════════════════ */
+
+let NIVELES_PLAN = [];
+let MIS_CUPOS = [];
+let EXENTA_PLAN = false;
+let NIVEL_ELEGIDO = '';
+let DIAS_PLAN = 30;
+let CUPOS_PEDIDOS = 1;
+
+/* A dónde vuelve después de contratar. Lo pone quien lo mandó aquí
+   —el asistente, casi siempre— para poder devolverlo a su borrador. */
+const destino = () => params().get('destino') || '';
+
+const unitario = (n) => (n.precio_vigente != null ? n.precio_vigente : n.precio);
+
+const nivel = (id) => NIVELES_PLAN.find((n) => n.id === id) || null;
+
+function avisar(mensaje, ok = false) {
+  const el = $('#avisoPlanes');
+  if (!el) return;
+  const caja = $('#estadoCuenta');
+  if (mensaje) caja.hidden = false;
+  el.hidden = !mensaje;
+  el.textContent = mensaje || '';
+  el.classList.toggle('acceso__aviso--ok', ok);
+}
+
+/* ── Lo que ya tiene ─────────────────────────────────────── */
+
+function pintarMisCupos() {
+  const caja = $('#estadoCuenta');
+  if (!haySesion() || !MIS_CUPOS.length) { caja.hidden = true; return; }
+
+  caja.hidden = false;
+  const libres = MIS_CUPOS.reduce((n, m) => (m.libres === null ? n : n + m.libres), 0);
+  const sinLimite = MIS_CUPOS.some((m) => m.libres === null);
+
+  $('#misCupos').innerHTML = MIS_CUPOS.map((m) => {
+    const dias = m.fin ? diasRestantes(m.fin) : null;
+    const sig = m.anuncios_incluidos == null ? null : precioAmpliacion({
+      precioUnitario: m.precio_unitario,
+      cupoActual: m.anuncios_incluidos,
+      cupoNuevo: m.anuncios_incluidos + 1,
+      dias: m.dias_ciclo || 30,
+      diasRestantes: dias ?? (m.dias_ciclo || 30),
+    });
+
+    return `<li class="membresia${m.libres === 0 ? ' membresia--llena' : ''}">
+      <span class="membresia__cabeza">
+        <b class="membresia__nivel">${esc(m.plan_nombre)}</b>
+        <span class="membresia__vigencia">${m.fin ? `Quedan ${dias} ${dias === 1 ? 'día' : 'días'}` : 'Sin caducidad'}</span>
+      </span>
+      <span class="membresia__cupo num">${m.anuncios_incluidos == null
+        ? `${m.ocupados} publicados · sin límite`
+        : `${m.libres} ${m.libres === 1 ? 'cupo libre' : 'cupos libres'} de ${m.anuncios_incluidos}`}</span>
+      ${sig ? (sig.total === 0
+        ? '<span class="membresia__gratis">El siguiente cupo no le cuesta nada</span>'
+        : `<span class="membresia__siguiente">Un cupo más: ${pesos(sig.total)} hasta su renovación</span>`) : ''}
+      ${m.anuncios_incluidos == null ? '' : `
+        <button type="button" class="btn btn--linea btn--chico" data-ampliar="${esc(m.id)}">
+          Añadir cupos a ${esc(m.plan_nombre)}
+        </button>`}
+    </li>`;
+  }).join('');
+
+  /* Si le sobran cupos, lo primero que ve es el atajo para usarlos.
+     Enseñarle precios a quien ya pagó es justo lo que hacía pensar que
+     se le cobraba dos veces. */
+  const atajo = $('#btnVolverPublicar');
+  if (libres > 0 || sinLimite) {
+    atajo.hidden = false;
+    atajo.textContent = destino() ? 'Volver a mi anuncio' : 'Publicar un equipo';
+    atajo.href = destino() || 'publicar.html';
+    avisar(sinLimite
+      ? 'Su cuenta publica sin límite. No necesita contratar nada.'
+      : `Le ${libres === 1 ? 'queda' : 'quedan'} ${libres} ${libres === 1 ? 'cupo libre' : 'cupos libres'}: puede publicar sin pagar nada más.`, true);
+  } else {
+    atajo.hidden = true;
+  }
+}
+
+/* ── Niveles ─────────────────────────────────────────────── */
+
+function tarjetaNivel(n) {
+  const elegido = n.id === NIVEL_ELEGIDO;
+  const porCupo = Math.round(unitario(n) * duracion(DIAS_PLAN).factor);
+
+  const rasgos = [
+    `Hasta ${n.fotos_maximas} fotografías por equipo`,
+    n.destacado ? 'Distintivo Destacado y posición preferente' : 'Ficha técnica completa con horas y condición',
+    n.destacado ? 'Aparece en la portada' : 'Contacto directo por teléfono y WhatsApp',
+    n.perfil_publico ? 'Página pública de su empresa en el directorio' : null,
+  ].filter(Boolean);
+
+  return `<li>
+    <label class="plan-op${elegido ? ' plan-op--elegido' : ''}${n.destacado && !n.perfil_publico ? ' plan-op--sugerido' : ''}">
+      <input type="radio" name="nivel" value="${esc(n.id)}"${elegido ? ' checked' : ''}>
+      <span class="plan-op__cabeza">
+        ${n.perfil_publico
+          ? '<span class="plan-op__cinta plan-op__cinta--membresia">Con página propia</span>'
+          : n.destacado
+            ? '<span class="plan-op__cinta">Más contratado</span>'
+            : '<span class="plan-op__hueco" aria-hidden="true"></span>'}
+        <span class="plan-op__nombre">${esc(n.nombre)}</span>
+      </span>
+      <span class="plan-op__precio num">${EXENTA_PLAN ? 'Sin costo' : pesos(porCupo)}</span>
+      <span class="plan-op__periodo">por equipo · ${DIAS_PLAN} días</span>
+      <ul class="plan-op__incluye">
+        ${rasgos.map((i) => `<li>${icono('i-check')} ${esc(i)}</li>`).join('')}
+      </ul>
+    </label>
+  </li>`;
+}
+
+function pintarTablaComparativa() {
+  const filas = [
+    ['Fotografías por equipo', (n) => `${n.fotos_maximas}`],
+    ['Vídeo del equipo', (n) => (n.destacado ? 'Sí' : '—')],
+    ['Distintivo Destacado', (n) => (n.destacado ? 'Sí' : '—')],
+    ['Posición preferente en resultados', (n) => (n.destacado ? 'Sí' : '—')],
+    ['Aparece en la portada', (n) => (n.destacado ? 'Sí' : '—')],
+    ['Página pública de la empresa', (n) => (n.perfil_publico ? 'Sí' : '—')],
+    ['Estadísticas de visitas y contactos', () => 'Sí'],
+    ['Cupo reutilizable al vender', () => 'Sí'],
+  ];
+
+  $('#tablaPlanes').innerHTML = `
+    <thead>
+      <tr>
+        <th scope="col">Prestación</th>
+        ${NIVELES_PLAN.map((n) => `<th scope="col">${esc(n.nombre)}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${filas.map(([rotulo, valor]) => `<tr>
+        <th scope="row">${esc(rotulo)}</th>
+        ${NIVELES_PLAN.map((n) => {
+    const v = valor(n);
+    return `<td class="${v === 'Sí' ? 'tabla-planes__si' : v === '—' ? 'tabla-planes__no' : 'num'}">${esc(v)}</td>`;
+  }).join('')}
+      </tr>`).join('')}
+    </tbody>`;
+}
+
+/* ── Pedido ──────────────────────────────────────────────── */
+
+function pedidoPlan() {
+  const n = nivel(NIVEL_ELEGIDO);
+  if (!n) return null;
+  return {
+    nivel: n,
+    ...precioCompra({ precioUnitario: unitario(n), cupo: CUPOS_PEDIDOS, dias: DIAS_PLAN }),
+  };
+}
+
+function pintarPedido() {
+  const caja = $('#resumenPlan');
+  const ped = pedidoPlan();
+  if (!caja || !ped) return;
+
+  /* `fechaLarga` de app.js recibe una fecha en formato AAAA-MM-DD y le
+     añade la hora; pasarle un objeto Date daba «Invalid Date». */
+  const vence = new Date();
+  vence.setDate(vence.getDate() + DIAS_PLAN);
+  const venceIso = vence.toISOString().slice(0, 10);
+
+  caja.innerHTML = EXENTA_PLAN
+    ? `<h3 class="pedido__titulo">Sin costo</h3>
+       <p class="pedido__vacio">${icono('i-check')} Su cuenta publica sin pagar y sin límite de equipos.</p>`
+    : `<h3 class="pedido__titulo">Resumen</h3>
+       <dl class="pedido__lista">
+         <div><dt>${esc(ped.nivel.nombre)} · ${ped.cupo} ${ped.cupo === 1 ? 'equipo' : 'equipos'}</dt>
+           <dd class="num">${pesos(ped.subtotal)}</dd></div>
+         <div><dt>Vigencia</dt><dd class="num">${DIAS_PLAN} días · hasta el ${fechaLarga(venceIso)}</dd></div>
+         ${ped.gratis ? `<div><dt>Cupos de regalo</dt><dd class="num">${ped.gratis}</dd></div>` : ''}
+         <div><dt>ITBIS (${Math.round(ITBIS * 100)} %)</dt><dd class="num">${pesos(ped.itbis)}</dd></div>
+         <div class="pedido__total"><dt>Total</dt><dd class="num">${pesos(ped.total)}</dd></div>
+       </dl>`;
+
+  $('#btnContratar').textContent = EXENTA_PLAN
+    ? 'Activar sin costo'
+    : `Contratar por ${pesos(ped.total)}`;
+}
+
+/* La regla del uno gratis por cada cinco, contada sobre lo que acaba
+   de teclear: decirle cuánto le falta para el siguiente es lo que la
+   hace útil y no un adorno. */
+function pintarRegla() {
+  const el = $('#reglaCupos');
+  if (EXENTA_PLAN) { el.hidden = true; return; }
+  el.hidden = false;
+
+  const gratis = cuposGratis(CUPOS_PEDIDOS);
+  const faltan = CUPOS_POR_UNO_GRATIS - (CUPOS_PEDIDOS % CUPOS_POR_UNO_GRATIS);
+
+  el.innerHTML = gratis > 0
+    ? `${icono('i-check')} <span>${gratis === 1 ? 'Se le regala' : 'Se le regalan'} <b>${gratis} ${gratis === 1 ? 'cupo' : 'cupos'}</b>: paga ${cuposCobrados(CUPOS_PEDIDOS)} de ${CUPOS_PEDIDOS}.${faltan < CUPOS_POR_UNO_GRATIS ? ` Con ${faltan} más, otro gratis.` : ''}</span>`
+    : `${icono('i-etiqueta')} <span>Uno gratis por cada ${CUPOS_POR_UNO_GRATIS}. Le ${faltan === 1 ? 'falta' : 'faltan'} <b>${faltan}</b> para que el siguiente no se cobre.</span>`;
+}
+
+function pintarTodo() {
+  $('#nivelesLista').innerHTML = NIVELES_PLAN.map(tarjetaNivel).join('');
+  $('#notaPremium').hidden = !(nivel(NIVEL_ELEGIDO) || {}).perfil_publico || esDealer();
+  pintarRegla();
+  pintarPedido();
+}
+
+/* ── Contratar ───────────────────────────────────────────── */
+
+async function contratar() {
+  const btn = $('#btnContratar');
+  const ped = pedidoPlan();
+  if (!ped) return;
+
+  if (!haySesion()) {
+    location.href = `cuenta.html?destino=${encodeURIComponent(`planes.html${location.search}`)}&crear=1`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('btn--ocupado');
+  const antes = btn.textContent;
+  btn.textContent = 'Contratando…';
+
+  try {
+    const r = await api('/membresias', {
+      metodo: 'POST',
+      cuerpo: { plan: ped.nivel.id, cupo: CUPOS_PEDIDOS, dias: DIAS_PLAN },
+    });
+    if (!r) throw new Error('No hay conexión con el servidor.');
+
+    /* Con destino se vuelve solo: el anunciante venía de su borrador y
+       devolverlo ahí es la mitad de la mejora. */
+    if (destino()) { location.href = destino(); return; }
+
+    MIS_CUPOS = (await api('/membresias', { silencioso: true }) || {}).membresias || MIS_CUPOS;
+    pintarMisCupos();
+    avisar(`Listo. Contrató ${CUPOS_PEDIDOS} ${CUPOS_PEDIDOS === 1 ? 'cupo' : 'cupos'} de ${ped.nivel.nombre}.`, true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    avisar(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('btn--ocupado');
+    btn.textContent = antes;
+  }
+}
+
+/* Ampliar lo que ya tiene, prorrateado. Es el caso de quien se quedó
+   sin cupos: no se le hace pasar otra vez por la compra entera. */
+async function ampliar(id) {
+  const m = MIS_CUPOS.find((x) => x.id === id);
+  if (!m) return;
+
+  const cuantos = prompt(
+    `¿Cuántos equipos quiere poder publicar en total con ${m.plan_nombre}?\n\n`
+    + `Ahora tiene ${m.anuncios_incluidos}. Solo paga los días que le queden, y cada quinto cupo no se cobra.`,
+    String(m.anuncios_incluidos + 1));
+  if (cuantos === null) return;
+
+  const cupo = Number(String(cuantos).replace(/\D+/g, ''));
+  if (!cupo || cupo <= m.anuncios_incluidos) {
+    avisar(`Indique una cantidad mayor que ${m.anuncios_incluidos}.`);
+    return;
+  }
+
+  const previo = precioAmpliacion({
+    precioUnitario: m.precio_unitario,
+    cupoActual: m.anuncios_incluidos,
+    cupoNuevo: cupo,
+    dias: m.dias_ciclo || 30,
+    diasRestantes: diasRestantes(m.fin) ?? (m.dias_ciclo || 30),
+  });
+
+  const nuevos = cupo - m.anuncios_incluidos;
+  const texto = EXENTA_PLAN || previo.total === 0
+    ? `Añadir ${nuevos} ${nuevos === 1 ? 'cupo' : 'cupos'} sin costo. ¿Confirma?`
+    : `Añadir ${nuevos} ${nuevos === 1 ? 'cupo' : 'cupos'} cuesta ${pesos(previo.total)} por los días que le quedan.\n\n¿Confirma?`;
+  if (!confirm(texto)) return;
+
+  try {
+    const r = await api(`/membresias/${encodeURIComponent(id)}/ampliar`, { metodo: 'POST', cuerpo: { cupo } });
+    if (!r) throw new Error('No hay conexión con el servidor.');
+    MIS_CUPOS = (await api('/membresias', { silencioso: true }) || {}).membresias || MIS_CUPOS;
+    pintarMisCupos();
+    avisar(`${m.plan_nombre} pasó a ${cupo} cupos.`, true);
+  } catch (e) { avisar(e.message); }
+}
+
+/* ── Arranque ────────────────────────────────────────────── */
+
+async function montarPlanes() {
+  if (!$('#nivelesLista')) return;
+
+  await cargarSesion();
+  const catalogo = await api('/planes', { silencioso: true });
+  NIVELES_PLAN = (catalogo && catalogo.planes) || [];
+
+  if (haySesion()) {
+    const mios = await api('/membresias', { silencioso: true });
+    MIS_CUPOS = (mios && mios.membresias) || [];
+    EXENTA_PLAN = !!(mios && mios.exenta);
+  }
+
+  // Por defecto el nivel intermedio, que es el que contrata casi todo
+  // el mundo, salvo que la URL pida otro.
+  const pedido = params().get('nivel');
+  const destacado = NIVELES_PLAN.find((n) => n.destacado && !n.perfil_publico);
+  NIVEL_ELEGIDO = (nivel(pedido) || destacado || NIVELES_PLAN[0] || {}).id || '';
+
+  const cupos = Number(params().get('cupos'));
+  if (cupos > 0) CUPOS_PEDIDOS = Math.min(cupos, CUPO_MAXIMO);
+  $('#cuantosCupos').value = String(CUPOS_PEDIDOS);
+  $('#ahorro60Planes').textContent = `Ahorra ${ahorro60()} %`;
+
+  pintarMisCupos();
+  pintarTablaComparativa();
+  pintarTodo();
+
+  $('#nivelesLista').addEventListener('change', (e) => {
+    if (e.target.name !== 'nivel') return;
+    NIVEL_ELEGIDO = e.target.value;
+    pintarTodo();
+  });
+
+  $('#duracionPlan').addEventListener('change', (e) => {
+    DIAS_PLAN = Number(e.target.value) === 60 ? 60 : 30;
+    pintarTodo();
+  });
+
+  const cuantos = $('#cuantosCupos');
+  cuantos.addEventListener('input', () => {
+    CUPOS_PEDIDOS = Math.max(1, Math.min(Number(String(cuantos.value).replace(/\D+/g, '')) || 1, CUPO_MAXIMO));
+    pintarRegla();
+    pintarPedido();
+  });
+  cuantos.addEventListener('blur', () => { cuantos.value = String(CUPOS_PEDIDOS); });
+
+  $('#btnContratar').addEventListener('click', contratar);
+
+  $('#misCupos').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-ampliar]');
+    if (btn) ampliar(btn.dataset.ampliar);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', montarPlanes);

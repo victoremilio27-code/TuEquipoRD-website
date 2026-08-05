@@ -1284,6 +1284,24 @@ const cambiarEstado = conSesion(async (req, res, ctx, idAnuncio) => {
   return responder(res, 200, { ok: true, estado: c.estado });
 });
 
+/* Eliminar un anuncio propio. Libera su cupo, que vuelve a estar
+   disponible sin pagar de nuevo. */
+const eliminarAnuncio = conSesion((req, res, ctx, idAnuncio) => {
+  const rutas = db.borrarAnuncio(idAnuncio, ctx.organizacion.id);
+  if (rutas === null) return fallo(res, 404, 'Ese anuncio no es suyo o no existe');
+
+  /* Los archivos se borran DESPUÉS de que la fila se haya ido. Si se
+     hiciera antes y la transacción fallara, el anuncio se quedaría
+     publicado apuntando a fotos que ya no están. `borrar` no lanza si
+     el archivo falta. */
+  rutas.forEach((r) => { try { fotos.borrar(r); } catch (_) { /* ya no estaba */ } });
+
+  return responder(res, 200, {
+    ok: true,
+    membresias: db.suscripcionesDe(ctx.organizacion.id),
+  });
+});
+
 /* Motor y transmisión de un anuncio ya publicado.
 
    Existe porque el asistente los preguntaba y no los mandaba: hay
@@ -1428,6 +1446,7 @@ const RUTAS = [
   ['PATCH', /^\/api\/anuncios\/([\w-]+)\/plan$/, cambiarPlanDeAnuncio],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)\/tren-motriz$/, editarTrenMotriz],
   ['PATCH', /^\/api\/anuncios\/([\w-]+)$/, cambiarEstado],
+  ['DELETE', /^\/api\/anuncios\/([\w-]+)$/, eliminarAnuncio],
 
   // Capacidad: se compra antes de publicar y se amplía prorrateada.
   ['GET',  /^\/api\/membresias$/,                    misPlanes],

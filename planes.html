@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es-DO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planes y precios · TuEquipoRD</title>
+<meta name="description" content="Planes para publicar maquinaria en TuEquipoRD. Se contratan cupos, no anuncios: un cupo libre se reutiliza sin volver a pagar. Estándar, Destacado y Premium.">
+<meta name="theme-color" content="#071A2B">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="cab">
+  <div class="cab__barra">
+    <div class="envoltura cab__inner">
+      <a class="cab__logo" href="index.html" aria-label="TuEquipoRD, inicio">
+        <img src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      </a>
+      <button class="cab__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="cab__nav" id="navMenu" aria-label="Principal">
+        <a href="equipos.html">Equipos</a>
+        <a href="categorias.html">Categorías</a>
+        <a href="alquiler.html">Alquiler</a>
+        <a href="transporte.html">Transporte</a>
+        <a href="importar.html">Importación</a>
+        <a href="financiamiento.html">Financiamiento</a>
+        <a href="planes.html">Planes</a>
+        <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+<div class="envoltura">
+
+  <header class="pagina">
+    <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> &rsaquo; <span>Planes</span></nav>
+    <h1 class="pagina__titulo"><em>Planes</em> para publicar</h1>
+    <p class="pagina__sub">No se paga por anuncio: se contratan <b>cupos</b>. Un cupo es el sitio que ocupa un equipo publicado, y es suyo mientras dure el plan: cuando venda una máquina, ese cupo queda libre y publica otra sin volver a pagar.</p>
+  </header>
+
+  <!-- Estado de la cuenta. Lo pinta planes.js: a quien ya tiene cupos
+       se le dice cuántos le quedan antes de ofrecerle comprar más, que
+       es lo que evita la sensación de estar pagando dos veces. -->
+  <section class="panel" id="estadoCuenta" hidden aria-labelledby="t-estado">
+    <h2 class="panel__titulo panel__titulo--limpio" id="t-estado"><em>Lo que</em> ya tiene</h2>
+    <ul class="membresias" id="misCupos"></ul>
+    <p class="acceso__aviso" id="avisoPlanes" role="alert" hidden></p>
+  </section>
+
+  <!-- Elección del nivel -->
+  <section class="panel" aria-labelledby="t-niveles">
+    <div class="panel__cabeza">
+      <h2 class="panel__titulo panel__titulo--limpio" id="t-niveles"><em>Elija</em> su nivel</h2>
+      <fieldset class="duracion" id="duracionPlan">
+        <legend class="visualmente-oculto">Durante cuánto tiempo</legend>
+        <label class="duracion__op"><input type="radio" name="duracion" value="30" checked><span>30 días</span></label>
+        <label class="duracion__op"><input type="radio" name="duracion" value="60"><span>60 días <b id="ahorro60Planes"></b></span></label>
+      </fieldset>
+    </div>
+
+    <ul class="planes-op planes-op--pagina" id="nivelesLista"></ul>
+
+    <p class="invitacion-dealer" id="notaPremium" hidden>
+      <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
+      <span>
+        <b>La página pública de empresa entra con Premium.</b>
+        Se activa cuando el equipo aprueba su RNC: pagar no salta esa revisión.
+        <a href="panel.html">Registre el RNC</a> desde su panel.
+      </span>
+    </p>
+  </section>
+
+  <!-- Cantidad y cobro -->
+  <section class="panel" aria-labelledby="t-cuantos">
+    <h2 class="panel__titulo panel__titulo--limpio" id="t-cuantos"><em>¿Cuántos</em> equipos quiere publicar?</h2>
+
+    <div class="compra-cupos compra-cupos--pagina">
+      <label class="campo-v">
+        <span>Cupos</span>
+        <input type="number" id="cuantosCupos" min="1" max="100" step="1" value="1" inputmode="numeric">
+        <small class="campo-v__ayuda">Puede añadir más después y solo paga los días que le queden.</small>
+      </label>
+
+      <div class="pedido pedido--destacado" id="resumenPlan"></div>
+    </div>
+
+    <p class="realce realce--regla" id="reglaCupos"></p>
+
+    <div class="acciones acciones--pie">
+      <button class="btn btn--ambar btn--grande" type="button" id="btnContratar">Contratar</button>
+      <a class="btn btn--linea btn--grande" href="publicar.html" id="btnVolverPublicar" hidden>Volver a mi anuncio</a>
+    </div>
+  </section>
+
+  <!-- Qué incluye cada nivel, en una tabla comparable -->
+  <section class="panel" aria-labelledby="t-comparar">
+    <h2 class="panel__titulo panel__titulo--limpio" id="t-comparar"><em>Qué</em> incluye cada nivel</h2>
+    <div class="tabla-envoltura">
+      <table class="tabla-planes" id="tablaPlanes"></table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-dudas">
+    <h2 class="panel__titulo panel__titulo--limpio" id="t-dudas"><em>Cómo</em> funcionan los cupos</h2>
+    <dl class="faq">
+      <div>
+        <dt>¿Qué pasa cuando vendo un equipo?</dt>
+        <dd>Lo marca como vendido en su panel y su cupo queda libre. Publica otra máquina en ese sitio sin volver a pagar.</dd>
+      </div>
+      <div>
+        <dt>¿Puedo cambiar un equipo de nivel?</dt>
+        <dd>Sí, desde su panel, sin volver a publicarlo. Si el nivel de destino tiene un cupo libre, el cambio es inmediato.</dd>
+      </div>
+      <div>
+        <dt>¿Y si necesito un cupo más a mitad de mes?</dt>
+        <dd>Lo añade desde su panel y solo paga los días que le queden hasta su renovación, no un ciclo entero.</dd>
+      </div>
+      <div>
+        <dt>¿Qué pasa al terminar el plazo?</dt>
+        <dd>Los anuncios se pausan, no se borran. Vuelven a estar activos en cuanto renueve, con sus fotos y sus estadísticas.</dd>
+      </div>
+    </dl>
+  </section>
+
+</div>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie__inner">
+    <div class="pie__col">
+      <img class="pie__logo" src="brand_assets/tuequipord-horizontal-oscuro.png" alt="TuEquipoRD">
+      <p class="pie__legal">© 2026 TuEquipoRD. Todos los derechos reservados.</p>
+      <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
+      <ul class="pie__lista">
+        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
+        <li><a href="contacto.html">Contacto</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Otros servicios</h3>
+      <ul class="pie__lista">
+        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
+        <li><a href="importar.html">Importación de maquinaria</a></li>
+        <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
+        <li><a href="categorias.html">Todas las categorías</a></li>
+      </ul>
+      <h3 class="pie__titulo">Síganos</h3>
+      <ul class="pie__lista">
+        <li><a href="https://instagram.com" rel="noopener">Instagram</a></li>
+        <li><a href="https://facebook.com" rel="noopener">Facebook</a></li>
+        <li><a href="mailto:hola@tuequipord.com">hola@tuequipord.com</a></li>
+      </ul>
+    </div>
+    <div class="pie__col">
+      <h3 class="pie__titulo">Enlaces</h3>
+      <ul class="pie__lista pie__lista--marcada">
+        <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
+        <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
+        <li><a href="planes.html"><b>Planes y precios:</b> cupos, niveles y beneficios</a></li>
+        <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
+      </ul>
+      <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/sesion.js"></script>
+<script src="assets/taxonomia.js"></script>
+<script src="assets/precios.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/planes.js"></script>
+</body>
+</html>

@@ -150,7 +150,7 @@ function pintarPlan() {
     caja.innerHTML = `
       <h2 class="panel__titulo" id="t-plan"><em>Sin</em> cupos contratados</h2>
       <p class="panel__texto">Un cupo es el sitio que ocupa un equipo publicado. Elija el nivel y cuántos equipos quiere publicar; después reparte los cupos entre sus máquinas y los reutiliza cuando venda alguna.</p>
-      <a class="btn btn--ambar" href="publicar.html">Publicar un equipo</a>`;
+      <a class="btn btn--ambar" href="planes.html">Ver los planes</a>`;
     return;
   }
 
@@ -188,7 +188,7 @@ function pintarPlan() {
       : ''}
 
     <div class="acciones acciones--pie">
-      <a class="btn btn--linea" href="publicar.html?comprar=1">Contratar más capacidad</a>
+      <a class="btn btn--linea" href="planes.html">Ver planes y contratar</a>
     </div>`;
 }
 
@@ -319,6 +319,8 @@ function filaAnuncio(a) {
              ${a.motor_marca ? 'Motor' : 'Falta el motor'}
            </button>`
         : ''}
+      <button type="button" class="btn-tabla btn-tabla--borrar" data-borrar="${esc(a.id)}"
+        aria-label="Eliminar ${esc(`${a.anio} ${a.marca} ${a.modelo}`)}">Eliminar</button>
     </td>
   </tr>`;
 }
@@ -802,6 +804,47 @@ async function montarPanel() {
     if (!btn) return;
     TREN_ABIERTO = TREN_ABIERTO === btn.dataset.tren ? null : btn.dataset.tren;
     pintarTabla();
+  });
+
+  /* Eliminar un anuncio.
+
+     Se avisa de las dos cosas que importan y que no se pueden
+     deshacer: se van las fotos y se van las estadísticas. Quien solo
+     quiere dejar de venderlo tiene «Marcar vendido», que conserva
+     ambas, y se lo decimos aquí mismo para que no elija mal. */
+  $('#filasAnuncios').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-borrar]');
+    if (!btn) return;
+
+    const id = btn.dataset.borrar;
+    const a = ANUNCIOS.find((x) => x.id === id);
+    const nombre = a ? `${a.anio} ${a.marca_nombre || a.marca} ${a.modelo}` : 'este anuncio';
+
+    if (!confirm(
+      `¿Eliminar ${nombre}?\n\n`
+      + 'Se borran el anuncio, sus fotografías y sus estadísticas, y no se puede deshacer. '
+      + 'Su cupo queda libre para publicar otro equipo.\n\n'
+      + 'Si solo quiere dejar de venderlo, use «Marcar vendido»: conserva las visitas y los contactos.')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Eliminando…';
+    try {
+      const r = await api(`/anuncios/${encodeURIComponent(id)}`, { metodo: 'DELETE' });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+
+      ANUNCIOS = ANUNCIOS.filter((x) => x.id !== id);
+      if (TREN_ABIERTO === id) TREN_ABIERTO = null;
+      MEMBRESIAS = r.membresias || MEMBRESIAS;
+
+      pintarFiltros();
+      pintarPlan();
+      pintarTabla();
+      avisoPlan(`${nombre} se eliminó. Su cupo vuelve a estar libre.`, false);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Eliminar';
+      avisoPlan(`No se pudo eliminar: ${e.message}`);
+    }
   });
 
   /* Los modelos dependen de la marca, igual que al publicar: una lista

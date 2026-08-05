@@ -1,10 +1,18 @@
 /* ═══════════════════════════════════════════════════════════
    TuEquipoRD · Asistente de publicación
-   Flujo directo: el anunciante completa la ficha, elige plan y,
-   si el plan es de pago, liquida antes de que el anuncio quede
-   activo. No hay solicitud previa ni revisión manual: la
-   publicación es del anunciante y se activa al confirmarse el
-   cobro.
+
+   Cinco pasos y ninguno cobra. La capacidad se contrata en
+   planes.html, que es el único sitio del portal donde entra dinero;
+   aquí el anuncio solo ocupa un cupo de lo que ya se pagó.
+
+   Antes había dos pasos más —elegir plan y pagar— dentro de este
+   mismo asistente. Quien ya tenía cupos contratados los veía igual,
+   con su formulario de tarjeta, y parecía que se le cobraba dos veces
+   por lo mismo. No hacía falta redactar mejor esa pantalla: hacía
+   falta que no estuviera.
+
+   No hay solicitud previa ni revisión manual: la publicación es del
+   anunciante y se activa al confirmar.
 
    Depende de data.js y app.js (cargados antes): usa esc, pesos,
    miles, icono, $ y $$. El cálculo del importe, de precios.js.
@@ -20,8 +28,7 @@ const PASOS = [
   { id: 'fotos',    nombre: 'Fotografías', detalle: 'Fotos y video' },
   { id: 'precio',   nombre: 'Precio',      detalle: 'Monto' },
   { id: 'contacto', nombre: 'Contacto',    detalle: 'Teléfonos' },
-  { id: 'plan',     nombre: 'Plan',        detalle: 'Nivel y cupo' },
-  { id: 'pago',     nombre: 'Pago',        detalle: 'Confirmación' },
+  { id: 'confirmar', nombre: 'Publicar',   detalle: 'Revisión' },
 ];
 
 const FOTOS_MINIMAS = 3;
@@ -65,11 +72,11 @@ function estadoInicial() {
       telefonos: [{ numero: '', tipo: 'ambos', nota: '' }],
       horario: '', web: '', preferencia: 'whatsapp',
     },
-    /* Qué sostiene este anuncio. `membresia` es el cupo ya comprado
-       que va a ocupar; `id`, `cupos` y `dias` son lo que se contrata
-       si no le queda ninguno libre. */
-    plan: { id: '', membresia: '', cupos: 1, dias: 30 },
-    pago: { forma: 'tarjeta', guardar: true, autorenovar: false },
+    /* Ni plan ni pago viven ya en el borrador. El anuncio ocupa el
+       cupo libre de mayor nivel que tenga la cuenta en el momento de
+       publicar, y eso se consulta al servidor: guardarlo aquí solo
+       serviría para que un borrador de hace tres días apuntara a una
+       membresía que ya venció. */
   };
 }
 
@@ -102,8 +109,6 @@ function leerBorrador() {
       equipo: { ...base.equipo, ...(datos.equipo || {}) },
       precio: { ...base.precio, ...(datos.precio || {}) },
       contacto: { ...base.contacto, ...(datos.contacto || {}) },
-      plan: { ...base.plan, ...(datos.plan || {}) },
-      pago: { ...base.pago, ...(datos.pago || {}) },
       fotos: Array.isArray(datos.fotos) ? datos.fotos : [],
     };
   } catch (_) {
@@ -761,446 +766,193 @@ function validarContacto(seccion) {
   return ok;
 }
 
-/* ── Paso 5 · Dónde se publica ───────────────────────────────
-   No se paga por anuncio: se compra capacidad. Un cupo es el sitio
-   que ocupa un equipo publicado, y es de la cuenta, no del anuncio.
+/* ── Paso 5 · Confirmación ───────────────────────────────────
+   AQUÍ NO SE COBRA NADA. La capacidad se contrata en planes.html, que
+   es el único sitio donde entra dinero. Publicar solo ocupa un cupo de
+   lo que ya se pagó.
 
-   De ahí los dos caminos de este paso:
-     · Le queda un cupo libre  → lo usa, y publicar no cuesta nada.
-     · No le queda ninguno     → contrata nivel, cantidad y duración.
+   Antes había dos pasos más —elegir plan y pagar— dentro del propio
+   asistente. Quien ya tenía cupos contratados los veía igual, con su
+   formulario de tarjeta, y parecía que se le cobraba dos veces por lo
+   mismo. Ese era el problema, y quitarlos es la solución: no hay una
+   pantalla de pago mejor redactada, hay una pantalla de pago que
+   sobra.
 
-   Antes el plan se pegaba al anuncio al publicarlo y ahí se quedaba
-   para siempre, así que quien compraba cinco Destacados no podía
-   llevarse a ellos un equipo ya publicado en Estándar: el cupo estaba
-   pagado, libre, y fuera de su alcance. */
+   El nivel tampoco se pregunta. Se usa el más alto con sitio libre,
+   que es el que más hace por el anuncio, y se dice cuál en la
+   confirmación. Cambiarlo después es un desplegable en el panel, sin
+   volver a publicar. */
 
-/* Lo que la cuenta tiene comprado, y el catálogo de niveles. Los dos
-   vienen del servidor: el precio no puede vivir solo aquí. */
 let MEMBRESIAS = [];
-let NIVELES = [];
-let MODO = 'comprar';           // 'usar' | 'comprar'
+let EXENTA = false;
 
 const conHueco = () => MEMBRESIAS.filter((m) => m.libres === null || m.libres > 0);
 
-const nivelElegido = () => NIVELES.find((p) => p.id === estado.plan.id) || null;
+/* Dónde va a caer este anuncio: el nivel más alto con sitio. La lista
+   llega ordenada por nivel descendente desde el servidor. */
+const membresiaElegida = () => conHueco()[0] || null;
 
-const membresiaElegida = () =>
-  MEMBRESIAS.find((m) => m.id === estado.plan.membresia) || null;
-
-/* Cuántas fotos admite lo que se va a usar. El servidor recorta a este
-   mismo tope al guardar; aquí es para avisar antes, no después. */
+/* Cuántas fotos admite. Sin cupo se permite el máximo: el anunciante
+   sube primero y resuelve la capacidad al final, no al revés. */
 function limiteFotos() {
-  if (MODO === 'usar') {
-    const m = membresiaElegida();
-    return m ? m.fotos_maximas : FOTOS_MAXIMAS;
-  }
-  const p = nivelElegido();
-  return p ? p.fotos_maximas : FOTOS_MAXIMAS;
+  const m = membresiaElegida();
+  return m ? m.fotos_maximas : FOTOS_MAXIMAS;
 }
 
-/* Lo que se va a cobrar. Null cuando se usa un cupo ya pagado: ahí no
-   hay pedido ninguno, que es justo la diferencia con el modelo viejo. */
-function pedido() {
-  if (MODO === 'usar' || cuentaExenta()) return null;
-
-  const nivel = nivelElegido();
-  if (!nivel) return null;
-
-  const cupo = Math.max(1, Math.min(estado.plan.cupos || 1, CUPO_MAXIMO));
-  return {
-    nivel,
-    cupo,
-    dias: estado.plan.dias,
-    ...precioCompra({
-      precioUnitario: nivel.precio_vigente != null ? nivel.precio_vigente : nivel.precio,
-      cupo,
-      dias: estado.plan.dias,
-    }),
-  };
+async function cargarMembresias() {
+  if (!haySesion()) { MEMBRESIAS = []; return; }
+  const r = await api('/membresias', { silencioso: true });
+  MEMBRESIAS = (r && r.membresias) || [];
+  EXENTA = !!(r && r.exenta);
 }
 
-/* ── Usar un cupo ya comprado ────────────────────────────── */
+/* Lo que se le ofrece a quien se quedó sin sitio. Nunca «vuelva a
+   empezar»: o amplía la membresía que ya tiene —prorrateada, solo los
+   días que le queden— o contrata otro nivel, y en los dos casos vuelve
+   aquí con el borrador intacto. */
+function pintarSinCupo() {
+  const caja = $('#bloqueSinCupo');
+  const hay = !!membresiaElegida();
 
-function tarjetaCupoHTML(m) {
-  const elegida = m.id === estado.plan.membresia;
-  const dias = m.fin ? Math.max(0, Math.ceil((new Date(m.fin) - new Date()) / 86400000)) : null;
+  caja.hidden = hay;
+  if (hay) return;
 
-  const libres = m.libres === null
-    ? 'Sin límite de equipos'
-    : `${m.libres} ${m.libres === 1 ? 'cupo libre' : 'cupos libres'} de ${m.anuncios_incluidos}`;
+  const volver = encodeURIComponent('publicar.html');
+  const tiene = MEMBRESIAS.filter((m) => m.anuncios_incluidos != null);
 
-  return `<li>
-    <label class="cupo-op${elegida ? ' cupo-op--elegido' : ''}">
-      <input type="radio" name="cupo" value="${esc(m.id)}"${elegida ? ' checked' : ''}>
-      <span class="cupo-op__nivel">${esc(m.plan_nombre)}</span>
-      <span class="cupo-op__libres num">${esc(libres)}</span>
-      <span class="cupo-op__vigencia">${dias === null
-        ? 'Sin caducidad'
-        : `El anuncio se publica ${dias} ${dias === 1 ? 'día' : 'días'}, hasta el ${fechaCorta(new Date(m.fin))}`}</span>
-      <span class="cupo-op__fotos">Hasta ${m.fotos_maximas} fotografías${m.destacado ? ' · sale destacado' : ''}</span>
-    </label>
-  </li>`;
+  $('#textoSinCupo').textContent = tiene.length
+    ? 'Sus cupos están ocupados. Añada uno a la membresía que ya tiene —solo paga los días que le queden— o libere uno marcando un equipo como vendido.'
+    : 'Todavía no tiene cupos. Contrate uno para publicar este equipo; su borrador queda guardado.';
+
+  const ampliables = tiene.map((m) => {
+    const p = precioAmpliacion({
+      precioUnitario: m.precio_unitario,
+      cupoActual: m.anuncios_incluidos,
+      cupoNuevo: m.anuncios_incluidos + 1,
+      dias: m.dias_ciclo || 30,
+      diasRestantes: diasRestantes(m.fin) ?? (m.dias_ciclo || 30),
+    });
+    return `<button type="button" class="btn btn--ambar" data-ampliar="${esc(m.id)}">
+      Añadir un cupo a ${esc(m.plan_nombre)}${EXENTA || p.total === 0 ? '' : ` · ${pesos(p.total)}`}
+    </button>`;
+  }).join('');
+
+  $('#accionesSinCupo').innerHTML = ampliables
+    + `<a class="btn ${tiene.length ? 'btn--linea' : 'btn--ambar'}" href="planes.html?destino=${volver}">
+         ${tiene.length ? 'Ver todos los planes' : 'Ver los planes'}
+       </a>`;
 }
 
-/* ── Contratar capacidad ─────────────────────────────────── */
+function pintarResumenPublicacion() {
+  const caja = $('#resumenPublicacion');
+  if (!caja) return;
 
-function tarjetaNivelHTML(nivel) {
-  const elegido = nivel.id === estado.plan.id;
-  const unitario = nivel.precio_vigente != null ? nivel.precio_vigente : nivel.precio;
-  const porCupo = Math.round(unitario * duracion(estado.plan.dias).factor);
+  const m = membresiaElegida();
+  const e = estado.equipo;
+  const titulo = [e.anio, nombreMarca(e.marca) || e.marca, e.modelo].filter(Boolean).join(' ') || 'Su equipo';
 
-  const rasgos = [
-    `Hasta ${nivel.fotos_maximas} fotografías`,
-    nivel.destacado ? 'Distintivo Destacado y posición preferente' : 'Ficha técnica completa',
-    nivel.destacado ? 'Aparece en la portada' : 'Contacto por teléfono y WhatsApp',
-    nivel.perfil_publico ? 'Página pública de su empresa' : null,
-  ].filter(Boolean);
-
-  return `<li>
-    <label class="plan-op${elegido ? ' plan-op--elegido' : ''}${nivel.destacado && !nivel.perfil_publico ? ' plan-op--sugerido' : ''}">
-      <input type="radio" name="plan" value="${esc(nivel.id)}"${elegido ? ' checked' : ''}>
-      <span class="plan-op__cabeza">
-        ${nivel.perfil_publico
-          ? '<span class="plan-op__cinta plan-op__cinta--membresia">Con página propia</span>'
-          : nivel.destacado
-            ? '<span class="plan-op__cinta">Más contratado</span>'
-            : '<span class="plan-op__hueco" aria-hidden="true"></span>'}
-        <span class="plan-op__nombre">${esc(nivel.nombre)}</span>
-      </span>
-      <span class="plan-op__precio num">${cuentaExenta() ? 'Sin costo' : pesos(porCupo)}</span>
-      <span class="plan-op__periodo">por equipo · ${estado.plan.dias} días</span>
-      <ul class="plan-op__incluye">
-        ${rasgos.map((i) => `<li>${icono('i-check')} ${esc(i)}</li>`).join('')}
-      </ul>
-    </label>
-  </li>`;
-}
-
-/* La regla del uno gratis por cada cinco, dicha sobre la cantidad que
-   el anunciante acaba de teclear. Contarle cuánto le falta para el
-   siguiente gratis es lo que hace la regla útil y no un adorno. */
-function textoRegla() {
-  const ped = pedido();
-  if (!ped) return '';
-
-  const faltan = CUPOS_POR_UNO_GRATIS - (ped.cupo % CUPOS_POR_UNO_GRATIS);
-  const gratis = cuposGratis(ped.cupo);
-
-  if (gratis > 0) {
-    return `${icono('i-check')} <span>${gratis === 1 ? 'Se le regala' : 'Se le regalan'} `
-      + `<b>${gratis} ${gratis === 1 ? 'cupo' : 'cupos'}</b>: paga ${ped.cobrados} de ${ped.cupo}.`
-      + `${faltan < CUPOS_POR_UNO_GRATIS ? ` Con ${faltan} ${faltan === 1 ? 'más' : 'más'}, otro gratis.` : ''}</span>`;
-  }
-  return `${icono('i-etiqueta')} <span>Uno gratis por cada ${CUPOS_POR_UNO_GRATIS}. `
-    + `Le ${faltan === 1 ? 'falta' : 'faltan'} <b>${faltan}</b> para que el siguiente no se cobre.</span>`;
-}
-
-function pintarPlanes() {
-  const hueco = conHueco();
-
-  $('#bloqueUsarCupo').hidden = MODO !== 'usar';
-  $('#bloqueComprar').hidden = MODO === 'usar';
-  $('#btnUsarLoQueTengo').hidden = !hueco.length;
-  $('#btnQuieroComprar').hidden = cuentaExenta();
-
-  if (MODO === 'usar') {
-    $('#cuposDisponibles').innerHTML = hueco.map(tarjetaCupoHTML).join('');
-  } else {
-    const cont = $('#planesSeleccion');
-    if (cont) cont.innerHTML = NIVELES.map(tarjetaNivelHTML).join('');
-
-    /* El campo de cantidad se resincroniza con el estado, salvo
-       mientras se teclea en él. Sin esto, un borrador recuperado con
-       cinco cupos enseñaba "1" en la casilla y "5 equipos" en el
-       resumen: dos cifras distintas para lo mismo, en la pantalla
-       donde se decide cuánto pagar. */
-    const cuantos = $('#cuantosCupos');
-    if (cuantos && document.activeElement !== cuantos) {
-      cuantos.value = String(estado.plan.cupos || 1);
-    }
-    $('#reglaCupos').innerHTML = cuentaExenta() ? '' : textoRegla();
-    $('#reglaCupos').hidden = cuentaExenta();
-    $('#notaCantidad').textContent = cuentaExenta()
-      ? 'Su cuenta publica sin costo.'
-      : 'Puede añadir más cupos después y solo paga los días que le queden.';
-    $('#invitacionDealer').hidden = esDealer() || cuentaExenta();
+  if (!m) {
+    caja.innerHTML = `
+      <h3 class="pedido__titulo">Falta un cupo</h3>
+      <p class="pedido__vacio">${icono('i-etiqueta')} ${esc(titulo)} está listo para publicarse. Solo falta el sitio donde ponerlo.</p>`;
+    $('#btnPublicar').disabled = true;
+    $('#btnPublicar').textContent = 'Publicar anuncio';
+    return;
   }
 
-  pintarResumenPedido();
+  const dias = m.fin ? diasRestantes(m.fin) : null;
+  $('#btnPublicar').disabled = false;
+  $('#btnPublicar').textContent = 'Publicar anuncio';
+
+  caja.innerHTML = `
+    <h3 class="pedido__titulo">Se publica ahora</h3>
+    <dl class="pedido__lista">
+      <div><dt>Equipo</dt><dd>${esc(titulo)}</dd></div>
+      <div><dt>Nivel</dt><dd>${esc(m.plan_nombre)}${m.destacado ? ' · sale destacado' : ''}</dd></div>
+      <div><dt>Fotografías</dt><dd class="num">${estado.fotos.length} de ${m.fotos_maximas}</dd></div>
+      <div><dt>Vigencia</dt><dd>${dias === null ? 'Sin caducidad' : `${dias} ${dias === 1 ? 'día' : 'días'}`}</dd></div>
+      <div class="pedido__total"><dt>Costo</dt><dd class="num">${EXENTA
+    ? 'Sin costo' : 'Ninguno · usa un cupo que ya pagó'}</dd></div>
+    </dl>
+    <p class="pedido__nota">Puede cambiarlo de nivel cuando quiera desde <a href="panel.html">su panel</a>, sin volver a publicarlo.</p>`;
+}
+
+function pintarPasoFinal() {
+  pintarSinCupo();
+  pintarResumenPublicacion();
   pintarFotos();
 }
 
-async function montarPasoPlan() {
-  const catalogo = await api('/planes', { silencioso: true });
-  NIVELES = (catalogo && catalogo.planes) || [];
+async function montarPasoConfirmar() {
+  await cargarMembresias();
 
-  /* Las membresías solo se piden con sesión abierta. A un visitante
-     anónimo la respuesta sería 401 garantizado: gastar la petición
-     para descartarla ensucia la consola de todo el que entra a mirar
-     y no aporta nada. */
-  const mios = haySesion() ? await api('/membresias', { silencioso: true }) : null;
-  MEMBRESIAS = (mios && mios.membresias) || [];
+  /* Quien llega sin ninguna capacidad contratada se va derecho a los
+     planes, sin recorrer cinco pasos para chocar al final. Solo si no
+     tiene NADA: a quien le sobra un cupo no se le enseña un precio. */
+  if (haySesion() && !MEMBRESIAS.length && params().get('sincupos') !== '1') {
+    guardarBorrador();
+    location.href = `planes.html?destino=${encodeURIComponent('publicar.html')}`;
+    return;
+  }
 
-  // Una cuenta interna no compra nada: publica y ya.
-  if (cuentaExenta()) {
-    MODO = 'usar';
-    if (!MEMBRESIAS.length) {
-      // Todavía no tiene la membresía interna: se le crea al publicar.
-      $('#bloqueUsarCupo').hidden = false;
-      $('#cuposDisponibles').innerHTML =
-        '<li><p class="panel__texto">Su cuenta publica sin costo y sin límite de equipos.</p></li>';
-      $('#btnQuieroComprar').hidden = true;
-      pintarResumenPedido();
-      return;
+  $('#accionesSinCupo').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-ampliar]');
+    if (!btn) return;
+
+    const m = MEMBRESIAS.find((x) => x.id === btn.dataset.ampliar);
+    if (!m) return;
+
+    const p = precioAmpliacion({
+      precioUnitario: m.precio_unitario,
+      cupoActual: m.anuncios_incluidos,
+      cupoNuevo: m.anuncios_incluidos + 1,
+      dias: m.dias_ciclo || 30,
+      diasRestantes: diasRestantes(m.fin) ?? (m.dias_ciclo || 30),
+    });
+
+    const texto = EXENTA || p.total === 0
+      ? `Añadir un cupo a ${m.plan_nombre} sin costo. ¿Confirma?`
+      : `Añadir un cupo a ${m.plan_nombre} cuesta ${pesos(p.total)} por los días que le quedan.\n\n¿Confirma?`;
+    if (!confirm(texto)) return;
+
+    btn.disabled = true;
+    try {
+      const r = await api(`/membresias/${encodeURIComponent(m.id)}/ampliar`, {
+        metodo: 'POST', cuerpo: { cupo: m.anuncios_incluidos + 1 },
+      });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      await cargarMembresias();
+      pintarPasoFinal();
+    } catch (e) {
+      btn.disabled = false;
+      avisoPaso($('.paso[data-paso="confirmar"]'), e.message);
     }
-  } else {
-    // Quien llega desde "contratar más capacidad" quiere comprar.
-    const quiereComprar = params().get('comprar') === '1';
-    MODO = !quiereComprar && conHueco().length ? 'usar' : 'comprar';
-  }
-
-  if (!estado.plan.membresia) {
-    const primera = conHueco()[0];
-    estado.plan.membresia = primera ? primera.id : '';
-  }
-  if (!estado.plan.id) {
-    // Por defecto, el nivel intermedio: es el que contrata casi todo
-    // el mundo y el que deja ver de qué va el sitio.
-    const destacado = NIVELES.find((p) => p.destacado && !p.perfil_publico);
-    estado.plan.id = (destacado || NIVELES[0] || {}).id || '';
-  }
-
-  $('#ahorro60Plan').textContent = `Ahorra ${ahorro60()} %`;
-
-  $('#cuposDisponibles').addEventListener('change', (e) => {
-    if (e.target.name !== 'cupo') return;
-    estado.plan.membresia = e.target.value;
-    pintarPlanes();
-    guardarBorrador();
   });
 
-  $('#planesSeleccion').addEventListener('change', (e) => {
-    if (e.target.name !== 'plan') return;
-    estado.plan.id = e.target.value;
-    pintarPlanes();
-    guardarBorrador();
+  $('#aceptaCondiciones').addEventListener('change', (e) => {
+    if (e.target.checked) avisoPaso($('.paso[data-paso="confirmar"]'), '');
   });
-
-  const cuantos = $('#cuantosCupos');
-  cuantos.value = String(estado.plan.cupos || 1);
-  cuantos.addEventListener('input', () => {
-    const n = Math.max(1, Math.min(Number(soloDigitos(cuantos.value)) || 1, CUPO_MAXIMO));
-    estado.plan.cupos = n;
-    pintarPlanes();
-    guardarBorrador();
-  });
-  cuantos.addEventListener('blur', () => { cuantos.value = String(estado.plan.cupos || 1); });
-
-  $('#duracionPublicacion').addEventListener('change', (e) => {
-    estado.plan.dias = Number(e.target.value) === 60 ? 60 : 30;
-    pintarPlanes();
-    guardarBorrador();
-  });
-
-  $('#btnQuieroComprar').addEventListener('click', () => { MODO = 'comprar'; pintarPlanes(); });
-  $('#btnUsarLoQueTengo').addEventListener('click', () => { MODO = 'usar'; pintarPlanes(); });
-
-  pintarPlanes();
 }
 
-function validarPlan(seccion) {
-  if (MODO === 'usar') {
-    if (!estado.plan.membresia && !cuentaExenta()) {
-      avisoPaso(seccion, 'Elija en cuál de sus membresías quiere publicar este equipo.');
-      return false;
-    }
-  } else if (!estado.plan.id) {
-    avisoPaso(seccion, 'Elija el nivel con el que quiere publicar.');
+function validarConfirmar(seccion) {
+  if (!membresiaElegida()) {
+    avisoPaso(seccion, 'Necesita un cupo libre para publicar este equipo.');
+    return false;
+  }
+  if (!$('#aceptaCondiciones').checked) {
+    avisoPaso(seccion, 'Debe aceptar las condiciones de publicación.');
     return false;
   }
   avisoPaso(seccion, '');
   return true;
 }
 
-/* ── Paso 6 · Pago ──────────────────────────────────────── */
+/* ── Publicación ────────────────────────────────────────── */
 
-/* Marca de la tarjeta por prefijo. Solo sirve para rotularla en
-   pantalla: la validación real la hace el procesador. */
-function marcaTarjeta(numero) {
-  const d = soloDigitos(numero);
-  if (/^4/.test(d)) return 'Visa';
-  if (/^5[1-5]/.test(d) || /^2[2-7]/.test(d)) return 'Mastercard';
-  if (/^3[47]/.test(d)) return 'American Express';
-  return '';
-}
-
-const esAmex = (numero) => /^3[47]/.test(soloDigitos(numero));
-
-function formatearTarjeta(valor) {
-  const d = soloDigitos(valor).slice(0, esAmex(valor) ? 15 : 16);
-  const grupos = esAmex(valor) ? [4, 6, 5] : [4, 4, 4, 4];
-  const salida = [];
-  let i = 0;
-  grupos.forEach((g) => {
-    if (i < d.length) { salida.push(d.slice(i, i + g)); i += g; }
-  });
-  return salida.join(' ');
-}
-
-/* Algoritmo de Luhn: descarta números mal tecleados antes de gastar
-   una llamada al procesador. No dice si la tarjeta tiene fondos. */
-function luhn(numero) {
-  const d = soloDigitos(numero);
-  if (d.length < 13) return false;
-  let suma = 0;
-  let doble = false;
-  for (let i = d.length - 1; i >= 0; i--) {
-    let n = Number(d[i]);
-    if (doble) { n *= 2; if (n > 9) n -= 9; }
-    suma += n;
-    doble = !doble;
-  }
-  return suma % 10 === 0;
-}
-
-function vencimientoValido(valor) {
-  const m = /^(\d{2})\s*\/\s*(\d{2})$/.exec(String(valor).trim());
-  if (!m) return false;
-  const mes = Number(m[1]);
-  const anio = 2000 + Number(m[2]);
-  if (mes < 1 || mes > 12) return false;
-  const hoy = new Date();
-  // Vale hasta el último día del mes indicado.
-  return new Date(anio, mes, 1) > hoy;
-}
-
+/* Fecha en palabras, para la confirmación. Vivía en el paso de pago y
+   se fue con él; la usa el resumen del anuncio publicado. */
 const fechaCorta = (d) =>
   d.toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' });
-
-function pintarResumenPago() {
-  const caja = $('#resumenPago');
-  if (!caja) return;
-
-  const ped = pedido();
-  const m = membresiaElegida();
-  const sinCobro = !ped;
-
-  if (sinCobro) {
-    /* Se publica en un cupo ya pagado, o la cuenta es interna. No hay
-       importe que enseñar: un cobro de cero, con su desglose y su
-       ITBIS, hace pensar en una factura que no existe. */
-    const dias = m && m.fin
-      ? Math.max(0, Math.ceil((new Date(m.fin) - new Date()) / 86400000))
-      : null;
-
-    caja.innerHTML = `
-      <h3 class="pedido__titulo">Detalle de la publicación</h3>
-      <dl class="pedido__lista">
-        <div><dt>Nivel</dt><dd>${esc(m ? m.plan_nombre : 'Premium')}</dd></div>
-        <div><dt>Cupo</dt><dd>${m && m.libres !== null
-          ? `Ocupa uno de los ${m.libres} que tiene libres`
-          : 'Sin límite de equipos'}</dd></div>
-        <div><dt>Vigencia</dt><dd>${dias === null
-          ? 'Sin caducidad'
-          : `${dias} ${dias === 1 ? 'día' : 'días'}`}</dd></div>
-        <div class="pedido__total"><dt>Total</dt><dd class="num">Sin costo</dd></div>
-      </dl>`;
-  } else {
-    const vence = new Date();
-    vence.setDate(vence.getDate() + ped.dias);
-
-    caja.innerHTML = `
-      <h3 class="pedido__titulo">Detalle del cobro</h3>
-      <dl class="pedido__lista">
-        <div><dt>Nivel</dt><dd>${esc(ped.nivel.nombre)}</dd></div>
-        <div><dt>Equipos que podrá publicar</dt><dd class="num">${ped.cupo}</dd></div>
-        <div><dt>Vigencia</dt><dd class="num">${ped.dias} días · hasta el ${fechaCorta(vence)}</dd></div>
-        ${ped.gratis
-          ? `<div><dt>Cupos que se cobran</dt><dd class="num">${ped.cobrados} de ${ped.cupo} · ${ped.gratis} ${ped.gratis === 1 ? 'gratis' : 'gratis'}</dd></div>`
-          : ''}
-        <div><dt>Subtotal</dt><dd class="num">${pesos(ped.subtotal)}</dd></div>
-        <div><dt>ITBIS (${Math.round(ITBIS * 100)} %)</dt><dd class="num">${pesos(ped.itbis)}</dd></div>
-        <div class="pedido__total"><dt>Total a pagar</dt><dd class="num">${pesos(ped.total)}</dd></div>
-      </dl>`;
-  }
-
-  $('#bloquePago').hidden = sinCobro;
-  $('#bloqueGratis').hidden = !sinCobro;
-  $('#textoGratis').textContent = cuentaExenta()
-    ? 'Su cuenta publica sin costo. Confirme para activar el anuncio.'
-    : 'Este equipo ocupa un cupo que ya tiene pagado. Confirme para activar el anuncio.';
-
-  $('#btnPublicar').textContent = sinCobro
-    ? 'Publicar anuncio'
-    : `Pagar ${pesos(ped.total)} y publicar`;
-}
-
-function montarPasoPago() {
-  const formas = $('#formaPago');
-  if (!formas) return;
-
-  formas.addEventListener('change', () => {
-    const valor = (formas.querySelector('input:checked') || {}).value || 'tarjeta';
-    estado.pago.forma = valor;
-    $('#bloqueTarjeta').hidden = valor !== 'tarjeta';
-    $('#bloqueTransferencia').hidden = valor !== 'transferencia';
-    guardarBorrador();
-  });
-
-  // Aceptar las condiciones retira el aviso de inmediato: dejarlo en
-  // rojo después de cumplirlo confunde.
-  $('#aceptaCondiciones').addEventListener('change', (e) => {
-    if (e.target.checked) avisoPaso($('.paso[data-paso="pago"]'), '');
-  });
-
-  const numero = $('#t-numero');
-  numero.addEventListener('input', () => {
-    numero.value = formatearTarjeta(numero.value);
-    const marca = marcaTarjeta(numero.value);
-    $('#marcaTarjeta').textContent = marca;
-    $('#t-cvv').maxLength = esAmex(numero.value) ? 4 : 3;
-  });
-
-  const exp = $('#t-exp');
-  exp.addEventListener('input', () => {
-    const d = soloDigitos(exp.value).slice(0, 4);
-    exp.value = d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
-  });
-
-  $('#t-cvv').addEventListener('input', (e) => {
-    e.target.value = soloDigitos(e.target.value).slice(0, esAmex(numero.value) ? 4 : 3);
-  });
-}
-
-function validarPago(seccion) {
-  limpiarErrores(seccion);
-  // Sin pedido no hay nada que cobrar: se publica en un cupo ya pagado.
-  if (!pedido()) return true;
-
-  if (estado.pago.forma === 'transferencia') {
-    return exigir($('#tr-referencia'), soloDigitos($('#tr-referencia').value).length >= 4,
-      'Indique el número de referencia de la transferencia.');
-  }
-
-  let ok = true;
-  ok = exigir($('#t-nombre'), $('#t-nombre').value.trim().length >= 5, 'Indique el nombre tal como aparece impreso en la tarjeta.') && ok;
-  ok = exigir($('#t-numero'), luhn($('#t-numero').value), 'Verifique el número de la tarjeta.') && ok;
-  ok = exigir($('#t-exp'), vencimientoValido($('#t-exp').value), 'Vencimiento en formato MM/AA y posterior a hoy.') && ok;
-  ok = exigir($('#t-cvv'), soloDigitos($('#t-cvv').value).length >= 3, 'Código de seguridad incompleto.') && ok;
-  return ok;
-}
-
-/* El cobro ya no se simula aquí: lo resuelve el servidor dentro de
-   POST /api/anuncios, en la misma transacción que crea el anuncio.
-
-   Cuando se conecte el procesador real (Azul o CardNET), estos campos
-   de tarjeta se sustituyen por el iframe del procesador: devuelve un
-   token, el token viaja al servidor en lugar del número, y el sitio
-   nunca llega a tocar el PAN. La validación de Luhn de más arriba se
-   queda igual porque solo evita gastar una llamada con un número mal
-   tecleado. */
-
-/* ── Publicación ────────────────────────────────────────── */
 
 /* El borrador, con la forma que espera POST /api/anuncios. Ningún
    importe viaja aquí: publicar ya no cobra. Lo único que se manda es
@@ -1209,7 +961,7 @@ function validarPago(seccion) {
 function anuncioParaApi() {
   const e = estado.equipo;
   return {
-    membresia: estado.plan.membresia,
+    membresia: (membresiaElegida() || {}).id || null,
 
     categoria: e.categoria,
     subcategoria: e.subcategoria,
@@ -1261,7 +1013,6 @@ function anuncioParaApi() {
 function pintarConfirmacion(respuesta) {
   const anuncio = respuesta.anuncio;
   const m = respuesta.membresia;
-  const cobro = respuesta.cobro;          // solo si se contrató capacidad
   const equipo = esc(`${anuncio.anio} ${anuncio.marca} ${anuncio.modelo}`);
 
   const libres = m && m.libres;
@@ -1274,13 +1025,11 @@ function pintarConfirmacion(respuesta) {
         : 'No tiene fecha de caducidad.'}
     </p>`;
 
-  const cobrado = !!(cobro && cobro.total > 0);
-  const filasCobro = cobrado
-    ? `<div><dt>Comprobante de pago</dt><dd class="num">${esc(cobro.referencia)}</dd></div>
-       <div><dt>Monto liquidado</dt><dd class="num">${pesos(cobro.total)}</dd></div>`
-    : `<div><dt>Costo</dt><dd>${cuentaExenta()
-      ? 'Sin costo · cuenta interna'
-      : 'Ninguno · ocupó un cupo que ya tenía'}</dd></div>`;
+  // Publicar nunca cobra: el importe se liquidó al contratar la
+  // capacidad, en su propia página y con su propio comprobante.
+  const filasCobro = `<div><dt>Costo</dt><dd>${EXENTA
+    ? 'Sin costo · cuenta interna'
+    : 'Ninguno · ocupó un cupo que ya tenía'}</dd></div>`;
 
   $('#publicar').hidden = true;
   const caja = $('#publicado');
@@ -1299,7 +1048,7 @@ function pintarConfirmacion(respuesta) {
     </dl>
 
     <p class="publicado__nota">
-      Enviamos la confirmación${cobrado ? ' y la factura' : ''} a <b>${esc(estado.contacto.correo)}</b>.
+      Enviamos la confirmación a <b>${esc(estado.contacto.correo)}</b>.
       Desde <a href="panel.html">su panel</a> puede seguir las visitas, cambiar el nivel de
       este equipo o marcarlo como vendido para liberar su cupo.
     </p>
@@ -1312,21 +1061,20 @@ function pintarConfirmacion(respuesta) {
   caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/* Publica de verdad. Son dos operaciones y en este orden:
+/* Publica. Una sola llamada, sin cobro de por medio: el anuncio ocupa
+   un cupo de lo que la organización ya tiene contratado.
 
-     1. Si hace falta capacidad, se contrata  → POST /api/membresias
-     2. El anuncio ocupa un cupo de ella      → POST /api/anuncios
-
-   Separadas a propósito. Si la primera falla no se ha creado nada; si
-   falla la segunda, la capacidad ya está comprada y sigue siendo suya
-   —se le dice y puede reintentar sin pagar otra vez—, que es mucho
-   mejor que perder el cobro o publicar sin haberlo hecho.
+   Antes eran dos operaciones —comprar capacidad y después publicar— y
+   había que explicarle al anunciante qué pasaba si la segunda fallaba
+   con la primera ya cobrada. Ese enredo desapareció al sacar el cobro
+   de aquí: la capacidad se contrata en planes.html, y esto solo
+   publica.
 
    Sin sesión se guarda el borrador y se manda a crear la cuenta:
    volverá aquí con todo lo escrito intacto. */
 async function publicar() {
   const btn = $('#btnPublicar');
-  const seccion = $('.paso[data-paso="pago"]');
+  const seccion = $('.paso[data-paso="confirmar"]');
 
   if (!haySesion()) {
     guardarBorrador();
@@ -1334,49 +1082,29 @@ async function publicar() {
     return;
   }
 
-  const ped = pedido();
-
   btn.disabled = true;
   btn.classList.add('btn--ocupado');
-  btn.textContent = ped ? 'Procesando el pago…' : 'Publicando…';
+  btn.textContent = 'Publicando…';
 
   const restaurar = (mensaje) => {
     btn.disabled = false;
     btn.classList.remove('btn--ocupado');
     avisoPaso(seccion, mensaje);
-    pintarResumenPago();
+    pintarPasoFinal();
     seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  let cobro = null;
   try {
-    if (ped) {
-      const compra = await api('/membresias', {
-        metodo: 'POST',
-        cuerpo: { plan: ped.nivel.id, cupo: ped.cupo, dias: ped.dias },
-      });
-      if (!compra) return restaurar('No hay conexión con el servidor. Vuelva a intentarlo; su borrador está guardado.');
-
-      cobro = compra.cobro;
-      estado.plan.membresia = compra.membresia.id;
-      MEMBRESIAS = [compra.membresia, ...MEMBRESIAS];
-      MODO = 'usar';
-      btn.textContent = 'Publicando…';
-    }
-
     const respuesta = await api('/anuncios', { metodo: 'POST', cuerpo: anuncioParaApi() });
-    if (!respuesta) {
-      return restaurar(cobro
-        ? 'El pago se registró, pero no pudimos publicar el anuncio. Su capacidad está contratada: vuelva a intentarlo sin pagar de nuevo.'
-        : 'No hay conexión con el servidor. Vuelva a intentarlo; su borrador está guardado.');
-    }
-
+    if (!respuesta) return restaurar('No hay conexión con el servidor. Vuelva a intentarlo; su borrador está guardado.');
     borrarBorrador();
-    pintarConfirmacion({ ...respuesta, cobro });
+    pintarConfirmacion(respuesta);
   } catch (e) {
-    restaurar(cobro
-      ? `${e.message} Su capacidad ya está contratada: no se le volverá a cobrar.`
-      : e.message);
+    /* Si el servidor dice que no queda sitio, se vuelve a leer la
+       capacidad: puede haber cambiado en otra pestaña, y así el paso
+       ofrece ampliar en vez de repetir un error. */
+    await cargarMembresias();
+    restaurar(e.message);
   }
 }
 
@@ -1395,11 +1123,8 @@ function pintarVistaPrevia() {
   const e = estado.equipo;
   const titulo = [e.anio, e.marca, e.modelo].filter(Boolean).join(' ') || 'Tu equipo';
   const uso = soloDigitos(e.uso) ? `${miles(Number(soloDigitos(e.uso)))} ${e.unidad}` : 'Uso pendiente';
-  // El distintivo depende del nivel con el que se vaya a publicar, que
-  // puede venir de un cupo ya comprado o de lo que esté contratando.
-  const destacado = MODO === 'usar'
-    ? !!(membresiaElegida() || {}).destacado
-    : !!(nivelElegido() || {}).destacado;
+  // El distintivo depende del nivel del cupo que vaya a ocupar.
+  const destacado = !!(membresiaElegida() || {}).destacado;
 
   caja.innerHTML = `
     <p class="vista-previa__rotulo">${icono('i-buscar')} Así se verá en el catálogo</p>
@@ -1422,32 +1147,26 @@ function pintarResumenPedido() {
   const caja = $('#resumenPedido');
   if (!caja) return;
 
-  const ped = pedido();
+  /* Aquí no hay pedido que resumir: publicar no cobra. Lo que se dice
+     es dónde va a caer el anuncio y qué le queda después, que es la
+     información que de verdad le sirve mientras rellena la ficha. */
   const m = membresiaElegida();
 
-  // Publicar en un cupo pagado no genera pedido. Se dice eso, en vez de
-  // enseñar un total de cero que parece una factura.
-  if (!ped) {
-    caja.innerHTML = m || cuentaExenta()
-      ? `<h3 class="pedido__titulo">Sin costo</h3>
-         <p class="pedido__vacio">${icono('i-check')} ${m
-          ? `Este equipo ocupa un cupo de su membresía ${esc(m.plan_nombre)}, que ya está pagado.`
-          : 'Su cuenta publica sin costo.'}</p>`
-      : `<p class="pedido__vacio">${icono('i-etiqueta')} Elija en el paso 5 dónde quiere publicar este equipo.</p>`;
+  if (!m) {
+    caja.innerHTML = haySesion()
+      ? `<h3 class="pedido__titulo">Le falta un cupo</h3>
+         <p class="pedido__vacio">${icono('i-etiqueta')} Complete la ficha igual: al final podrá añadir un cupo o contratar un plan, y su borrador no se pierde.</p>`
+      : `<p class="pedido__vacio">${icono('i-etiqueta')} Entre a su cuenta al terminar para publicar el equipo.</p>`;
     return;
   }
 
   caja.innerHTML = `
-    <h3 class="pedido__titulo">Resumen del pedido</h3>
+    <h3 class="pedido__titulo">Sin costo adicional</h3>
     <dl class="pedido__lista">
-      <div><dt>${esc(ped.nivel.nombre)} · ${ped.cupo} ${ped.cupo === 1 ? 'equipo' : 'equipos'}</dt>
-        <dd class="num">${pesos(ped.subtotal)}</dd></div>
-      <div><dt>Vigencia</dt><dd class="num">${ped.dias} días</dd></div>
-      ${ped.gratis
-        ? `<div><dt>Cupos de regalo</dt><dd class="num">${ped.gratis}</dd></div>`
-        : ''}
-      <div><dt>ITBIS</dt><dd class="num">${pesos(ped.itbis)}</dd></div>
-      <div class="pedido__total"><dt>Total</dt><dd class="num">${pesos(ped.total)}</dd></div>
+      <div><dt>Se publica en</dt><dd>${esc(m.plan_nombre)}</dd></div>
+      <div><dt>Fotografías</dt><dd class="num">hasta ${m.fotos_maximas}</dd></div>
+      <div><dt>Cupos libres</dt><dd class="num">${m.libres === null ? 'Sin límite' : m.libres}</dd></div>
+      <div class="pedido__total"><dt>Total</dt><dd class="num">${EXENTA ? 'Sin costo' : 'Ya pagado'}</dd></div>
     </dl>`;
 }
 
@@ -1458,8 +1177,7 @@ const VALIDADORES = {
   fotos: validarFotos,
   precio: validarPrecio,
   contacto: validarContacto,
-  plan: validarPlan,
-  pago: validarPago,
+  confirmar: validarConfirmar,
 };
 
 function pintarPasos() {
@@ -1485,7 +1203,7 @@ function pintarPasos() {
   $('#progresoTexto').textContent = `Paso ${estado.paso + 1} de ${PASOS.length}`;
   $('#progresoBarra').style.setProperty('--avance', `${((estado.paso + 1) / PASOS.length) * 100}%`);
 
-  if (ultimo) pintarResumenPago();
+  if (ultimo) pintarPasoFinal();
 }
 
 function irAPaso(i) {
@@ -1543,9 +1261,6 @@ function leerPaso(id) {
       web: $('#c-web').value.trim(),
       preferencia: $('#c-preferencia').value,
     });
-  } else if (id === 'pago') {
-    estado.pago.guardar = $('#t-guardar').checked;
-    estado.pago.autorenovar = $('#t-autorenovar').checked;
   }
 }
 
@@ -1583,8 +1298,6 @@ function volcarEstadoAlFormulario() {
   $('#c-web').value = c.web;
   $('#c-preferencia').value = c.preferencia;
 
-  $('#t-guardar').checked = estado.pago.guardar;
-  $('#t-autorenovar').checked = estado.pago.autorenovar;
 }
 
 /* ── Arranque ───────────────────────────────────────────── */
@@ -1609,8 +1322,7 @@ async function montarPublicador() {
   montarPasoFotos();
   montarPasoPrecio();
   montarPasoContacto();
-  await montarPasoPlan();
-  montarPasoPago();
+  await montarPasoConfirmar();
 
   if (guardado) {
     volcarEstadoAlFormulario();
@@ -1659,14 +1371,8 @@ async function montarPublicador() {
   });
 
   $('#btnPublicar').addEventListener('click', () => {
-    const seccion = $('.paso[data-paso="pago"]');
-    leerPaso('pago');
-    if (!$('#aceptaCondiciones').checked) {
-      avisoPaso(seccion, 'Debe aceptar las condiciones de publicación antes de continuar.');
-      return;
-    }
-    if (!validarPago(seccion)) return;
-    avisoPaso(seccion, '');
+    const seccion = $('.paso[data-paso="confirmar"]');
+    if (!validarConfirmar(seccion)) return;
     publicar();
   });
 

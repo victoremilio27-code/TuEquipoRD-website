@@ -32,6 +32,7 @@
         <a href="transporte.html">Transporte</a>
         <a href="importar.html">Importación</a>
         <a href="financiamiento.html">Financiamiento</a>
+        <a href="planes.html">Planes</a>
         <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
       </nav>
     </div>
@@ -65,7 +66,7 @@
         <ol class="pasos" id="pasosNav"></ol>
         <p class="progreso">
           <span class="progreso__barra" id="progresoBarra" aria-hidden="true"></span>
-          <span class="progreso__texto" id="progresoTexto">Paso 1 de 6</span>
+          <span class="progreso__texto" id="progresoTexto">Paso 1 de 5</span>
         </p>
       </nav>
 
@@ -272,147 +273,24 @@
         </section>
 
         <!-- Paso 5 · Plan -->
-        <section class="paso" data-paso="plan" aria-labelledby="t-p5" hidden>
-          <h2 class="panel__titulo" id="t-p5"><em>Dónde</em> se publica</h2>
+        <!-- Paso 5 · Confirmación
+             No hay paso de plan ni de pago. La capacidad se contrata en
+             planes.html y publicar solo ocupa un cupo: quien ya pagó no
+             vuelve a ver un formulario de tarjeta por el mismo dinero. -->
+        <section class="paso" data-paso="confirmar" aria-labelledby="t-p5" hidden>
+          <h2 class="panel__titulo" id="t-p5"><em>Revise</em> y publique</h2>
 
-          <!-- Cupos ya comprados. Si le queda alguno libre, publicar no
-               cuesta nada más: el sitio ya está pagado. -->
-          <div id="bloqueUsarCupo" hidden>
-            <p class="panel__texto">Un cupo es el sitio que ocupa un equipo publicado. Le quedan libres, así que este anuncio no tiene costo adicional.</p>
-            <ul class="cupos-op" id="cuposDisponibles"></ul>
-            <p class="panel__nota">
-              Puede cambiar el nivel de este equipo cuando quiera desde <a href="panel.html">su panel</a>,
-              sin volver a publicarlo.
+          <div class="pedido pedido--destacado" id="resumenPublicacion"></div>
+
+          <!-- Sin cupos libres. No se le manda a empezar de cero: se le
+               ofrece añadir uno a lo que ya tiene, prorrateado. -->
+          <div id="bloqueSinCupo" hidden>
+            <p class="realce realce--aviso">
+              <svg class="ico" aria-hidden="true"><use href="#i-aviso"/></svg>
+              <span id="textoSinCupo"></span>
             </p>
-            <button type="button" class="btn btn--linea btn--chico" id="btnQuieroComprar">
-              Prefiero contratar otro nivel
-            </button>
-          </div>
-
-          <!-- Comprar capacidad. Se elige nivel, cuántos equipos y por
-               cuánto tiempo; el precio se calcula al momento. -->
-          <div id="bloqueComprar" hidden>
-            <p class="panel__texto" id="textoComprar">Elija el nivel con el que quiere publicar y para cuántos equipos. Un cupo es el sitio que ocupa un equipo; cuando venda uno, ese cupo queda libre y lo reutiliza sin volver a pagar.</p>
-
-            <ul class="planes-op" id="planesSeleccion"></ul>
-
-            <div class="compra-cupos">
-              <label class="campo-v">
-                <span>¿Cuántos equipos quiere publicar?</span>
-                <input type="number" id="cuantosCupos" min="1" max="100" step="1" value="1" inputmode="numeric">
-                <small class="campo-v__ayuda" id="notaCantidad"></small>
-              </label>
-
-              <fieldset class="duracion" id="duracionPublicacion">
-                <legend class="etiqueta etiqueta--bloque">Durante cuánto tiempo</legend>
-                <label class="duracion__op"><input type="radio" name="duracion" value="30" checked><span>30 días</span></label>
-                <label class="duracion__op"><input type="radio" name="duracion" value="60"><span>60 días <b id="ahorro60Plan"></b></span></label>
-              </fieldset>
-            </div>
-
-            <p class="realce realce--regla" id="reglaCupos"></p>
-
-            <button type="button" class="btn btn--linea btn--chico" id="btnUsarLoQueTengo" hidden>
-              Usar un cupo que ya tengo
-            </button>
-
-            <p class="invitacion-dealer" id="invitacionDealer" hidden>
-              <svg class="ico" aria-hidden="true"><use href="#i-edificio"/></svg>
-              <span>
-                <b>¿Comercializa maquinaria de forma habitual?</b>
-                El nivel Premium incluye la página pública de su empresa y el perfil en el directorio de
-                dealers. Se activa en cuentas de empresa aprobadas: <a href="panel.html">registre el RNC</a>.
-              </span>
-            </p>
-          </div>
-        </section>
-
-        <!-- Paso 6 · Pago -->
-        <section class="paso" data-paso="pago" aria-labelledby="t-p6" hidden>
-          <h2 class="panel__titulo" id="t-p6"><em>Confirmación</em> y pago</h2>
-
-          <div class="pedido pedido--destacado" id="resumenPago"></div>
-
-          <div id="bloqueGratis" hidden>
-            <p class="realce">
-              <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
-              <span id="textoGratis">El plan Estándar no tiene costo durante la promoción de lanzamiento. Confirme para activar el anuncio.</span>
-            </p>
-          </div>
-
-          <div id="bloquePago">
-            <fieldset class="campo-grupo" id="formaPago">
-              <legend class="etiqueta etiqueta--bloque">Forma de pago</legend>
-              <label class="opcion">
-                <input type="radio" name="forma" value="tarjeta" checked>
-                <span class="opcion__cuerpo">
-                  <b class="opcion__nombre">Tarjeta de crédito o débito</b>
-                  <span class="opcion__detalle">Activación inmediata del anuncio</span>
-                </span>
-              </label>
-              <label class="opcion" id="opcionTransferencia">
-                <input type="radio" name="forma" value="transferencia">
-                <span class="opcion__cuerpo">
-                  <b class="opcion__nombre">Transferencia bancaria</b>
-                  <span class="opcion__detalle">Activación al confirmarse el crédito, hasta 24 horas hábiles</span>
-                </span>
-              </label>
-            </fieldset>
-
-            <p class="nota-membresia" id="notaMembresiaPago" hidden>
-              <svg class="ico" aria-hidden="true"><use href="#i-reloj"/></svg>
-              <span>
-                <b>La membresía se cobra de forma recurrente.</b>
-                <span id="renovacionTexto"></span>
-                La tarjeta queda registrada como medio de pago de la membresía para poder renovarla
-                sin que tenga que volver a introducirla. Puede cambiarla o cancelar la renovación
-                en cualquier momento desde su panel. Por eso la transferencia bancaria no está
-                disponible en esta modalidad: no permite un cobro automático.
-              </span>
-            </p>
-
-            <div id="bloqueTarjeta">
-              <div class="campos">
-                <label class="campo-v campo-v--ancho"><span>Nombre en la tarjeta *</span>
-                  <input type="text" id="t-nombre" autocomplete="cc-name" placeholder="Tal como aparece impreso">
-                </label>
-                <label class="campo-v campo-v--ancho"><span>Número de tarjeta * <b class="marca-tarjeta" id="marcaTarjeta"></b></span>
-                  <input type="text" id="t-numero" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000">
-                </label>
-                <label class="campo-v"><span>Vencimiento *</span>
-                  <input type="text" id="t-exp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5">
-                </label>
-                <label class="campo-v"><span>Código de seguridad *</span>
-                  <input type="text" id="t-cvv" inputmode="numeric" autocomplete="cc-csc" placeholder="CVV" maxlength="3">
-                </label>
-              </div>
-
-              <div class="casillas casillas--pago" id="casillasCompra">
-                <label class="casilla"><input type="checkbox" id="t-guardar" checked><span>Guardar esta tarjeta para renovaciones y futuras contrataciones</span></label>
-                <label class="casilla"><input type="checkbox" id="t-autorenovar"><span>Renovar automáticamente al vencer la vigencia</span></label>
-              </div>
-
-              <p class="nota-segura">
-                <svg class="ico" aria-hidden="true"><use href="#i-candado"/></svg>
-                Los datos de la tarjeta se transmiten cifrados directamente al procesador de pagos. TuEquipoRD no almacena el número completo: conserva únicamente el token, la marca y los últimos cuatro dígitos.
-              </p>
-            </div>
-
-            <div id="bloqueTransferencia" hidden>
-              <div class="datos-banco">
-                <p class="etiqueta etiqueta--bloque">Cuenta receptora</p>
-                <dl class="pedido__lista">
-                  <div><dt>Beneficiario</dt><dd>TuEquipoRD, SRL</dd></div>
-                  <div><dt>RNC</dt><dd class="num">1-31-00000-0</dd></div>
-                  <div><dt>Cuenta corriente</dt><dd class="num">000-000000-0</dd></div>
-                </dl>
-              </div>
-              <div class="campos campos--uno">
-                <label class="campo-v"><span>Número de referencia de la transferencia *</span>
-                  <input type="text" id="tr-referencia" placeholder="Comprobante emitido por su banco">
-                </label>
-              </div>
-            </div>
+            <div class="acciones" id="accionesSinCupo"></div>
+            <p class="panel__nota">Su borrador queda guardado: al volver, el anuncio sigue completo.</p>
           </div>
 
           <label class="casilla casilla--condiciones">
@@ -493,7 +371,7 @@
         <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
         <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
         <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
-        <li><a href="publicar.html"><b>Publicar un equipo:</b> niveles, cupos y precios</a></li>
+        <li><a href="planes.html"><b>Planes y precios:</b> cupos, niveles y beneficios</a></li>
         <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
       </ul>
       <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>

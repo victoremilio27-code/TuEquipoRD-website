@@ -32,6 +32,7 @@
         <a href="transporte.html">Transporte</a>
         <a href="importar.html">Importación</a>
         <a href="financiamiento.html">Financiamiento</a>
+        <a href="planes.html">Planes</a>
         <a class="cab__nav-cta" href="publicar.html">Publicar equipo</a>
       </nav>
     </div>
@@ -269,36 +270,25 @@
 
     <aside class="panel pub pub--bloque" id="pubBloque" aria-label="Publicidad" hidden></aside>
 
-    <section class="panel" id="vende" aria-labelledby="t-vende">
+    <section class="panel panel--servicio" id="vende" aria-labelledby="t-vende">
       <h2 class="panel__titulo" id="t-vende"><em>Publicación</em> de equipos</h2>
-      <p class="panel__texto">Publique su maquinaria ante contratistas, constructoras y administradores de flota. Complete la ficha, seleccione el plan y el anuncio queda activo de inmediato.</p>
+      <p class="panel__texto">Publique su maquinaria ante contratistas, constructoras y administradores de flota. No se paga por anuncio: se contratan <b>cupos</b>, y un cupo libre se reutiliza sin volver a pagar.</p>
 
       <p class="realce">
         <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
         <span>Los cupos del nivel <b>Estándar</b> no se cobran hasta <b data-promo-hasta>fecha por definir</b></span>
       </p>
 
-      <p class="panel__nota">
-        No se paga por anuncio: se contratan <b>cupos</b>. Un cupo es el sitio que ocupa un equipo publicado,
-        y es suyo: cuando venda una máquina, ese cupo queda libre y publica otra sin volver a pagar.
-        Cada cinco cupos, uno no se cobra, y contratarlos por 60 días
-        <b id="ahorroPortada"></b> frente a renovar dos veces. El nivel Premium añade la
-        <a href="dealers.html">página pública de su empresa</a> en el directorio.
-      </p>
-
-      <p class="etiqueta etiqueta--bloque">Recomendaciones para vender antes</p>
-      <ul class="lista-punteada lista-punteada--pasos">
-        <li>Fotografíe el equipo desde todos los ángulos, incluido el horómetro.</li>
-        <li>Incluya un video corto con el equipo encendido y en movimiento.</li>
-        <li>Declare todas las características: año, horas, implementos y trabajos pendientes.</li>
+      <ul class="servicio__puntos">
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Uno de cada cinco cupos no se cobra</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Al vender, el cupo queda libre para otra máquina</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Contratar 60 días <b id="ahorroPortada"></b> frente a renovar dos veces</li>
       </ul>
 
-      <a class="btn btn--ambar btn--bloque" href="publicar.html">Publicar un equipo</a>
-
-      <p class="nota-verificado">
-        <span class="pastilla pastilla--verde"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Anunciante verificado</span>
-        Sin costo, previa comprobación de cédula o RNC y de titularidad. Evaluación en menos de 24 horas hábiles.
-      </p>
+      <div class="servicio__acciones">
+        <a class="btn btn--ambar" href="publicar.html">Publicar un equipo</a>
+        <a class="btn btn--linea" href="planes.html">Planes y precios</a>
+      </div>
     </section>
   </div>
 
@@ -315,10 +305,12 @@
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Mantenimiento preventivo y averías a nuestro cargo</li>
       </ul>
 
-      <a class="btn btn--ambar btn--bloque" href="alquiler.html">
-        <svg class="ico" aria-hidden="true"><use href="#i-llave"/></svg> Cotizar alquiler
-      </a>
-      <p class="panel__nota">Indique el equipo requerido, la ubicación de la obra y el plazo. Respondemos con precio y disponibilidad.</p>
+      <div class="servicio__acciones">
+        <a class="btn btn--ambar" href="alquiler.html">
+          <svg class="ico" aria-hidden="true"><use href="#i-llave"/></svg> Cotizar alquiler
+        </a>
+        <a class="btn btn--linea" href="alquiler.html#detalle">Más información</a>
+      </div>
     </section>
 
     <section class="panel panel--servicio" id="transporte" aria-labelledby="t-tra">
@@ -331,10 +323,12 @@
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Carga, amarre y aseguramiento a cargo de nuestro personal</li>
       </ul>
 
-      <a class="btn btn--ambar btn--bloque" href="transporte.html">
-        <svg class="ico" aria-hidden="true"><use href="#i-lowboy"/></svg> Cotizar transporte
-      </a>
-      <p class="panel__nota">Solicitar la reserva no tiene costo ni compromiso: primero recibe precio y fecha, después decide.</p>
+      <div class="servicio__acciones">
+        <a class="btn btn--ambar" href="transporte.html">
+          <svg class="ico" aria-hidden="true"><use href="#i-lowboy"/></svg> Cotizar transporte
+        </a>
+        <a class="btn btn--linea" href="transporte.html#detalle">Más información</a>
+      </div>
     </section>
 
     <section class="panel panel--servicio" id="importacion" aria-labelledby="t-imp">
@@ -347,10 +341,12 @@
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Inspección previa a la compra y gestión aduanal</li>
       </ul>
 
-      <a class="btn btn--ambar btn--bloque" href="importar.html">
-        <svg class="ico" aria-hidden="true"><use href="#i-barco"/></svg> Cotizar importación
-      </a>
-      <p class="panel__nota">Trabajamos por presupuesto y necesidad operativa, no por catálogo cerrado.</p>
+      <div class="servicio__acciones">
+        <a class="btn btn--ambar" href="importar.html">
+          <svg class="ico" aria-hidden="true"><use href="#i-barco"/></svg> Cotizar importación
+        </a>
+        <a class="btn btn--linea" href="importar.html#detalle">Más información</a>
+      </div>
     </section>
   </div>
 
@@ -371,9 +367,7 @@
 
        El inventario de mayor valor está en equipos.html, donde el
        visitante busca con intención de compra declarada. -->
-  <aside class="anuncio anuncio--ancho" aria-label="Espacio publicitario">
-    <span>Espacio publicitario · 970 &times; 120</span>
-  </aside>
+
 
   <!-- ==== MARCAS CON EQUIPOS PUBLICADOS ==== -->
   <section class="panel panel--marcas" aria-labelledby="t-marcas">
@@ -444,7 +438,7 @@
         <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
         <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
         <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
-        <li><a href="publicar.html"><b>Publicar un equipo:</b> niveles, cupos y precios</a></li>
+        <li><a href="planes.html"><b>Planes y precios:</b> cupos, niveles y beneficios</a></li>
         <li><a href="dealers.html"><b>Directorio:</b> dealers y talleres</a></li>
       </ul>
       <p class="pie__sede">Av. 27 de Febrero, Santo Domingo · República Dominicana</p>

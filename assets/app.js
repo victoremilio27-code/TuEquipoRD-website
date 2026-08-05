@@ -19,6 +19,7 @@ const SPRITE = `
 <symbol id="i-montacargas" viewBox="0 0 24 24"><circle cx="7" cy="18" r="2.2"/><path d="M4 15.5V9h6.5v6.5"/><path d="M14 4v13"/><path d="M14 17h6.5"/><path d="M17 17V9"/></symbol>
 <symbol id="i-generador" viewBox="0 0 24 24"><rect x="3" y="7.5" width="18" height="10.5" rx="2"/><path d="M12.8 10.2 10 13.8h3.2L11.8 16.5"/><path d="M6.5 5.5v2"/><path d="M17.5 5.5v2"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-filtro" viewBox="0 0 24 24"><path d="M3 6h13M19 6h2M3 12h5M11 12h10M3 18h9M15 18h6"/><circle cx="17.5" cy="6" r="2"/><circle cx="9.5" cy="12" r="2"/><circle cx="13.5" cy="18" r="2"/></symbol>
 <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
 <symbol id="i-reloj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5.2l3.2 2"/></symbol>
 <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.5s6.5-6.1 6.5-11a6.5 6.5 0 1 0-13 0c0 4.9 6.5 11 6.5 11z"/><circle cx="12" cy="10.5" r="2.4"/></symbol>
@@ -374,7 +375,7 @@ async function montarDealers() {
   cont.innerHTML = lista.length
     ? lista.map(dealerHTML).join('')
     : `<li class="vacio-min vacio-min--ancho">Todavía no hay empresas con perfil publicado.
-        <a href="publicar.html">Conozca el nivel Premium</a></li>`;
+        <a href="planes.html?nivel=premium">Conozca el nivel Premium</a></li>`;
 
   const cuenta = $('#dealersCuenta');
   if (cuenta) cuenta.textContent = lista.length;
@@ -507,9 +508,11 @@ async function montarResultados() {
     });
   }
 
+  const activos = Object.entries(filtros).filter(([, v]) => v);
+  montarPanelFiltros(activos.length);
+
   // Los chips quitan un filtro conservando los demás y el orden.
   const chips = $('#chipsFiltros');
-  const activos = Object.entries(filtros).filter(([, v]) => v);
   if (chips) {
     chips.innerHTML = activos.map(([k, v]) => {
       const q = new URLSearchParams(location.search);
@@ -835,6 +838,62 @@ function montarCategoriasPagina() {
       </span>
     </a></li>`;
   }).join('');
+}
+
+/* ── Filtros en móvil ───────────────────────────────────────
+   En una pantalla de teléfono los filtros ocupaban dos pantallas
+   entre la búsqueda y los resultados: para ver el primer equipo había
+   que desplazarse por seis desplegables que casi nadie iba a tocar.
+
+   Ahora se retiran detrás de un botón que además dice cuántos hay
+   puestos, porque ese número es lo que responde «¿por qué salen tan
+   pocos resultados?».
+
+   El panel es un cajón lateral y no un acordeón: el acordeón sigue
+   empujando la página hacia abajo al abrirse, que es el problema que
+   se quería resolver. */
+function montarPanelFiltros(cuantos) {
+  const panel = $('#panelFiltros');
+  const abrir = $('#abrirFiltros');
+  const cerrar = $('#cerrarFiltros');
+  const velo = $('#veloFiltros');
+  if (!panel || !abrir) return;
+
+  const cuenta = $('#cuentaFiltros');
+  if (cuenta) {
+    cuenta.hidden = !cuantos;
+    cuenta.textContent = cuantos || '';
+    abrir.setAttribute('aria-label', cuantos
+      ? `Filtros de búsqueda, ${cuantos} ${cuantos === 1 ? 'puesto' : 'puestos'}`
+      : 'Filtros de búsqueda');
+  }
+
+  const mostrar = (abierto) => {
+    panel.classList.toggle('abierto', abierto);
+    velo.hidden = !abierto;
+    abrir.setAttribute('aria-expanded', String(abierto));
+    // Se bloquea el fondo para que el dedo no arrastre el catálogo por
+    // debajo del panel, que se siente como un fallo.
+    document.body.classList.toggle('sin-scroll', abierto);
+    if (abierto) {
+      const primero = panel.querySelector('input, select, button');
+      if (primero) primero.focus({ preventScroll: true });
+    } else {
+      abrir.focus({ preventScroll: true });
+    }
+  };
+
+  abrir.addEventListener('click', () => mostrar(true));
+  cerrar.addEventListener('click', () => mostrar(false));
+  velo.addEventListener('click', () => mostrar(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panel.classList.contains('abierto')) mostrar(false);
+  });
+
+  /* Al volver a escritorio se deshace todo: si la ventana se ensancha
+     con el panel abierto, el velo se quedaría tapando la página. */
+  const ancho = window.matchMedia('(min-width: 861px)');
+  ancho.addEventListener('change', (e) => { if (e.matches) mostrar(false); });
 }
 
 /* ── Portada: fotografías del catálogo ──────────────────────
