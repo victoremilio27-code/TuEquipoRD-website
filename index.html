@@ -263,7 +263,12 @@
     <div class="panel__cabeza">
       <h2 class="panel__titulo panel__titulo--limpio" id="t-dest"><em>Equipos</em> destacados</h2>
       <div class="panel__meta panel__meta--mandos">
-        <span><span class="num" id="destacadosCuenta">0</span> con plan destacado</span>
+        <!-- El rótulo lo escribe app.js para que concuerde en singular.
+             Decía «con plan destacado» debajo de un título que ya dice
+             «Equipos destacados»: repetía lo que el lector acababa de
+             leer y hablaba del plan, que es asunto del anunciante y no
+             de quien viene a comprar. -->
+        <span id="destacadosRotulo"><span class="num" id="destacadosCuenta">0</span> equipos listados</span>
         <span class="carrusel__mandos" data-mandos="destacadosLista">
           <button type="button" class="carrusel__flecha carrusel__flecha--atras" data-ir="-1" aria-label="Ver los anteriores">
             <svg class="ico" aria-hidden="true"><use href="#i-flecha"/></svg>

@@ -257,11 +257,18 @@ async function montarDestacados() {
   const { anuncios } = await buscarEquipos({ destacados: '1', porPagina: 12 });
   cont.innerHTML = anuncios.length
     ? anuncios.map(avisoHTML).join('')
-    : vacioHTML('Todavía no hay equipos con plan destacado.',
-      { href: 'publicar.html', texto: 'Destaque el suyo' });
+    : vacioHTML('Todavía no hay equipos destacados.',
+      { href: 'planes.html', texto: 'Destaque el suyo' });
 
-  const cuenta = $('#destacadosCuenta');
-  if (cuenta) cuenta.textContent = ESTADISTICAS.destacados;
+  /* Cuenta lo que se está viendo, no cuántos hay contratados. El
+     título ya dice «destacados»; repetirlo aquí gasta la línea en algo
+     que el lector acaba de leer, y el plan es asunto del anunciante,
+     no de quien viene a comprar. */
+  const rotulo = $('#destacadosRotulo');
+  if (rotulo) {
+    const n = anuncios.length;
+    rotulo.innerHTML = `<span class="num">${miles(n)}</span> ${n === 1 ? 'equipo listado' : 'equipos listados'}`;
+  }
 }
 
 /* Cifras del héroe. Se dibujan solo si hay algo que contar: anunciar
