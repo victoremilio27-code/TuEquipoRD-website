@@ -2973,3 +2973,190 @@ main { position: relative; }
 
 /* Bloquea el fondo mientras hay un panel abierto encima. */
 body.sin-scroll { overflow: hidden; }
+
+/* ── Carrusel horizontal ────────────────────────────────────
+   La rejilla de recientes crecía hacia abajo: dieciocho tarjetas en
+   tres filas ocupaban media portada. En horizontal cabe el mismo
+   inventario en un tercio del alto, y en el teléfono se arrastra con
+   el dedo, que es el gesto que ya espera cualquiera.
+
+   Sin JavaScript de por medio para desplazar: scroll nativo con
+   scroll-snap. Las flechas son un añadido para el ratón, no el
+   mecanismo. */
+.carrusel { position: relative; }
+
+.carrusel__pista {
+  display: grid;
+  /* .rejilla define seis columnas explícitas y las pistas explícitas
+     mandan sobre grid-auto-columns: con ellas puestas, las tarjetas
+     seguían repartiéndose en filas y del carrusel solo quedaba el
+     nombre. Anularlas es lo que lo vuelve horizontal de verdad. */
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  /* Ancho DEFINIDO, no minmax(0, …). Con dieciocho columnas que no
+     caben, un mínimo de cero deja que el navegador las encoja hasta el
+     contenido —salían de 56 px— y el carrusel se quedaba en nada. */
+  grid-auto-columns: 210px;
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 2px;
+  padding-bottom: 4px;
+  /* La barra se oculta en escritorio porque están las flechas; en
+     táctil el propio gesto ya dice que hay más a los lados. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--linea) transparent;
+}
+.carrusel__pista > * { scroll-snap-align: start; }
+.carrusel__pista::-webkit-scrollbar { height: 6px; }
+.carrusel__pista::-webkit-scrollbar-thumb { background: var(--linea); border-radius: 99px; }
+
+/* Cuántas piezas se ven a la vez, por ancho de ventana. */
+@media (min-width: 700px)  { .carrusel__pista { grid-auto-columns: calc((100% - 24px) / 3); } }
+@media (min-width: 1000px) { .carrusel__pista { grid-auto-columns: calc((100% - 48px) / 5); } }
+@media (min-width: 1280px) { .carrusel__pista { grid-auto-columns: calc((100% - 60px) / 6); } }
+
+.carrusel__mandos { display: flex; gap: 6px; }
+.carrusel__flecha {
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--r);
+  color: var(--azul); cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.carrusel__flecha:hover:not(:disabled) { border-color: var(--ambar); background: #FFFDF7; }
+.carrusel__flecha:disabled { opacity: .35; cursor: default; }
+.carrusel__flecha .ico { width: 15px; height: 15px; }
+.carrusel__flecha--atras .ico { transform: rotate(180deg); }
+
+/* En táctil sobran: se arrastra. Se apagan por ancho Y por falta de
+   hover, porque un portátil con pantalla táctil tiene las dos cosas y
+   ahí las flechas sí ayudan. */
+@media (max-width: 860px) { .carrusel__mandos { display: none; } }
+@media (hover: none) and (pointer: coarse) { .carrusel__mandos { display: none; } }
+
+/* ── Mosaico de categorías ──────────────────────────────────
+   Sustituye la lista de seis renglones grises de «Tipos con más
+   equipos». Cada pieza enseña una máquina publicada de esa categoría,
+   y la primera va a doble tamaño para que la rejilla tenga jerarquía
+   en vez de ser seis cuadrados iguales. */
+.mosaico {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.mosaico > li:first-child { grid-column: span 2; grid-row: span 2; }
+
+.mosaico__pieza {
+  position: relative;
+  display: block;
+  height: 100%;
+  min-height: 116px;
+  overflow: hidden;
+  border-radius: var(--r);
+  background: var(--azul);
+  color: var(--blanco);
+}
+.mosaico__pieza img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform .35s ease;
+}
+.mosaico__pieza:hover img { transform: scale(1.05); }
+
+/* Velo por debajo del texto: sin él, un nombre blanco sobre una foto
+   clara no se lee. Solo en la mitad inferior, que es donde va. */
+.mosaico__pieza::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(7, 26, 43, .05) 30%, rgba(7, 26, 43, .82) 100%);
+}
+.mosaico__cuerpo {
+  position: absolute; inset: auto 0 0 0;
+  z-index: 1;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 10px 12px;
+}
+.mosaico__nombre { font-family: var(--display); font-size: 14px; font-weight: 700; }
+.mosaico > li:first-child .mosaico__nombre { font-size: 19px; }
+.mosaico__total { font-size: 12px; font-weight: 600; color: var(--ambar); }
+
+.mosaico__vacia { display: grid; place-items: center; background: var(--hueso); color: var(--gris-acero); }
+.mosaico__vacia::after { display: none; }
+
+@media (max-width: 860px) {
+  .mosaico { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mosaico > li:first-child { grid-column: span 2; grid-row: auto; min-height: 150px; }
+}
+
+/* ── Banda oscura a todo el ancho ───────────────────────────
+   Corta la sucesión de recuadros blancos. Los tres servicios propios
+   —alquiler, transporte, importación— viven aquí: son lo que hace
+   TuEquipoRD además del catálogo, y en tres paneles blancos más se
+   perdían entre los demás. */
+.banda {
+  margin: clamp(20px, 3vw, 34px) 0;
+  padding: clamp(26px, 4vw, 44px) 0;
+  background:
+    radial-gradient(900px 300px at 82% 0%, rgba(242, 169, 0, .13), transparent 62%),
+    var(--azul);
+  color: var(--blanco);
+}
+.banda__titulo {
+  font-family: var(--display);
+  font-size: clamp(20px, 2.4vw, 27px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+.banda__titulo em { font-style: normal; color: var(--ambar); }
+.banda__sub { max-width: 68ch; margin-top: 8px; font-size: 14px; color: var(--texto-claro); }
+
+.banda__rejilla {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: clamp(18px, 2.4vw, 26px);
+}
+.banda__servicio {
+  display: flex; flex-direction: column;
+  padding: 18px;
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid var(--linea-dark);
+  border-radius: var(--r);
+}
+.banda__ico {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; margin-bottom: 11px;
+  background: rgba(242, 169, 0, .14); border-radius: var(--r);
+  color: var(--ambar);
+}
+.banda__ico .ico { width: 20px; height: 20px; }
+.banda__nombre { font-family: var(--display); font-size: 16px; font-weight: 700; }
+.banda__texto { margin-top: 6px; font-size: 13.5px; line-height: 1.5; color: var(--texto-claro); flex: 1; }
+.banda__acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.banda__acciones .btn--linea { color: var(--blanco); border-color: var(--linea-dark); }
+.banda__acciones .btn--linea:hover { background: var(--azul-2); border-color: var(--ambar); }
+
+@media (max-width: 860px) {
+  .banda__rejilla { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Cabecera de sección con los mandos del carrusel a la derecha. */
+.panel__meta--mandos { display: flex; align-items: center; gap: 12px; }
+
+/* Alto fijo de fila en el mosaico: sin él, la pieza grande estiraba la
+   rejilla a casi quinientos píxeles y la portada crecía en vez de
+   encogerse. */
+.mosaico { grid-auto-rows: 128px; }
+@media (max-width: 860px) { .mosaico { grid-auto-rows: 120px; } }
+
+/* La búsqueda avanzada pasó a ancho completo, así que sus campos van
+   en fila y no apilados: antes ocupaba una columna estrecha y ahora
+   dejaba trescientos píxeles de aire a los lados de cada desplegable. */
+#buscador { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
+#buscador .campo { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+#buscador .form__pie { grid-column: 1 / -1; }
+@media (max-width: 900px) { #buscador { grid-template-columns: minmax(0, 1fr); } }

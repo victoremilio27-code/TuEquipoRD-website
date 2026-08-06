@@ -122,7 +122,11 @@ function cacheDe(ext) {
 const PUBLICO = [
   /^\/[\w-]+\.html$/,                       // páginas del sitio
   /^\/assets\/[\w.-]+\.(js|svg|css|woff2?)$/, // scripts e iconos
-  /^\/brand_assets\/[\w.-]+\.(png|svg|jpe?g|webp)$/, // logotipos
+  /* Logotipos y las fotografías del héroe, que viven en
+     brand_assets/portada. Se admite UN nivel de subcarpeta y su nombre
+     solo puede llevar letras, dígitos y guiones: sin puntos no hay
+     «..» que valga, así que no se sale de aquí. */
+  /^\/brand_assets\/(?:[\w-]+\/)?[\w.-]+\.(png|svg|jpe?g|webp)$/,
   /^\/styles\.css$/,
   /^\/favicon\.ico$/,
   /^\/robots\.txt$/,

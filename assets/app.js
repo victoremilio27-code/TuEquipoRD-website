@@ -224,13 +224,6 @@ function destacadoHTML(e) {
   </a></li>`;
 }
 
-function tipoHTML(c) {
-  return `<li><a href="equipos.html?categoria=${encodeURIComponent(c.id)}">
-    <span class="tipos__ico">${icono(c.icono)}</span> ${esc(c.nombre)}
-    <b class="num">${c.total}</b>
-  </a></li>`;
-}
-
 /* Una empresa del directorio. Todas vienen de la base con su `slug`,
    su conteo real de equipos activos y su sello, así que la tarjeta
    siempre lleva a una página que existe. */
@@ -258,9 +251,12 @@ async function montarDestacados() {
   const cont = $('#destacadosLista');
   if (!cont) return;
 
-  const { anuncios } = await buscarEquipos({ destacados: '1', porPagina: 8 });
+  /* Tarjeta de catálogo, no la fila estrecha de antes: ahora viven en
+     un carrusel a ancho completo y la foto se ve. Doce en vez de ocho
+     porque en horizontal el alto ya no crece. */
+  const { anuncios } = await buscarEquipos({ destacados: '1', porPagina: 12 });
   cont.innerHTML = anuncios.length
-    ? anuncios.map(destacadoHTML).join('')
+    ? anuncios.map(avisoHTML).join('')
     : vacioHTML('Todavía no hay equipos con plan destacado.',
       { href: 'publicar.html', texto: 'Destaque el suyo' });
 
@@ -294,23 +290,98 @@ function montarCifrasPortada() {
     .join('');
 }
 
-function montarTipos() {
-  const cont = $('#tiposLista');
+/* Mosaico de categorías de la portada.
+
+   Sustituye a una lista de seis renglones de texto gris. Cada pieza
+   enseña una máquina publicada de esa categoría —las trae
+   /api/portada— y la primera va a doble tamaño: una rejilla de piezas
+   iguales no dice cuál importa más, y aquí la que más inventario tiene
+   sí importa más.
+
+   Las categorías sin equipos no entran. Enseñar diez casillas vacías
+   con «0» hace parecer que el catálogo está desierto. */
+function montarMosaicoCategorias() {
+  const cont = $('#mosaicoCategorias');
   if (!cont) return;
-  const tope = Number(cont.dataset.top) || 5;
-  const conteo = conteoCategorias().filter((c) => c.total > 0);
 
-  cont.innerHTML = conteo.length
-    ? conteo.slice(0, tope).map(tipoHTML).join('')
-    : vacioHTML('Aún no hay equipos publicados en ninguna categoría.');
+  const tope = Number(cont.dataset.top) || 7;
+  const conteo = conteoCategorias().filter((c) => c.total > 0).slice(0, tope);
 
-  const restantes = CATEGORIAS.length - Math.min(conteo.length, tope);
+  if (!conteo.length) {
+    cont.innerHTML = `<li class="mosaico__vacia mosaico__pieza">
+      <span class="mosaico__cuerpo"><span class="mosaico__nombre">Aún no hay equipos publicados</span></span></li>`;
+    return;
+  }
+
+  cont.innerHTML = conteo.map((c) => {
+    const fotos = FOTOS_CATEGORIA[c.id] || [];
+    const foto = fotos.length ? alAzar(fotos) : null;
+
+    return `<li>
+      <a class="mosaico__pieza" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
+        ${foto
+          ? `<img src="${esc(foto.foto)}" alt="${esc(foto.titulo)}, publicado en ${esc(c.nombre)}" loading="lazy" decoding="async">`
+          : ''}
+        <span class="mosaico__cuerpo">
+          <span class="mosaico__nombre">${esc(c.nombre)}</span>
+          <span class="mosaico__total num">${c.total}</span>
+        </span>
+      </a>
+    </li>`;
+  }).join('');
+
   const pie = $('#tiposResto');
   if (pie) {
+    const restantes = CATEGORIAS.length - conteo.length;
     pie.textContent = restantes > 0
       ? `Ver las otras ${restantes} categorías →`
       : 'Ver todas las categorías →';
   }
+}
+
+/* ── Carrusel ───────────────────────────────────────────────
+   El desplazamiento lo hace el navegador: `overflow-x` con
+   scroll-snap. Esto solo cablea las flechas para el ratón y las apaga
+   al llegar a los extremos, porque una flecha que no hace nada se
+   siente como un fallo.
+
+   En táctil las flechas ni se dibujan: ahí se arrastra. */
+function montarCarruseles() {
+  $$('.carrusel__mandos').forEach((mandos) => {
+    const pista = document.getElementById(mandos.dataset.mandos);
+    if (!pista) return;
+
+    const flechas = $$('[data-ir]', mandos);
+    const refrescar = () => {
+      const max = pista.scrollWidth - pista.clientWidth - 2;
+      flechas.forEach((f) => {
+        f.disabled = Number(f.dataset.ir) < 0 ? pista.scrollLeft <= 2 : pista.scrollLeft >= max;
+      });
+      // Sin nada que desplazar, los mandos sobran.
+      mandos.hidden = pista.scrollWidth <= pista.clientWidth + 2;
+    };
+
+    flechas.forEach((f) => f.addEventListener('click', () => {
+      // Se avanza algo menos de una pantalla: así queda a la vista un
+      // resto de la tarjeta siguiente y se entiende que hay más.
+      pista.scrollBy({ left: Number(f.dataset.ir) * pista.clientWidth * 0.85, behavior: 'smooth' });
+    }));
+
+    pista.addEventListener('scroll', refrescar, { passive: true });
+    window.addEventListener('resize', refrescar);
+
+    /* Hay que mirar el CONTENIDO, no la caja. El contenedor mide lo
+       mismo con dos tarjetas que con dieciocho —lo que crece es
+       scrollWidth—, así que un ResizeObserver sobre la pista no se
+       entera de nada y los mandos se quedaban ocultos para siempre.
+       Con las tarjetas ya puestas y las fotos aún por cargar, la
+       medida tampoco es la definitiva. */
+    if ('MutationObserver' in window) {
+      new MutationObserver(refrescar).observe(pista, { childList: true });
+    }
+    pista.addEventListener('load', refrescar, { capture: true });   // fotos
+    refrescar();
+  });
 }
 
 function montarMarcas() {
@@ -350,16 +421,17 @@ async function montarRecientes() {
       : 'Sea el primero en publicar. Su equipo aparecerá aquí y en los resultados de búsqueda.'}
       ${caido ? '' : '<a href="publicar.html">Publicar un equipo</a>'}</li>`;
 
+  /* El rótulo se escribe en SU span, no en el `.panel__meta` entero.
+     Ahí dentro viven ahora las flechas del carrusel, y reemplazar el
+     innerHTML del contenedor se las llevaba por delante: los mandos
+     desaparecían del DOM en cuanto se pintaban los anuncios. */
   const total = $('#totalEquipos');
-  if (total) {
-    total.textContent = miles(ESTADISTICAS.anuncios);
-    const rotulo = total.closest('.panel__meta');
-    if (rotulo) {
-      rotulo.innerHTML = ESTADISTICAS.anuncios
-        ? `<span class="num">${miles(ESTADISTICAS.anuncios)}</span> ${ESTADISTICAS.anuncios === 1 ? 'equipo publicado' : 'equipos publicados'} de <span class="num">${ESTADISTICAS.anunciantes}</span> ${ESTADISTICAS.anunciantes === 1 ? 'anunciante' : 'anunciantes'}`
-        : 'Catálogo en apertura';
-    }
-  }
+  if (!total) return;
+
+  const rotulo = total.parentElement;
+  rotulo.innerHTML = ESTADISTICAS.anuncios
+    ? `<span class="num" id="totalEquipos">${miles(ESTADISTICAS.anuncios)}</span> ${ESTADISTICAS.anuncios === 1 ? 'equipo publicado' : 'equipos publicados'} de <span class="num">${ESTADISTICAS.anunciantes}</span> ${ESTADISTICAS.anunciantes === 1 ? 'anunciante' : 'anunciantes'}`
+    : 'Catálogo en apertura';
 }
 
 /* Directorio de dealers. Solo empresas reales con perfil habilitado:
@@ -1581,7 +1653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   montarPromo();
   refrescarMarcasActivas();
   montarCifrasPortada();
-  montarTipos();
+  montarMosaicoCategorias();
   montarMarcas();
   montarCategoriasPagina();
 
@@ -1594,4 +1666,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     montarTransporte(),
     montarContactoDesdeFicha(),
   ]);
+
+  /* Los carruseles van al final: hasta aquí las pistas estaban vacías,
+     y midiendo un contenedor sin contenido las flechas habrían salido
+     apagadas para siempre. */
+  montarCarruseles();
 });

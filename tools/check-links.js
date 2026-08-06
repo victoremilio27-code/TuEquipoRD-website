@@ -22,7 +22,7 @@ const PAGINAS = [
 
 /* Contenedores que el render debe llenar, por página. */
 const ESPERADO = {
-  'index.html': ['#destacadosLista', '#tiposLista', '#marcasLista', '#rejillaRecientes', '#dealersLista'],
+  'index.html': ['#destacadosLista', '#mosaicoCategorias', '#marcasLista', '#rejillaRecientes', '#dealersLista'],
   'equipos.html': ['#resultados'],
   'categorias.html': ['#categoriasTodas'],
   // El asistente pinta los pasos y las tarjetas de plan al arrancar.

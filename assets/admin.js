@@ -615,7 +615,7 @@ function pintarHeroe(heroe) {
      sitio. Poner en la lista una que va a rechazarse convierte el
      desplegable en una trampa. */
   const sel = $('#heroe-catalogo');
-  const candidatas = (heroe && heroe.opciones ? heroe.opciones : []).filter((o) => o.fijable);
+  const candidatas = (heroe && heroe.delCatalogo ? heroe.delCatalogo : []).filter((o) => o.fijable);
   sel.length = 1;
   candidatas.forEach((o) => {
     sel.add(new Option(o.alt.replace(' publicado en TuEquipoRD', ''), o.imagen));

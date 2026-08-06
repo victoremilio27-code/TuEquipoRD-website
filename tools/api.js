@@ -539,6 +539,23 @@ const subirFoto = conSesion(async (req, res, ctx) => {
    máquinas de verdad: la fotografía del héroe y unas cuantas de cada
    categoría. Va aparte de /api/estadisticas porque las fotos pesan y
    solo hacen falta en esas dos pantallas. */
+/* Fotografías del héroe de la portada.
+
+   Son archivos del sitio, no anuncios del catálogo. Se probó con las
+   últimas máquinas publicadas y el resultado dependía de quién hubiera
+   subido algo esa mañana: una foto de móvil mal encuadrada acababa de
+   portada. Estas están elegidas para eso y no cambian solas.
+
+   La pantalla toma UNA al azar en cada visita. El equipo puede fijar
+   otra desde /admin.html y entonces manda esa. */
+const FONDOS_HEROE = [
+  { imagen: '/brand_assets/portada/heroe-1.jpg', alt: 'Maquinaria pesada de movimiento de tierra en obra' },
+  { imagen: '/brand_assets/portada/heroe-2.jpg', alt: 'Excavadora trabajando sobre terreno abierto' },
+  { imagen: '/brand_assets/portada/heroe-3.jpg', alt: 'Flota de equipo pesado alineada en un patio' },
+  { imagen: '/brand_assets/portada/heroe-4.jpg', alt: 'Equipo de construcción en plena faena' },
+  { imagen: '/brand_assets/portada/heroe-5.jpg', alt: 'Maquinaria de construcción al pie de obra' },
+];
+
 function verPortada(req, res) {
   const heroe = db.heroePortada(10);
 
@@ -553,9 +570,12 @@ function verPortada(req, res) {
 
   return responder(res, 200, {
     heroe: {
-      ...heroe,
       imagen: heroe.imagen && existe(heroe.imagen) ? heroe.imagen : null,
-      opciones: heroe.opciones.filter((o) => existe(o.imagen)),
+      alt: heroe.alt,
+      opciones: FONDOS_HEROE,
+      // Las del catálogo siguen ofreciéndose en /admin.html para poder
+      // fijar una máquina concreta; ya no entran en la rotación.
+      delCatalogo: heroe.opciones.filter((o) => existe(o.imagen)),
     },
     categorias: db.fotosPorCategoria(4),
   });

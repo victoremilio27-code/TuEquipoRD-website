@@ -13,7 +13,10 @@ correos/
 
 # Capturas de referencia
 *.png
+*.jpg
+*.jpeg
 !brand_assets/*.png
+!brand_assets/portada/*.jpg
 
 # Entorno
 .env

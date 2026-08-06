@@ -187,9 +187,9 @@
 
 <div class="envoltura">
 
-  <!-- ==== FILA 1: buscador · tipos · destacados ==== -->
-  <div class="fila fila--busqueda">
-
+  <!-- ==== BÚSQUEDA AVANZADA ====
+       A ancho completo. Antes compartía fila con «Tipos» y
+       «Destacados», y los tres salían estrechos y apretados. -->
     <section class="panel" aria-labelledby="t-buscar">
       <h2 class="panel__titulo" id="t-buscar"><em>Búsqueda</em> avanzada</h2>
 
@@ -241,21 +241,44 @@
       </form>
     </section>
 
-    <section class="panel" id="tipos" aria-labelledby="t-tipos">
-      <h2 class="panel__titulo" id="t-tipos">Tipos <span class="panel__apunte">con más equipos</span></h2>
-      <ul class="tipos" id="tiposLista" data-top="5"></ul>
-      <p class="tipos__pie"><a href="categorias.html" id="tiposResto">Ver todas las categorías &rarr;</a></p>
-    </section>
 
-    <section class="panel panel--destacados" aria-labelledby="t-dest">
-      <div class="panel__cabeza panel__cabeza--ajustada">
-        <h2 class="panel__titulo panel__titulo--limpio" id="t-dest"><em>Destacados</em></h2>
-        <p class="panel__meta"><span class="num" id="destacadosCuenta">0</span> equipos con plan destacado</p>
+  <!-- ==== CATEGORÍAS EN MOSAICO ====
+       Sustituye la lista de «Tipos con más equipos», que eran seis
+       renglones de texto gris. Cada pieza enseña una máquina publicada
+       de esa categoría; la primera va a doble tamaño para que la
+       rejilla tenga jerarquía y no sea seis cuadrados iguales. -->
+  <section class="panel" aria-labelledby="t-tipos">
+    <div class="panel__cabeza">
+      <h2 class="panel__titulo panel__titulo--limpio" id="t-tipos"><em>Explore</em> por categoría</h2>
+      <p class="panel__meta"><a class="enlace-mas" href="categorias.html" id="tiposResto">Ver todas las categorías &rarr;</a></p>
+    </div>
+    <ul class="mosaico" id="mosaicoCategorias" data-top="7"></ul>
+  </section>
+
+  <!-- ==== DESTACADOS EN CARRUSEL ====
+       Antes era una columna vertical de ocho renglones dentro de un
+       panel estrecho. En horizontal caben los mismos ocho ocupando un
+       tercio del alto, y en el teléfono se arrastran con el dedo. -->
+  <section class="panel" aria-labelledby="t-dest">
+    <div class="panel__cabeza">
+      <h2 class="panel__titulo panel__titulo--limpio" id="t-dest"><em>Equipos</em> destacados</h2>
+      <div class="panel__meta panel__meta--mandos">
+        <span><span class="num" id="destacadosCuenta">0</span> con plan destacado</span>
+        <span class="carrusel__mandos" data-mandos="destacadosLista">
+          <button type="button" class="carrusel__flecha carrusel__flecha--atras" data-ir="-1" aria-label="Ver los anteriores">
+            <svg class="ico" aria-hidden="true"><use href="#i-flecha"/></svg>
+          </button>
+          <button type="button" class="carrusel__flecha" data-ir="1" aria-label="Ver los siguientes">
+            <svg class="ico" aria-hidden="true"><use href="#i-flecha"/></svg>
+          </button>
+        </span>
       </div>
-      <ul class="destacados" id="destacadosLista"></ul>
-      <p class="panel__pie"><a class="enlace-mas" href="equipos.html">Ver todo el catálogo publicado &rarr;</a></p>
-    </section>
-  </div>
+    </div>
+    <div class="carrusel">
+      <ul class="rejilla carrusel__pista" id="destacadosLista"></ul>
+    </div>
+    <p class="panel__pie"><a class="enlace-mas" href="equipos.html">Ver todo el catálogo publicado &rarr;</a></p>
+  </section>
 
   <!-- ==== FILA 2: publicidad · vende ====
        Aquí vivía la calculadora de financiamiento. La herramienta no se
@@ -292,82 +315,56 @@
     </section>
   </div>
 
-  <!-- ==== FILA 3: alquiler · transporte · importación ==== -->
-  <div class="fila fila--tres">
+</div><!-- /envoltura -->
 
-    <section class="panel panel--servicio" id="alquiler" aria-labelledby="t-alq">
-      <h2 class="panel__titulo" id="t-alq"><em>Alquiler</em> de maquinaria</h2>
-      <p class="panel__texto">Alquilamos <b>flota propia</b>, no equipos de terceros. Por eso respondemos por el estado de la máquina, su mantenimiento y su reemplazo ante una falla en obra.</p>
+<!-- ==== SERVICIOS PROPIOS, EN BANDA ====
+     Sale de la envoltura a propósito: la franja azul cruza la página
+     de lado a lado y corta la sucesión de recuadros blancos, que es lo
+     que hacía la portada monótona.
 
-      <ul class="servicio__puntos">
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Con operador o sin operador, según su necesidad</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Por día, semana o mes, con transporte cotizado por separado</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Mantenimiento preventivo y averías a nuestro cargo</li>
-      </ul>
+     Son los tres servicios que presta TuEquipoRD además del catálogo.
+     Como tres paneles blancos más se perdían entre los otros ocho;
+     aquí se leen como lo que son, un bloque aparte. -->
+<section class="banda" aria-labelledby="t-servicios">
+  <div class="envoltura">
+    <h2 class="banda__titulo" id="t-servicios"><em>Además</em> del catálogo</h2>
+    <p class="banda__sub">Alquilamos, trasladamos e importamos con flota y equipo propios. No somos intermediarios: respondemos por el servicio.</p>
 
-      <div class="servicio__acciones">
-        <a class="btn btn--ambar" href="alquiler.html">
-          <svg class="ico" aria-hidden="true"><use href="#i-llave"/></svg> Cotizar alquiler
-        </a>
-        <a class="btn btn--linea" href="alquiler.html#detalle">Más información</a>
-      </div>
-    </section>
+    <div class="banda__rejilla">
+      <article class="banda__servicio">
+        <span class="banda__ico"><svg class="ico" aria-hidden="true"><use href="#i-llave"/></svg></span>
+        <h3 class="banda__nombre">Alquiler de maquinaria</h3>
+        <p class="banda__texto">Flota propia, con operador o sin él, por día, semana o mes. El mantenimiento y las averías corren de nuestra cuenta.</p>
+        <div class="banda__acciones">
+          <a class="btn btn--ambar btn--chico" href="alquiler.html">Cotizar alquiler</a>
+          <a class="btn btn--linea btn--chico" href="alquiler.html#detalle">Más información</a>
+        </div>
+      </article>
 
-    <section class="panel panel--servicio" id="transporte" aria-labelledby="t-tra">
-      <h2 class="panel__titulo" id="t-tra"><em>Transporte</em> de maquinaria</h2>
-      <p class="panel__texto">Trasladamos maquinaria por todo el país con <b>flota propia de lowboys</b>, se haya adquirido o no en este portal. Reserve el viaje y coordinamos los detalles con usted.</p>
+      <article class="banda__servicio">
+        <span class="banda__ico"><svg class="ico" aria-hidden="true"><use href="#i-lowboy"/></svg></span>
+        <h3 class="banda__nombre">Transporte de maquinaria</h3>
+        <p class="banda__texto">Lowboys propios a todo el país, se haya comprado el equipo aquí o no. Con seguimiento por GPS hasta la entrega.</p>
+        <div class="banda__acciones">
+          <a class="btn btn--ambar btn--chico" href="transporte.html">Cotizar transporte</a>
+          <a class="btn btn--linea btn--chico" href="transporte.html#detalle">Más información</a>
+        </div>
+      </article>
 
-      <ul class="servicio__puntos">
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Seguimiento por GPS en el mapa hasta la entrega</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Permisos de carga ancha y escolta cuando corresponde</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Carga, amarre y aseguramiento a cargo de nuestro personal</li>
-      </ul>
-
-      <div class="servicio__acciones">
-        <a class="btn btn--ambar" href="transporte.html">
-          <svg class="ico" aria-hidden="true"><use href="#i-lowboy"/></svg> Cotizar transporte
-        </a>
-        <a class="btn btn--linea" href="transporte.html#detalle">Más información</a>
-      </div>
-    </section>
-
-    <section class="panel panel--servicio" id="importacion" aria-labelledby="t-imp">
-      <h2 class="panel__titulo" id="t-imp"><em>Importación</em> de maquinaria</h2>
-      <p class="panel__texto">Si el equipo que busca no está publicado, lo importamos. Indique <b>presupuesto y aplicación prevista</b> y localizamos la máquina en el exterior con el costo puesto en puerto dominicano.</p>
-
-      <ul class="servicio__puntos">
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Búsqueda en subastas y dealers de Estados Unidos</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Flete, seguro y aranceles estimados por adelantado</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Inspección previa a la compra y gestión aduanal</li>
-      </ul>
-
-      <div class="servicio__acciones">
-        <a class="btn btn--ambar" href="importar.html">
-          <svg class="ico" aria-hidden="true"><use href="#i-barco"/></svg> Cotizar importación
-        </a>
-        <a class="btn btn--linea" href="importar.html#detalle">Más información</a>
-      </div>
-    </section>
+      <article class="banda__servicio">
+        <span class="banda__ico"><svg class="ico" aria-hidden="true"><use href="#i-barco"/></svg></span>
+        <h3 class="banda__nombre">Importación de maquinaria</h3>
+        <p class="banda__texto">Si lo que busca no está publicado, lo localizamos en el exterior con flete, seguro y aranceles estimados por adelantado.</p>
+        <div class="banda__acciones">
+          <a class="btn btn--ambar btn--chico" href="importar.html">Cotizar importación</a>
+          <a class="btn btn--linea btn--chico" href="importar.html#detalle">Más información</a>
+        </div>
+      </article>
+    </div>
   </div>
+</section>
 
-  <!-- ==== PUBLICIDAD ====
-       Antes había cuatro huecos de 290×150 en fila aquí y un banner de
-       1200×110 como primer elemento de la página. Se cambió por un solo
-       espacio, y más abajo, por tres razones:
-
-       · El banner sobre el contenido es la posición con menos atención
-         medida (ceguera al banner) y empujaba el catálogo fuera de la
-         primera pantalla: costaba visitas sin ganar clics.
-       · Cuatro huecos seguidos sin vender se ven como una página rota, y
-         con anunciantes reales compiten entre sí y bajan el valor de
-         cada uno. Un solo espacio se vende más caro que cuatro baratos.
-       · Aquí llega quien ya recorrió los servicios y va camino del
-         catálogo: es tráfico calificado y el formato queda dentro del
-         flujo de lectura, no atravesado en él.
-
-       El inventario de mayor valor está en equipos.html, donde el
-       visitante busca con intención de compra declarada. -->
-
+<div class="envoltura">
 
   <!-- ==== MARCAS CON EQUIPOS PUBLICADOS ==== -->
   <section class="panel panel--marcas" aria-labelledby="t-marcas">
@@ -376,13 +373,29 @@
     <p class="marcas__nota" id="marcasNota"></p>
   </section>
 
-  <!-- ==== ANUNCIOS RECIENTES ==== -->
+  <!-- ==== ANUNCIOS RECIENTES ====
+       También en carrusel. Dieciocho tarjetas en rejilla ocupaban tres
+       filas y media portada; en horizontal caben las mismas en una
+       sola franja, y quien quiera verlas todas tiene el catálogo a un
+       clic. -->
   <section class="panel" id="recientes" aria-labelledby="t-rec">
     <div class="panel__cabeza">
       <h2 class="panel__titulo panel__titulo--limpio" id="t-rec"><em>Anuncios</em> recientes</h2>
-      <p class="panel__meta"><span class="num" id="totalEquipos">0</span> equipos publicados · actualizado hoy</p>
+      <div class="panel__meta panel__meta--mandos">
+        <span><span class="num" id="totalEquipos">0</span> equipos publicados</span>
+        <span class="carrusel__mandos" data-mandos="rejillaRecientes">
+          <button type="button" class="carrusel__flecha carrusel__flecha--atras" data-ir="-1" aria-label="Ver los anteriores">
+            <svg class="ico" aria-hidden="true"><use href="#i-flecha"/></svg>
+          </button>
+          <button type="button" class="carrusel__flecha" data-ir="1" aria-label="Ver los siguientes">
+            <svg class="ico" aria-hidden="true"><use href="#i-flecha"/></svg>
+          </button>
+        </span>
+      </div>
     </div>
-    <ul class="rejilla" id="rejillaRecientes" data-tope="18"></ul>
+    <div class="carrusel">
+      <ul class="rejilla carrusel__pista" id="rejillaRecientes" data-tope="18"></ul>
+    </div>
     <nav class="paginas" aria-label="Paginación de anuncios">
       <a class="btn btn--linea" href="equipos.html">Ver todos los equipos</a>
     </nav>
