@@ -3084,8 +3084,20 @@ body.sin-scroll { overflow: hidden; }
 .mosaico > li:first-child .mosaico__nombre { font-size: 19px; }
 .mosaico__total { font-size: 12px; font-weight: 600; color: var(--ambar); }
 
-.mosaico__vacia { display: grid; place-items: center; background: var(--hueso); color: var(--gris-acero); }
-.mosaico__vacia::after { display: none; }
+/* Categoría sin inventario todavía. No se esconde: enseñar el abanico
+   dice de qué va el sitio, y la cifra dice dónde hay algo hoy. Va más
+   apagada para que la vista se vaya primero a las que sí tienen. */
+.mosaico__pieza--vacia { background: var(--hueso); }
+.mosaico__pieza--vacia::after { background: none; }
+.mosaico__pieza--vacia .mosaico__nombre { color: var(--azul); }
+.mosaico__pieza--vacia .mosaico__total { color: var(--gris-acero); font-size: 11.5px; }
+
+.mosaico__ico {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: var(--gris-neutro);
+}
+.mosaico__ico .ico { width: 40%; max-width: 56px; height: auto; aspect-ratio: 1; }
 
 @media (max-width: 860px) {
   .mosaico { grid-template-columns: repeat(2, minmax(0, 1fr)); }

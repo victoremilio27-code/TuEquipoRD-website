@@ -312,26 +312,33 @@ function montarMosaicoCategorias() {
   if (!cont) return;
 
   const tope = Number(cont.dataset.top) || 7;
-  const conteo = conteoCategorias().filter((c) => c.total > 0).slice(0, tope);
 
-  if (!conteo.length) {
-    cont.innerHTML = `<li class="mosaico__vacia mosaico__pieza">
-      <span class="mosaico__cuerpo"><span class="mosaico__nombre">Aún no hay equipos publicados</span></span></li>`;
-    return;
-  }
+  /* Entran también las categorías sin inventario, detrás de las que sí
+     lo tienen. `conteoCategorias` ya ordena por cantidad.
+
+     Filtrarlas dejaba el mosaico en una sola pieza mientras el
+     catálogo fuera joven —hoy en producción solo hay camiones— y una
+     casilla suelta en una rejilla de cuatro columnas se lee como algo
+     que no cargó. Enseñar el abanico dice de qué va el sitio; la
+     cifra dice dónde hay algo hoy. */
+  const conteo = conteoCategorias().slice(0, tope);
+  if (!conteo.length) return;
 
   cont.innerHTML = conteo.map((c) => {
-    const fotos = FOTOS_CATEGORIA[c.id] || [];
+    const hay = c.total > 0;
+    // La foto solo si de verdad hay inventario: una pieza con
+    // fotografía y el rótulo «Sin equipos» se contradice a sí misma.
+    const fotos = hay ? (FOTOS_CATEGORIA[c.id] || []) : [];
     const foto = fotos.length ? alAzar(fotos) : null;
 
     return `<li>
-      <a class="mosaico__pieza" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
+      <a class="mosaico__pieza${hay ? '' : ' mosaico__pieza--vacia'}" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
         ${foto
           ? `<img src="${esc(foto.foto)}" alt="${esc(foto.titulo)}, publicado en ${esc(c.nombre)}" loading="lazy" decoding="async">`
-          : ''}
+          : `<span class="mosaico__ico">${icono(c.icono)}</span>`}
         <span class="mosaico__cuerpo">
           <span class="mosaico__nombre">${esc(c.nombre)}</span>
-          <span class="mosaico__total num">${c.total}</span>
+          <span class="mosaico__total num">${hay ? c.total : 'Sin equipos'}</span>
         </span>
       </a>
     </li>`;
