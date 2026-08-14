@@ -96,10 +96,27 @@ function cabecerasDe(extra = {}) {
    revalida siempre y el resto dura lo justo. */
 function cacheDe(ext) {
   if (!PRODUCCION) return 'no-store';
-  if (ext === '.html') return 'no-cache';
-  if (ext === '.css' || ext === '.js') return 'public, max-age=3600';
+  /* `no-cache` no significa «no guardes»: significa «guárdalo pero
+     pregunta antes de usarlo». Con el ETag de abajo, esa pregunta se
+     responde con un 304 vacío, así que se ahorra la descarga igual y
+     además se ve el cambio al instante.
+
+     Antes styles.css y los scripts llevaban max-age=3600 SIN ETag: un
+     despliegue tardaba hasta una hora en verse y la única salida era
+     Ctrl+F5. Los nombres no llevan hash, así que cachear a ciegas no
+     es una opción.
+
+     Las imágenes de marca sí duran: cambian cada muchos meses y
+     revalidarlas en cada visita no compensa. */
+  if (ext === '.html' || ext === '.css' || ext === '.js') return 'no-cache';
   return 'public, max-age=604800';
 }
+
+/* Marca de versión del archivo. Tamaño y fecha de modificación bastan
+   —no hace falta leer el contenido para compararlo— y cambian con
+   cualquier despliegue, que es justo cuando el navegador tiene que
+   volver a pedirlo. */
+const etagDe = (est) => `W/"${est.size.toString(36)}-${est.mtimeMs.toString(36)}"`;
 
 /* QUÉ SE PUEDE PEDIR POR HTTP.
  *
@@ -247,19 +264,44 @@ const servidor = http.createServer((req, res) => {
     return;
   }
 
-  fs.readFile(archivo, (err, datos) => {
-    if (err) {
+  fs.stat(archivo, (errEst, est) => {
+    if (errEst || !est.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<h1>404</h1><p>No existe <code>' + ruta.replace(/[<>&]/g, '') + '</code></p>');
       console.log(`404  ${ruta}`);
       return;
     }
-    res.writeHead(200, {
-      'Content-Type': TIPOS[path.extname(archivo).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': cacheDe(path.extname(archivo).toLowerCase()),
+
+    const ext = path.extname(archivo).toLowerCase();
+    const etag = etagDe(est);
+    const cabeceras = {
+      'Content-Type': TIPOS[ext] || 'application/octet-stream',
+      'Cache-Control': cacheDe(ext),
+      ETag: etag,
+      'Last-Modified': new Date(est.mtimeMs).toUTCString(),
+    };
+
+    /* El navegador ya lo tiene y no ha cambiado: se le responde 304 sin
+       cuerpo. Cuesta unos cientos de bytes en vez de los cien kilos del
+       archivo, y en cuanto se despliega algo el ETag cambia y se manda
+       la versión nueva sin que nadie tenga que forzar la recarga. */
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, cabeceras);
+      res.end();
+      console.log(`304  ${ruta}`);
+      return;
+    }
+
+    fs.readFile(archivo, (err, datos) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>404</h1><p>No existe.</p>');
+        return;
+      }
+      res.writeHead(200, cabeceras);
+      res.end(datos);
+      console.log(`200  ${ruta}`);
     });
-    res.end(datos);
-    console.log(`200  ${ruta}`);
   });
 });
 
