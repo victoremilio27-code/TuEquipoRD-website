@@ -21,9 +21,60 @@ const destinoTrasEntrar = () => {
   return /^[\w-]+\.html$/.test(pedido || '') ? pedido : 'panel.html';
 };
 
+/* ── Ver la contraseña ──────────────────────────────────────
+   Un botón por campo, puesto por código y no a mano en cada
+   formulario: son cuatro repartidos por cinco vistas y basta olvidar
+   uno para que la pantalla quede a medias.
+
+   Empieza siempre oculta y vuelve a ocultarse al enviar: dejarla a la
+   vista en un móvil que se pasa de mano en mano no es un favor.
+
+   `aria-pressed` en vez de cambiar solo el icono: un lector de
+   pantalla tiene que poder decir si ahora mismo se está mostrando. */
+function montarVerClave(raiz = document) {
+  raiz.querySelectorAll('input[type="password"]').forEach((campo) => {
+    const caja = campo.closest('.campo-v');
+    if (!caja || caja.querySelector('.ver-clave')) return;
+
+    caja.classList.add('campo-v--clave');
+
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'ver-clave';
+    boton.setAttribute('aria-pressed', 'false');
+    boton.setAttribute('aria-label', 'Mostrar la contraseña');
+    boton.innerHTML = `<svg class="ico" aria-hidden="true"><use href="#i-ojo"/></svg>`;
+
+    boton.addEventListener('click', () => {
+      const visible = campo.type === 'text';
+      campo.type = visible ? 'password' : 'text';
+      boton.setAttribute('aria-pressed', String(!visible));
+      boton.setAttribute('aria-label', visible ? 'Mostrar la contraseña' : 'Ocultar la contraseña');
+      boton.classList.toggle('ver-clave--activo', !visible);
+      // El cursor vuelve al final: cambiar el tipo lo manda al inicio.
+      const fin = campo.value.length;
+      campo.focus();
+      try { campo.setSelectionRange(fin, fin); } catch (_) { /* algunos tipos no lo admiten */ }
+    });
+
+    campo.insertAdjacentElement('afterend', boton);
+
+    const form = campo.closest('form');
+    if (form) {
+      form.addEventListener('submit', () => {
+        campo.type = 'password';
+        boton.setAttribute('aria-pressed', 'false');
+        boton.classList.remove('ver-clave--activo');
+      });
+    }
+  });
+}
+
 function montarCuenta() {
   const el = (id) => document.getElementById(id);
   if (!el('formEntrar')) return;
+
+  montarVerClave();
 
   const aviso = el('avisoAcceso');
   const pestanas = document.querySelector('.pestanas');
@@ -153,6 +204,13 @@ function montarCuenta() {
     const clave = el('new-clave').value;
 
     if (clave.length < 10) return mostrarAviso('La contraseña debe tener al menos 10 caracteres.');
+    /* Una errata al teclear algo que no se ve deja la cuenta creada con
+       una clave que su dueño no conoce, y la única salida es el correo
+       de recuperación. */
+    if (el('new-clave2').value !== clave) {
+      el('new-clave2').focus();
+      return mostrarAviso('Las dos contraseñas no coinciden.');
+    }
     if (dealer) {
       if (!el('new-empresa').value.trim()) return mostrarAviso('Escriba la razón social de la empresa.');
       if (el('new-rnc').value.replace(/\D/g, '').length !== 9) {

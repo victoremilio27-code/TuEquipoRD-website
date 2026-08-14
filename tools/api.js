@@ -603,6 +603,80 @@ const editarPortada = conAdmin(async (req, res) => {
   return responder(res, 200, { heroe: db.heroePortada() });
 });
 
+/* ── Rutas: solicitudes de servicio ─────────────────────────
+   Alquiler, transporte e importación. Antes estos formularios no
+   llegaban a ningún sitio: pintaban un resumen en pantalla y le pedían
+   al cliente que lo copiara a WhatsApp. Quien no lo copiaba se perdía.
+
+   Va sin sesión a propósito: pedir cotización no debe exigir cuenta.
+   Lo que sí se exige es con qué responder. */
+const SERVICIOS_SOLICITUD = ['alquiler', 'transporte', 'importacion', 'contacto'];
+
+async function crearSolicitudServicio(req, res) {
+  const c = await leerCuerpo(req);
+  const ip = origen(req);
+
+  // El mismo tope que el registro: un humano no manda seis cotizaciones
+  // en una hora, un guion sí.
+  if (!db.permitir(`servicio:${ip}`, 6, 60)) {
+    return fallo(res, 429, 'Demasiadas solicitudes desde esta conexión. Inténtelo más tarde.');
+  }
+
+  const servicio = String(c.servicio || '');
+  if (!SERVICIOS_SOLICITUD.includes(servicio)) return fallo(res, 400, 'Servicio no reconocido');
+
+  const nombre = texto(c.nombre, 120);
+  if (!nombre || nombre.length < 3) return fallo(res, 400, 'Escriba su nombre o el de su empresa');
+
+  const telefono = String(c.telefono || '').replace(/\D/g, '');
+  if (telefono.length !== 10) return fallo(res, 400, 'Indique un teléfono de 10 dígitos');
+
+  // El correo es opcional, pero si viene tiene que ser válido: uno mal
+  // escrito es peor que ninguno, porque se cuenta como vía de respuesta.
+  const correoCliente = texto(c.correo, 160);
+  if (correoCliente && !correoValido(correoCliente)) return fallo(res, 400, 'Escriba un correo válido o déjelo vacío');
+
+  /* El detalle llega como pares rótulo/valor de la propia pantalla. Se
+     recorta y se limita: es texto libre que acaba en un correo. */
+  const detalle = {};
+  Object.entries(c.detalle || {}).slice(0, 25).forEach(([k, v]) => {
+    const rotulo = texto(k, 60);
+    const valor = texto(v, 600);
+    if (rotulo && valor) detalle[rotulo] = valor;
+  });
+
+  const solicitud = db.crearSolicitudServicio({
+    servicio, nombre, telefono, correo: correoCliente, empresa: texto(c.empresa, 120), detalle,
+  });
+
+  correo.enviarSolicitudServicio(solicitud);
+  return responder(res, 201, {
+    referencia: solicitud.referencia,
+    mensaje: correoCliente
+      ? 'Recibimos su solicitud. Le enviamos copia por correo y le respondemos con precio y disponibilidad.'
+      : 'Recibimos su solicitud. Le respondemos con precio y disponibilidad.',
+  });
+}
+
+const listarSolicitudesServicio = conAdmin((req, res, ctx, consulta) => {
+  const q = consulta || new URLSearchParams();
+  return responder(res, 200, {
+    solicitudes: db.solicitudesServicio({
+      servicio: SERVICIOS_SOLICITUD.includes(q.get('servicio')) ? q.get('servicio') : undefined,
+      estado: ['nueva', 'atendida', 'cerrada'].includes(q.get('estado')) ? q.get('estado') : undefined,
+    }),
+  });
+});
+
+const marcarSolicitudServicio = conAdmin(async (req, res, ctx, idSol) => {
+  const c = await leerCuerpo(req);
+  if (!['nueva', 'atendida', 'cerrada'].includes(c.estado)) {
+    return fallo(res, 400, 'Estado inválido');
+  }
+  db.marcarSolicitudServicio(idSol, c.estado, texto(c.nota, 500));
+  return responder(res, 200, { ok: true, estado: c.estado });
+});
+
 /* ── Rutas: taxonomía ───────────────────────────────────── */
 
 /* La jerarquía completa, para que la pantalla de publicación arme sus
@@ -743,6 +817,21 @@ function datosFlota(c, servicio, { parcial = false } = {}) {
   if (c.detalle !== undefined) d.detalle = texto(c.detalle, 240);
   if (c.icono !== undefined) d.icono = texto(c.icono, 40);
   if (c.foto !== undefined) d.foto = texto(c.foto, 300);
+  if (c.capacidadTexto !== undefined) d.capacidad_texto = texto(c.capacidadTexto, 80);
+
+  /* Galería del tipo de equipo. Cada ruta tiene que ser un archivo del
+     propio sitio: si se aceptara una URL cualquiera, la ficha acabaría
+     cargando la imagen de un tercero que puede cambiarla o retirarla. */
+  if (Array.isArray(c.fotos)) {
+    const fotos_ = [];
+    for (const f of c.fotos.slice(0, 8)) {
+      const url = texto(typeof f === 'string' ? f : f && f.url, 300);
+      if (!url) continue;
+      if (!fotos.archivoDe(url)) return { error: 'Las fotografías tienen que subirse al sitio' };
+      fotos_.push({ url, alt: texto(f && f.alt, 160) });
+    }
+    d.fotos = fotos_;
+  }
 
   if (servicio === 'alquiler') {
     if (c.unidad !== undefined || !parcial) {
@@ -1478,6 +1567,12 @@ const RUTAS = [
   // Flota propia de alquiler y transporte. La lectura es pública;
   // todo lo que la modifica exige sesión con es_admin.
   ['GET',  /^\/api\/taxonomia$/,                        verTaxonomia],
+
+  // Cotizaciones de alquiler, transporte e importación. Crearlas va sin
+  // sesión —pedir precio no debe exigir cuenta—; leerlas, no.
+  ['POST',  /^\/api\/solicitudes$/,                      crearSolicitudServicio],
+  ['GET',   /^\/api\/admin\/solicitudes-servicio$/,      listarSolicitudesServicio],
+  ['PATCH', /^\/api\/admin\/solicitudes-servicio\/([\w-]+)$/, marcarSolicitudServicio],
 
   // Portada: fotografía del héroe y fotos por categoría.
   ['GET',   /^\/api\/portada$/,                         verPortada],

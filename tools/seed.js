@@ -313,18 +313,27 @@ function sembrar() {
    escritos a mano en assets/data.js antes de que se pudieran
    administrar. No es demostración: es el inventario real de partida, y
    por eso se siembra siempre y no se toca si ya existe. */
-const FLOTA_INICIAL = [
-  ['alquiler', 'Excavadora 20 t', 'Clase CAT 320 · brazo estándar · con operador', 'i-excavadora', 'día', null],
-  ['alquiler', 'retro-4x4', 'Clase JCB 3CX · martillo opcional', 'i-retro', 'día', null],
-  ['alquiler', 'Cargador frontal 3 m³', 'Clase WA200 · ideal para acopio', 'i-cargador', 'día', null],
-  ['alquiler', 'Camión volteo 16 m³', 'Con chofer · movimiento de material', 'i-volteo', 'viaje', null],
-  ['alquiler', 'Rodillo compactador', '11 t · vibratorio liso', 'i-rodillo', 'día', null],
-  ['alquiler', 'Planta eléctrica 100 kW', 'Insonorizada · diésel · tablero incluido', 'i-generador', 'semana', null],
+/* Flota propia, por TIPO de equipo y capacidad.
 
-  ['transporte', 'Lowboy 40 t', 'Excavadoras de 20 t en adelante, grúas y equipo de oruga', 'i-lowboy', null, 40],
-  ['transporte', 'Cama baja 25 t', 'Retroexcavadoras, cargadores medianos y rodillos', 'i-lowboy', null, 25],
-  ['transporte', 'Plataforma 15 t', 'Montacargas, plantas eléctricas y equipo compacto', 'i-lowboy', null, 15],
-  ['transporte', 'Cama con rampas 8 t', 'Minicargadores, miniexcavadoras y compactadoras chicas', 'i-lowboy', null, 8],
+   El nombre no lleva marca ni modelo, y el detalle dice para qué
+   sirve. Antes decía «Clase CAT 320» y eso prometía una máquina
+   concreta: lo que se alquila es una excavadora de veinte toneladas y
+   va la que esté libre ese día. La ficha lo dice en pantalla y en el
+   correo que recibe el equipo.
+
+   [servicio, nombre, capacidadTexto, detalle, icono, unidad, toneladas] */
+const FLOTA_INICIAL = [
+  ['alquiler', 'Excavadora', '18 a 22 toneladas', 'Excavación, zanjas y carga de material. Con operador o sin él.', 'i-excavadora', 'día', null],
+  ['alquiler', 'Retroexcavadora 4x4', 'Pala de 1 m³ · brazo de 4,5 m', 'Zanjas, relleno y carga en espacios reducidos. Admite martillo.', 'i-retro', 'día', null],
+  ['alquiler', 'Cargador frontal', 'Cucharón de 2,5 a 3 m³', 'Acopio, carga de camiones y movimiento de agregados.', 'i-cargador', 'día', null],
+  ['alquiler', 'Camión volteo', '14 a 16 m³', 'Traslado de tierra, arena y escombro. Incluye chofer.', 'i-volteo', 'viaje', null],
+  ['alquiler', 'Rodillo compactador', '10 a 12 toneladas', 'Compactación de terraplenes y bases. Vibratorio liso.', 'i-rodillo', 'día', null],
+  ['alquiler', 'Planta eléctrica', '80 a 100 kW', 'Energía en obra sin red. Insonorizada, con tablero de transferencia.', 'i-generador', 'semana', null],
+
+  ['transporte', 'Lowboy', '40 toneladas', 'Excavadoras de 20 t en adelante, grúas y equipo de oruga.', 'i-lowboy', null, 40],
+  ['transporte', 'Cama baja', '25 toneladas', 'Retroexcavadoras, cargadores medianos y rodillos.', 'i-lowboy', null, 25],
+  ['transporte', 'Plataforma', '15 toneladas', 'Montacargas, plantas eléctricas y equipo compacto.', 'i-lowboy', null, 15],
+  ['transporte', 'Cama con rampas', '8 toneladas', 'Minicargadores, miniexcavadoras y compactadoras chicas.', 'i-lowboy', null, 8],
 ];
 
 function sembrarFlota() {
@@ -333,11 +342,11 @@ function sembrarFlota() {
   if (hay) return 0;
 
   const ins = d.prepare(`INSERT INTO flota
-    (id, servicio, nombre, detalle, icono, unidad, capacidad, activo, orden, creado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
+    (id, servicio, nombre, capacidad_texto, detalle, icono, unidad, capacidad, activo, orden, creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
   const t = db.ahora();
-  FLOTA_INICIAL.forEach(([servicio, nombre, detalle, icono, unidad, capacidad], i) => {
-    ins.run(db.id(), servicio, nombre, detalle, icono, unidad, capacidad, i, t);
+  FLOTA_INICIAL.forEach(([servicio, nombre, capacidadTexto, detalle, icono, unidad, capacidad], i) => {
+    ins.run(db.id(), servicio, nombre, capacidadTexto, detalle, icono, unidad, capacidad, i, t);
   });
   return FLOTA_INICIAL.length;
 }

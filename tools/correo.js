@@ -347,6 +347,84 @@ function enviarAvisoCambioClave({ para, nombre }) {
  * Este es el único correo que lleva el RNC completo, y va a una
  * dirección interna. No se reenvía al dealer ni aparece en ningún
  * mensaje que reciba un tercero. */
+/* ── Solicitud de alquiler, transporte o importación ────────
+   Van DOS correos: uno al equipo, con los datos de contacto arriba del
+   todo porque lo primero que se hace es llamar; y otro al cliente con
+   su referencia, para que sepa que llegó y tenga con qué preguntar.
+
+   El del cliente solo sale si dejó correo: el teléfono es obligatorio,
+   el correo no. */
+const NOMBRE_SERVICIO = {
+  alquiler: 'alquiler de maquinaria',
+  transporte: 'transporte de maquinaria',
+  importacion: 'importación de maquinaria',
+  contacto: 'contacto general',
+};
+
+function enviarSolicitudServicio(s) {
+  const servicio = NOMBRE_SERVICIO[s.servicio] || s.servicio;
+  const detalle = Object.entries(s.detalle || {}).filter(([, v]) => v !== '' && v != null);
+
+  const cuerpo = [
+    `Nueva solicitud de ${servicio}.`,
+    '',
+    '── Contacto ──',
+    `Nombre: ${s.nombre}`,
+    `Teléfono: ${s.telefono}`,
+    s.correo ? `Correo: ${s.correo}` : null,
+    s.empresa ? `Empresa: ${s.empresa}` : null,
+    '',
+    '── Lo que pide ──',
+    ...detalle.map(([k, v]) => `${k}: ${v}`),
+    '',
+    `Referencia ${s.referencia}`,
+  ].filter((l) => l !== null).join('\n');
+
+  enviar({
+    para: REVISION,
+    asunto: `Solicitud de ${servicio} · ${s.nombre} · ${s.referencia}`,
+    texto: cuerpo,
+    html: envoltura({
+      titulo: `Solicitud de ${servicio}`,
+      parrafos: [
+        `<b style="color:${AZUL}">${esc(s.nombre)}</b> pide una cotización.`,
+        `Teléfono: <b>${esc(s.telefono)}</b>${s.correo ? ` · Correo: ${esc(s.correo)}` : ''}`,
+      ],
+      extra: tarjeta(filas([
+        ['Referencia', s.referencia],
+        ['Nombre', s.nombre],
+        ['Teléfono', s.telefono],
+        ['Correo', s.correo],
+        ['Empresa', s.empresa],
+        ...detalle,
+      ])),
+    }),
+  });
+
+  if (!s.correo) return { entregado: true };
+
+  return enviar({
+    para: s.correo,
+    asunto: `Recibimos su solicitud · ${s.referencia}`,
+    texto: [
+      `Hola ${s.nombre},`,
+      '',
+      `Recibimos su solicitud de ${servicio}. La referencia es ${s.referencia}.`,
+      'Le respondemos con precio y disponibilidad, normalmente el mismo día hábil.',
+      '',
+      'Si necesita adelantar algo, responda a este correo citando la referencia.',
+    ].join('\n'),
+    html: envoltura({
+      titulo: 'Recibimos su solicitud',
+      parrafos: [
+        `Hola ${esc(s.nombre)}, ya tenemos su solicitud de ${esc(servicio)}.`,
+        'Le respondemos con precio y disponibilidad, normalmente el mismo día hábil.',
+      ],
+      extra: tarjeta(filas([['Referencia', s.referencia]])),
+    }),
+  });
+}
+
 function enviarSolicitudDealer(s) {
   const linea = (rotulo, valor) => (valor == null || valor === '' ? null : `${rotulo}: ${valor}`);
   const ubicacion = [s.direccion, s.municipio, s.provincia].filter(Boolean).join(', ');
@@ -672,7 +750,7 @@ const enviarBienvenida = ({ para, nombre, esDealer }) => enviar({
 
 module.exports = {
   enviar, enviarCodigo, enviarAvisoCambioClave,
-  enviarSolicitudDealer, enviarResolucionDealer,
+  enviarSolicitudDealer, enviarResolucionDealer, enviarSolicitudServicio,
   enviarAnuncioPublicado, enviarAnuncioPorVencer, enviarAnuncioVencido,
   enviarComprobante, enviarContactoRecibido, enviarBienvenida,
   BANDEJA, REVISION, SITIO,

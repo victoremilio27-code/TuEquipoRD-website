@@ -218,17 +218,24 @@ function avisarFlota(mensaje, bien = false) {
 }
 
 function flotaHTML(f) {
+  /* La capacidad manda sobre todo lo demás: es lo que distingue un tipo
+     de equipo de otro para quien lo alquila. */
   const medida = SERVICIO === 'transporte'
-    ? `hasta ${Number(f.capacidad) || '—'} t`
-    : `por ${esc(f.unidad || 'día')}`;
+    ? (f.capacidad_texto || `hasta ${Number(f.capacidad) || '—'} t`)
+    : [f.capacidad_texto, `por ${f.unidad || 'día'}`].filter(Boolean).join(' · ');
+
+  const fotos = f.fotos || [];
 
   return `<li class="sol${f.activo ? '' : ' sol--rechazada'}" data-id="${esc(f.id)}">
     <div class="sol__cabeza">
       <b class="sol__nombre">${esc(f.nombre)}</b>
-      <span class="sol__meta">${medida}</span>
+      <span class="sol__meta">${esc(medida)}</span>
       ${f.activo ? '' : '<span class="pastilla pastilla--roja">Fuera de servicio</span>'}
     </div>
     ${f.detalle ? `<p class="sol__meta">${esc(f.detalle)}</p>` : ''}
+    ${fotos.length
+      ? `<div class="flota-fotos">${fotos.map((x) => `<img src="${esc(x.url)}" alt="${esc(x.alt || f.nombre)}">`).join('')}</div>`
+      : '<p class="sol__meta sol__meta--aviso">Sin fotografías. Con una sola imagen el cliente espera esa máquina en concreto; con varias de marcas distintas entiende que se le entrega la disponible.</p>'}
     <div class="sol__acciones">
       <button type="button" class="btn btn--linea btn--chico" data-flota="alternar">
         ${f.activo ? 'Retirar del servicio' : 'Volver a poner'}
@@ -325,12 +332,40 @@ function montarFlota() {
     }
   });
 
+  /* Las fotos se suben al elegirlas, no al enviar: así el equipo ve si
+     alguna falló antes de dar de alta el tipo. Se reducen en el
+     navegador, igual que en publicar.js. */
+  let FOTOS_FLOTA = [];
+  const entradaFotos = $('#fl-fotos');
+  entradaFotos.addEventListener('change', async () => {
+    const archivos = [...(entradaFotos.files || [])].slice(0, 8);
+    const estado = $('#flEstadoFotos');
+    if (!archivos.length) { FOTOS_FLOTA = []; return; }
+
+    estado.textContent = `Subiendo ${archivos.length}…`;
+    try {
+      FOTOS_FLOTA = [];
+      for (const archivo of archivos) {
+        // Secuencial y no en paralelo: ocho canvas a la vez en un móvil
+        // se queda sin memoria y falla la última sin decir por qué.
+        // eslint-disable-next-line no-await-in-loop
+        FOTOS_FLOTA.push({ url: await reducirYSubir(archivo, 1200) });
+      }
+      estado.textContent = `${FOTOS_FLOTA.length} ${FOTOS_FLOTA.length === 1 ? 'fotografía lista' : 'fotografías listas'}.`;
+    } catch (e) {
+      FOTOS_FLOTA = [];
+      estado.textContent = `No se pudieron subir: ${e.message}`;
+    }
+  });
+
   $('#formFlota').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const cuerpo = {
       nombre: $('#fl-nombre').value.trim(),
       detalle: $('#fl-detalle').value.trim(),
+      capacidadTexto: $('#fl-capacidad-texto').value.trim(),
       icono: $('#fl-icono').value,
+      fotos: FOTOS_FLOTA,
     };
     if (SERVICIO === 'alquiler') cuerpo.unidad = $('#fl-unidad').value;
     else cuerpo.capacidad = $('#fl-capacidad').value;
@@ -339,6 +374,8 @@ function montarFlota() {
       const r = await api(`/admin/flota/${SERVICIO}`, { metodo: 'POST', cuerpo });
       if (!r) throw new Error('No hay conexión con el servidor.');
       $('#formFlota').reset();
+      FOTOS_FLOTA = [];
+      $('#flEstadoFotos').textContent = 'Varias, y de marcas distintas: enseñar una sola promete esa máquina en concreto.';
       $('#altaFlota').open = false;
       await cargarFlota();
       avisarFlota(`«${r.elemento.nombre}» añadido a ${SERVICIO}.`, true);

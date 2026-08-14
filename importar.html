@@ -80,7 +80,7 @@
     <h2 class="panel__titulo" id="t-form"><em>Requerimiento</em> de importación</h2>
     <p class="panel__texto">Cuanto más preciso sea al describir el trabajo previsto, mejor será la recomendación. No es necesario conocer el modelo exacto.</p>
 
-    <form class="form-largo" data-cotizacion="resumenImportar">
+    <form class="form-largo" data-servicio="importacion" data-cotizacion="resumenImportar">
       <div class="campos">
         <label class="campo-v"><span>Tipo de equipo</span>
           <select name="Tipo de equipo" data-categorias required><option value="">Seleccione uno</option></select>
@@ -113,8 +113,11 @@
             <option>Estoy explorando</option>
           </select>
         </label>
-        <label class="campo-v"><span>Tu nombre o empresa</span>
-          <input type="text" name="Nombre" required>
+        <label class="campo-v"><span>Su nombre o empresa *</span>
+          <input type="text" name="Nombre" autocomplete="name" required>
+        </label>
+        <label class="campo-v"><span>Correo electrónico</span>
+          <input type="email" name="Correo" autocomplete="email" placeholder="Para enviarle copia por escrito">
         </label>
         <label class="campo-v"><span>Teléfono o WhatsApp</span>
           <input type="tel" name="Teléfono" placeholder="(809) 000-0000" required>

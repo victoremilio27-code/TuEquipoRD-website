@@ -65,7 +65,7 @@
 
       <p class="aviso-demo" id="contactoDesdeFicha" hidden></p>
 
-      <form class="form-largo" data-cotizacion="resumenContacto">
+      <form class="form-largo" data-servicio="contacto" data-cotizacion="resumenContacto">
         <div class="campos campos--uno">
           <label class="campo-v"><span>Motivo</span>
             <select name="Motivo" required>
@@ -79,8 +79,11 @@
               <option>Otra cosa</option>
             </select>
           </label>
-          <label class="campo-v"><span>Tu nombre</span>
-            <input type="text" name="Nombre" required>
+          <label class="campo-v"><span>Su nombre *</span>
+            <input type="text" name="Nombre" autocomplete="name" required>
+          </label>
+          <label class="campo-v"><span>Correo electrónico</span>
+            <input type="email" name="Correo" autocomplete="email" placeholder="Para enviarle copia por escrito">
           </label>
           <label class="campo-v"><span>Teléfono o WhatsApp</span>
             <input type="tel" name="Teléfono" placeholder="(809) 000-0000" required>

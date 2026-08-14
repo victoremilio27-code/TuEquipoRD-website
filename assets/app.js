@@ -1138,17 +1138,42 @@ async function montarAlquiler() {
     ? datos.flota
     : (typeof EQUIPOS_ALQUILER !== 'undefined' ? EQUIPOS_ALQUILER : []);
 
-  cont.innerHTML = flota.map((a) => `<li>
-    <label class="alq">
-      <input type="checkbox" name="equipo" value="${esc(a.nombre)}">
-      <span class="alq__ico">${icono(a.icono || 'i-hex')}</span>
-      <span class="alq__cuerpo">
-        <span class="alq__nombre">${esc(a.nombre)}</span>
-        <span class="alq__detalle">${esc(a.detalle || '')}</span>
-      </span>
-      <span class="alq__unidad">por ${esc(a.unidad || 'día')}</span>
-    </label>
-  </li>`).join('');
+  /* Se elige un TIPO de equipo y su capacidad, no una máquina concreta.
+
+     Antes cada ficha decía «Clase CAT 320» y eso prometía un modelo
+     que nadie se comprometió a entregar: se alquila una excavadora de
+     veinte toneladas y va la que esté libre ese día. Por eso las fotos
+     son varias y de marcas distintas — enseñar una sola vuelve a
+     prometer esa misma máquina.
+
+     El valor que viaja al servidor incluye la capacidad: «Excavadora ·
+     18 a 22 toneladas» es lo que hay que cotizar, y sin ella el
+     correo llega diciendo solo «Excavadora». */
+  cont.innerHTML = flota.map((a) => {
+    const fotos = (a.fotos || []).slice(0, 4);
+    const capacidad = a.capacidad_texto || (a.capacidad ? `${a.capacidad} toneladas` : '');
+    const valor = [a.nombre, capacidad].filter(Boolean).join(' · ');
+
+    return `<li>
+      <label class="alq">
+        <input type="checkbox" name="equipo" value="${esc(valor)}">
+        <span class="alq__galeria">
+          ${fotos.length
+            ? fotos.map((f) => `<img src="${esc(f.url)}" alt="${esc(f.alt || a.nombre)}" loading="lazy" decoding="async">`).join('')
+            : `<span class="alq__ico">${icono(a.icono || 'i-hex')}</span>`}
+        </span>
+        <span class="alq__cuerpo">
+          <span class="alq__nombre">${esc(a.nombre)}</span>
+          ${capacidad ? `<span class="alq__capacidad num">${esc(capacidad)}</span>` : ''}
+          <span class="alq__detalle">${esc(a.detalle || '')}</span>
+          ${fotos.length > 1
+            ? '<span class="alq__nota">Se asigna la unidad disponible; la marca puede variar.</span>'
+            : ''}
+        </span>
+        <span class="alq__unidad">por ${esc(a.unidad || 'día')}</span>
+      </label>
+    </li>`;
+  }).join('');
 }
 
 function montarFinanciadoras() {
@@ -1529,35 +1554,85 @@ function montarNav() {
 
 /* Sin backend todavía: confirmamos en pantalla y dejamos el resumen
    listo para enviar por WhatsApp o correo. No fingimos un envío. */
+/* Cotizaciones de alquiler, transporte e importación.
+
+   ESTO NO MANDABA NADA. Pintaba un resumen en pantalla y le pedía al
+   cliente que lo copiara a WhatsApp. Quien no lo copiaba —que es casi
+   todo el mundo— se perdía, y encima sin dejar rastro de cuántos se
+   perdían. Ahora la solicitud llega al equipo por correo, queda
+   guardada y el cliente recibe una referencia. */
 function montarCotizaciones() {
   $$('form[data-cotizacion]').forEach((form) => {
-    form.addEventListener('submit', (ev) => {
+    const servicio = form.dataset.servicio || 'alquiler';
+
+    /* El rótulo se saca de la propia etiqueta del campo: así el correo
+       dice «Provincia de la obra» y no «Provincia», sin mantener una
+       segunda lista de nombres que se desincroniza con el formulario. */
+    const etiquetaDe = (clave) => {
+      const campo = form.querySelector(`[name="${clave}"]`);
+      const lab = campo && (campo.closest('label') || form.querySelector(`label[for="${campo.id}"]`));
+      return lab ? lab.textContent.trim().replace(/\s+/g, ' ').replace(/\s*\*$/, '') : clave;
+    };
+
+    form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const destino = $('#' + form.dataset.cotizacion);
+      const boton = form.querySelector('button[type="submit"]');
       if (!destino) return;
 
-      const datos = [];
+      const valores = {};
       new FormData(form).forEach((valor, clave) => {
         if (!valor) return;
-        const existente = datos.find((d) => d.clave === clave);
-        if (existente) existente.valor += ', ' + valor;
-        else datos.push({ clave, valor });
+        valores[clave] = valores[clave] ? `${valores[clave]}, ${valor}` : valor;
       });
 
-      const etiquetaDe = (clave) => {
-        const campo = form.querySelector(`[name="${clave}"]`);
-        const lab = campo && (campo.closest('label') || form.querySelector(`label[for="${campo.id}"]`));
-        return lab ? lab.textContent.trim().replace(/\s+/g, ' ') : clave;
+      // Los datos de contacto viajan aparte: son los que deciden si la
+      // solicitud sirve de algo, y el servidor los exige.
+      const detalle = {};
+      Object.entries(valores).forEach(([k, v]) => {
+        if (['Nombre', 'Teléfono', 'Correo', 'Empresa'].includes(k)) return;
+        detalle[etiquetaDe(k)] = v;
+      });
+
+      const antes = boton ? boton.innerHTML : '';
+      if (boton) { boton.disabled = true; boton.textContent = 'Enviando…'; }
+
+      const fallar = (mensaje) => {
+        if (boton) { boton.disabled = false; boton.innerHTML = antes; }
+        destino.hidden = false;
+        destino.innerHTML = `<p class="resumen__error">${icono('i-aviso')} ${esc(mensaje)}</p>`;
+        destino.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       };
 
-      destino.hidden = false;
-      destino.innerHTML = `
-        <h3 class="resumen__titulo">Resumen de la solicitud</h3>
-        <dl class="resumen__lista">
-          ${datos.map((d) => `<div><dt>${esc(etiquetaDe(d.clave))}</dt><dd>${esc(d.valor)}</dd></div>`).join('')}
-        </dl>
-        <p class="resumen__nota">Copie este resumen y remítalo por WhatsApp al <a href="https://wa.me/18090000000" rel="noopener">(809) 000-0000</a> o al correo <a href="mailto:hola@tuequipord.com">hola@tuequipord.com</a>. Le respondemos con precio y disponibilidad.</p>`;
-      destino.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      try {
+        const r = await api('/solicitudes', {
+          metodo: 'POST',
+          cuerpo: {
+            servicio,
+            nombre: valores.Nombre || '',
+            telefono: valores['Teléfono'] || '',
+            correo: valores.Correo || '',
+            empresa: valores.Empresa || '',
+            detalle,
+          },
+        });
+        if (!r) throw new Error('No hay conexión con el servidor. Inténtelo de nuevo en un momento.');
+
+        form.hidden = true;
+        destino.hidden = false;
+        destino.innerHTML = `
+          <h3 class="resumen__titulo">${icono('i-check')} Solicitud enviada</h3>
+          <p class="resumen__texto">${esc(r.mensaje)}</p>
+          <dl class="resumen__lista">
+            <div><dt>Referencia</dt><dd class="num">${esc(r.referencia)}</dd></div>
+            ${Object.entries(detalle).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}
+          </dl>
+          <p class="resumen__nota">Guarde la referencia. Si prefiere adelantarlo, escríbanos por
+            <a href="https://wa.me/18090000000" rel="noopener">WhatsApp</a> citándola.</p>`;
+        destino.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {
+        fallar(e.message);
+      }
     });
   });
 }

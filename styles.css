@@ -3172,3 +3172,73 @@ body.sin-scroll { overflow: hidden; }
 #buscador .campo { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 #buscador .form__pie { grid-column: 1 / -1; }
 @media (max-width: 900px) { #buscador { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── Ver la contraseña ──────────────────────────────────────
+   El botón va DENTRO del campo, a la derecha, y el input reserva el
+   hueco con padding: colocarlo al lado desalinearía la rejilla de
+   campos y en móvil partiría la fila. */
+.campo-v--clave { position: relative; }
+.campo-v--clave input { padding-right: 42px; }
+
+.ver-clave {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  background: transparent; border: 0; border-radius: 5px;
+  color: var(--gris-acero); cursor: pointer;
+  transition: color .15s ease, background-color .15s ease;
+}
+.ver-clave:hover { color: var(--azul); background: var(--hueso); }
+.ver-clave--activo { color: var(--ambar-hondo); }
+.ver-clave .ico { width: 17px; height: 17px; }
+
+/* Con la ayuda debajo del campo, el botón sube para no montarse. */
+.campo-v--clave:has(.campo-v__ayuda) .ver-clave,
+.campo-v--clave:has(.campo-v__error) .ver-clave { bottom: auto; top: 26px; }
+
+/* ── Alquiler: elegir un tipo de equipo ─────────────────────
+   No se alquila una máquina concreta, se alquila un tipo con su
+   capacidad, y va la que esté libre. Por eso la ficha lleva VARIAS
+   fotos de marcas distintas: una sola volvería a prometer ese modelo. */
+.alq__galeria {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  width: 132px;
+  flex: none;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--gris-neutro);
+}
+.alq__galeria img { display: block; width: 100%; height: 74px; object-fit: cover; }
+.alq__galeria .alq__ico { display: grid; place-items: center; height: 74px; color: var(--gris-acero); }
+
+.alq__capacidad {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px; font-weight: 700; color: var(--ambar-hondo);
+}
+.alq__nota { display: block; margin-top: 4px; font-size: 11.5px; color: var(--gris-acero); }
+
+@media (max-width: 700px) {
+  .alq__galeria { width: 96px; }
+  .alq__galeria img, .alq__galeria .alq__ico { height: 56px; }
+}
+
+/* Resultado de una solicitud enviada. */
+.resumen__texto { margin: 0 0 12px; font-size: 14px; color: var(--gris-acero); }
+.resumen__error {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px 14px;
+  background: #FDF3F3; border: 1px solid #E8C4C4; border-left: 3px solid #B3261E;
+  border-radius: var(--r); font-size: 13.5px; color: #7A1B15;
+}
+.resumen__error .ico { flex: none; width: 17px; height: 17px; }
+
+/* Galería de un tipo de equipo, en el panel de administración. */
+.flota-fotos { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.flota-fotos img { width: 64px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid var(--linea); }
+.sol__meta--aviso { color: var(--ambar-hondo); }

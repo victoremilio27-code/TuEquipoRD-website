@@ -172,6 +172,54 @@ CREATE TABLE IF NOT EXISTS flota (
 
 CREATE INDEX IF NOT EXISTS ix_flota_servicio ON flota (servicio, activo, orden);
 
+-- Fotografías de cada tipo de equipo.
+--
+-- VARIAS Y DE MARCAS DISTINTAS a propósito. No se alquila «la CAT 320»:
+-- se alquila «una excavadora de 20 toneladas», y se entrega la que esté
+-- disponible ese día. Enseñar una sola máquina promete un modelo
+-- concreto que nadie se comprometió a dar.
+CREATE TABLE IF NOT EXISTS flota_fotos (
+  id       TEXT PRIMARY KEY,
+  flota_id TEXT NOT NULL REFERENCES flota(id) ON DELETE CASCADE,
+  url      TEXT NOT NULL,
+  alt      TEXT,
+  orden    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS ix_flota_fotos ON flota_fotos (flota_id, orden);
+
+-- ── Solicitudes de servicio ────────────────────────────────
+--
+-- Alquiler, transporte e importación. Antes estos formularios no
+-- mandaban nada: pintaban un resumen en pantalla y le pedían al cliente
+-- que lo copiara a WhatsApp. Quien no lo copiaba se perdía, y no
+-- quedaba rastro de cuántos se perdieron.
+--
+-- Los datos de contacto son obligatorios: sin ellos la solicitud no
+-- sirve de nada, porque no hay a quién responder.
+CREATE TABLE IF NOT EXISTS solicitudes_servicio (
+  id         TEXT PRIMARY KEY,
+  servicio   TEXT NOT NULL CHECK (servicio IN ('alquiler', 'transporte', 'importacion', 'contacto')),
+  referencia TEXT NOT NULL UNIQUE,        -- la que se le da al cliente
+
+  nombre     TEXT NOT NULL,
+  telefono   TEXT NOT NULL,
+  correo     TEXT,
+  empresa    TEXT,
+
+  -- El detalle cambia según el servicio, así que va en JSON en vez de
+  -- veinte columnas nulas. No se consulta por dentro: se lee entero.
+  detalle    TEXT NOT NULL,
+
+  estado     TEXT NOT NULL DEFAULT 'nueva'
+             CHECK (estado IN ('nueva', 'atendida', 'cerrada')),
+  nota       TEXT,
+  creada     TEXT NOT NULL,
+  atendida   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_solicitudes_servicio ON solicitudes_servicio (servicio, estado, creada);
+
 -- ── Ajustes del sitio ──────────────────────────────────────
 
 -- Pares clave/valor que el equipo cambia desde /admin.html sin tocar

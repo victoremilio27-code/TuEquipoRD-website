@@ -303,6 +303,55 @@ const MIGRACIONES = [
        actualizado TEXT NOT NULL
      )`,
   ]],
+
+  /* Alquiler por TIPO de equipo, y solicitudes que llegan de verdad.
+
+     Dos cosas que iban juntas:
+
+     · Los formularios de alquiler, transporte e importación no
+       mandaban nada. Pintaban un resumen y le pedían al cliente que lo
+       copiara a WhatsApp. Quien no lo copiaba se perdía, y encima sin
+       dejar rastro de cuántos se perdían.
+
+     · La flota se anunciaba como máquinas concretas —«Clase CAT 320»—
+       cuando lo que se alquila es una excavadora de veinte toneladas y
+       se entrega la que esté libre. Ahora cada ficha es un tipo con su
+       capacidad y varias fotos de marcas distintas. */
+  ['2026-08-alquiler-por-tipo', [
+    'ALTER TABLE flota ADD COLUMN capacidad_texto TEXT',
+
+    `CREATE TABLE IF NOT EXISTS flota_fotos (
+       id       TEXT PRIMARY KEY,
+       flota_id TEXT NOT NULL REFERENCES flota(id) ON DELETE CASCADE,
+       url      TEXT NOT NULL,
+       alt      TEXT,
+       orden    INTEGER NOT NULL DEFAULT 0
+     )`,
+    'CREATE INDEX IF NOT EXISTS ix_flota_fotos ON flota_fotos (flota_id, orden)',
+
+    `CREATE TABLE IF NOT EXISTS solicitudes_servicio (
+       id         TEXT PRIMARY KEY,
+       servicio   TEXT NOT NULL CHECK (servicio IN ('alquiler', 'transporte', 'importacion', 'contacto')),
+       referencia TEXT NOT NULL UNIQUE,
+       nombre     TEXT NOT NULL,
+       telefono   TEXT NOT NULL,
+       correo     TEXT,
+       empresa    TEXT,
+       detalle    TEXT NOT NULL,
+       estado     TEXT NOT NULL DEFAULT 'nueva'
+                  CHECK (estado IN ('nueva', 'atendida', 'cerrada')),
+       nota       TEXT,
+       creada     TEXT NOT NULL,
+       atendida   TEXT
+     )`,
+    'CREATE INDEX IF NOT EXISTS ix_solicitudes_servicio ON solicitudes_servicio (servicio, estado, creada)',
+
+    /* La foto que ya tuviera cada tipo pasa a ser la primera de su
+       galería, para no perderla al cambiar de modelo. */
+    `INSERT INTO flota_fotos (id, flota_id, url, alt, orden)
+     SELECT lower(hex(randomblob(16))), id, foto, nombre, 0
+       FROM flota WHERE foto IS NOT NULL AND foto <> ''`,
+  ]],
 ];
 
 function migrar() {
@@ -713,21 +762,114 @@ function registrarDealer(idOrg, idUsuario, { rnc, empresa, web, descripcion, sol
   return d.prepare('SELECT * FROM organizaciones WHERE id = ?').get(idOrg);
 }
 
+/* ── Solicitudes de servicio ────────────────────────────────
+   Alquiler, transporte e importación. Antes estos formularios no
+   guardaban nada: pintaban un resumen y le pedían al cliente que lo
+   copiara a WhatsApp. Quien no lo copiaba se perdía, y no quedaba
+   rastro de cuántos se perdían. */
+
+/* Referencia corta y legible por teléfono. Lleva el año para que dos
+   de eneros distintos no se confundan al buscarlas. */
+function referenciaServicio(servicio) {
+  const letra = { alquiler: 'A', transporte: 'T', importacion: 'I' }[servicio] || 'S';
+  return `${letra}${new Date().getFullYear()}-${id().slice(0, 5).toUpperCase()}`;
+}
+
+function crearSolicitudServicio(datos) {
+  const d = abrir();
+  const idSol = id();
+  const referencia = referenciaServicio(datos.servicio);
+
+  d.prepare(`INSERT INTO solicitudes_servicio
+    (id, servicio, referencia, nombre, telefono, correo, empresa, detalle, estado, creada)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'nueva', ?)`)
+    .run(idSol, datos.servicio, referencia, datos.nombre, datos.telefono,
+      datos.correo || null, datos.empresa || null,
+      JSON.stringify(datos.detalle || {}), ahora());
+
+  return solicitudServicio(idSol);
+}
+
+function solicitudServicio(idSol) {
+  const s = abrir().prepare('SELECT * FROM solicitudes_servicio WHERE id = ?').get(idSol);
+  if (!s) return null;
+  let detalle = {};
+  try { detalle = JSON.parse(s.detalle); } catch (_) { /* guardado a mano */ }
+  return { ...s, detalle };
+}
+
+const solicitudesServicio = ({ servicio, estado } = {}) => {
+  const donde = [];
+  const args = {};
+  if (servicio) { donde.push('servicio = :servicio'); args.servicio = servicio; }
+  if (estado) { donde.push('estado = :estado'); args.estado = estado; }
+
+  return abrir().prepare(`SELECT * FROM solicitudes_servicio
+      ${donde.length ? `WHERE ${donde.join(' AND ')}` : ''}
+      ORDER BY creada DESC LIMIT 200`).all(args)
+    .map((s) => {
+      let detalle = {};
+      try { detalle = JSON.parse(s.detalle); } catch (_) { /* guardado a mano */ }
+      return { ...s, detalle };
+    });
+};
+
+const marcarSolicitudServicio = (idSol, estado, nota) =>
+  abrir().prepare(`UPDATE solicitudes_servicio
+       SET estado = ?, nota = COALESCE(?, nota), atendida = ?
+     WHERE id = ?`)
+    .run(estado, nota || null, estado === 'nueva' ? null : ahora(), idSol);
+
 /* ── Flota propia (alquiler y transporte) ───────────────── */
+
+/* Fotografías de un tipo de equipo. Varias y de marcas distintas: no
+   se alquila una máquina concreta, se alquila un tipo, y se entrega la
+   que esté libre ese día. */
+const fotosDeFlota = (idFlota) =>
+  abrir().prepare('SELECT id, url, alt, orden FROM flota_fotos WHERE flota_id = ? ORDER BY orden, id')
+    .all(idFlota);
+
+/* Reemplaza la galería entera. Es más simple que ir cotejando cuál
+   cambió, y son cuatro o cinco filas por tipo. */
+function guardarFotosDeFlota(idFlota, fotos) {
+  const d = abrir();
+  d.prepare('DELETE FROM flota_fotos WHERE flota_id = ?').run(idFlota);
+  fotos.slice(0, 8).forEach((f, i) => {
+    const url = typeof f === 'string' ? f : f.url;
+    if (!url) return;
+    d.prepare('INSERT INTO flota_fotos (id, flota_id, url, alt, orden) VALUES (?, ?, ?, ?, ?)')
+      .run(id(), idFlota, String(url), (f && f.alt) || null, i);
+  });
+}
+
+/* Añade la galería a cada ficha. Si un tipo todavía no tiene ninguna,
+   se cae en la foto suelta de siempre para no dejarlo sin imagen. */
+const conFotos = (f) => {
+  const fotos = fotosDeFlota(f.id);
+  return {
+    ...f,
+    fotos: fotos.length
+      ? fotos
+      : (f.foto ? [{ url: f.foto, alt: f.nombre, orden: 0 }] : []),
+  };
+};
 
 /* Lo que ve el visitante: solo lo activo, en su orden. */
 const flotaPublica = (servicio) =>
-  abrir().prepare(`SELECT id, nombre, detalle, icono, unidad, capacidad, foto
+  abrir().prepare(`SELECT id, nombre, detalle, icono, unidad, capacidad, capacidad_texto, foto
                    FROM flota WHERE servicio = ? AND activo = 1
-                   ORDER BY orden, nombre`).all(servicio);
+                   ORDER BY orden, nombre`).all(servicio).map(conFotos);
 
 /* Lo que ve el administrador: también lo desactivado, porque desde
    ahí se vuelve a activar. */
 const flotaCompleta = (servicio) =>
-  abrir().prepare(`SELECT * FROM flota WHERE servicio = ? ORDER BY orden, nombre`).all(servicio);
+  abrir().prepare(`SELECT * FROM flota WHERE servicio = ? ORDER BY orden, nombre`).all(servicio)
+    .map(conFotos);
 
-const flotaPorId = (idFlota) =>
-  abrir().prepare('SELECT * FROM flota WHERE id = ?').get(idFlota);
+const flotaPorId = (idFlota) => {
+  const f = abrir().prepare('SELECT * FROM flota WHERE id = ?').get(idFlota);
+  return f ? conFotos(f) : null;
+};
 
 function crearFlota(datos) {
   const idFlota = id();
@@ -738,12 +880,13 @@ function crearFlota(datos) {
     .get(datos.servicio).n;
 
   abrir().prepare(`INSERT INTO flota
-    (id, servicio, nombre, detalle, icono, unidad, capacidad, foto, activo, orden, creado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
+    (id, servicio, nombre, detalle, icono, unidad, capacidad, capacidad_texto, foto, activo, orden, creado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
     .run(idFlota, datos.servicio, datos.nombre, datos.detalle || null,
       datos.icono || null, datos.unidad || null, datos.capacidad ?? null,
-      datos.foto || null, (ultimo || 0) + 1, t);
+      datos.capacidad_texto || datos.capacidadTexto || null, datos.foto || null, (ultimo || 0) + 1, t);
 
+  if (Array.isArray(datos.fotos)) guardarFotosDeFlota(idFlota, datos.fotos);
   return flotaPorId(idFlota);
 }
 
@@ -753,9 +896,11 @@ function actualizarFlota(idFlota, datos) {
   const actual = flotaPorId(idFlota);
   if (!actual) throw Object.assign(new Error('Ese elemento no existe'), { codigo: 404 });
 
-  const campos = ['nombre', 'detalle', 'icono', 'unidad', 'capacidad', 'foto', 'activo', 'orden'];
+  if (Array.isArray(datos.fotos)) guardarFotosDeFlota(idFlota, datos.fotos);
+
+  const campos = ['nombre', 'detalle', 'icono', 'unidad', 'capacidad', 'capacidad_texto', 'foto', 'activo', 'orden'];
   const cambios = campos.filter((c) => datos[c] !== undefined);
-  if (!cambios.length) return actual;
+  if (!cambios.length) return flotaPorId(idFlota);
 
   abrir().prepare(`UPDATE flota SET ${cambios.map((c) => `${c} = ?`).join(', ')}, actualizado = ?
                    WHERE id = ?`)
@@ -1848,6 +1993,8 @@ module.exports = {
   solicitudes, solicitudCompleta, resolverSolicitud, contarPendientes, marcarAdmin,
   flotaPublica, flotaCompleta, flotaPorId, crearFlota, actualizarFlota, borrarFlota,
   AJUSTES, ajustes, guardarAjuste, fotosPorCategoria, heroePortada,
+  crearSolicitudServicio, solicitudServicio, solicitudesServicio, marcarSolicitudServicio,
+  fotosDeFlota, guardarFotosDeFlota,
   publicidadVigente, publicidadCompleta, publicidadPorId,
   crearPublicidad, actualizarPublicidad, borrarPublicidad, sumarImpresiones, sumarClic,
   sucursalesDe, sucursal, crearSucursal, actualizarSucursal, desactivarSucursal, marcarPrincipal,

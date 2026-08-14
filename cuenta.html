@@ -102,6 +102,13 @@
           <label class="campo-v"><span>Contraseña *</span>
             <input type="password" id="new-clave" autocomplete="new-password" placeholder="Mínimo 10 caracteres" required>
           </label>
+          <!-- Confirmación. Una errata al teclear una contraseña que no
+               se ve deja la cuenta creada con una clave que su dueño no
+               conoce, y el único arreglo es el correo de recuperación.
+               Se compara mientras se escribe, no al enviar. -->
+          <label class="campo-v"><span>Repita la contraseña *</span>
+            <input type="password" id="new-clave2" autocomplete="new-password" placeholder="La misma de arriba" required>
+          </label>
         </div>
 
         <!-- Solicitud de empresa. Se despliega al elegir la cuenta de

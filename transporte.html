@@ -124,7 +124,7 @@
 
     <p class="realce" id="transporteDesdeFicha" hidden></p>
 
-    <form class="form-largo" id="formTransporte" data-cotizacion="resumenTransporte">
+    <form class="form-largo" id="formTransporte" data-servicio="transporte" data-cotizacion="resumenTransporte">
 
       <p class="bloque__titulo"><svg class="ico" aria-hidden="true"><use href="#i-peso"/></svg> El equipo</p>
       <div class="campos">
@@ -206,8 +206,11 @@
 
       <p class="bloque__titulo"><svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg> Datos de contacto</p>
       <div class="campos">
-        <label class="campo-v"><span>Tu nombre o empresa</span>
-          <input type="text" name="Nombre" required>
+        <label class="campo-v"><span>Su nombre o empresa *</span>
+          <input type="text" name="Nombre" autocomplete="name" required>
+        </label>
+        <label class="campo-v"><span>Correo electrónico</span>
+          <input type="email" name="Correo" autocomplete="email" placeholder="Para enviarle copia por escrito">
         </label>
         <label class="campo-v"><span>Teléfono o WhatsApp</span>
           <input type="tel" name="Teléfono" placeholder="(809) 000-0000" required>

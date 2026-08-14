@@ -73,7 +73,7 @@
   <section class="panel" id="solicitud" aria-labelledby="t-form">
     <h2 class="panel__titulo" id="t-form"><em>Solicitud</em> de cotización</h2>
 
-    <form class="form-largo" data-cotizacion="resumenAlquiler">
+    <form class="form-largo" data-servicio="alquiler" data-cotizacion="resumenAlquiler">
       <p class="etiqueta etiqueta--bloque">Equipos requeridos</p>
       <ul class="alquiler-lista" id="alquilerLista"></ul>
 
@@ -102,14 +102,27 @@
             <option>No estoy seguro</option>
           </select>
         </label>
-        <label class="campo-v"><span>Tu nombre o empresa</span>
-          <input type="text" name="Nombre" required>
-        </label>
-        <label class="campo-v"><span>Teléfono o WhatsApp</span>
-          <input type="tel" name="Teléfono" placeholder="(809) 000-0000" required>
-        </label>
-        <label class="campo-v campo-v--ancho"><span>Qué trabajo vas a hacer</span>
+        <label class="campo-v campo-v--ancho"><span>Qué trabajo va a hacer</span>
           <textarea name="Trabajo" placeholder="Ej. movimiento de tierra para una nave de 800 m², terreno con roca suelta, acceso por camino de tierra."></textarea>
+        </label>
+      </div>
+
+      <!-- Datos de contacto. Van aparte y con su propio rótulo porque
+           son los que deciden si la solicitud sirve de algo: sin ellos
+           no hay a quién responderle con el precio. -->
+      <p class="etiqueta etiqueta--bloque">Cómo le respondemos</p>
+      <div class="campos">
+        <label class="campo-v"><span>Su nombre *</span>
+          <input type="text" name="Nombre" autocomplete="name" required>
+        </label>
+        <label class="campo-v"><span>Teléfono o WhatsApp *</span>
+          <input type="tel" name="Teléfono" autocomplete="tel" placeholder="(809) 000-0000" required>
+        </label>
+        <label class="campo-v"><span>Correo electrónico</span>
+          <input type="email" name="Correo" autocomplete="email" placeholder="Para enviarle copia de la cotización">
+        </label>
+        <label class="campo-v"><span>Empresa</span>
+          <input type="text" name="Empresa" autocomplete="organization" placeholder="Si aplica">
         </label>
       </div>
 
