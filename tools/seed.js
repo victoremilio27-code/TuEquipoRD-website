@@ -313,22 +313,25 @@ function sembrar() {
    escritos a mano en assets/data.js antes de que se pudieran
    administrar. No es demostración: es el inventario real de partida, y
    por eso se siembra siempre y no se toca si ya existe. */
-/* Flota propia, por TIPO de equipo y capacidad.
+/* Flota propia, por FUNCIÓN del equipo.
 
-   El nombre no lleva marca ni modelo, y el detalle dice para qué
-   sirve. Antes decía «Clase CAT 320» y eso prometía una máquina
-   concreta: lo que se alquila es una excavadora de veinte toneladas y
-   va la que esté libre ese día. La ficha lo dice en pantalla y en el
-   correo que recibe el equipo.
+   El nombre no lleva marca, modelo ni tamaño: el detalle dice para qué
+   sirve y ya está. Primero decía «Clase CAT 320», que prometía una
+   máquina; después «Excavadora · 18 a 22 toneladas», que prometía un
+   tamaño. Las dos cosas dejaban elegir la unidad al cliente, y la
+   unidad la asignamos nosotros al leer el trabajo y la accesibilidad
+   de la obra.
+
+   En alquiler todo va con operador y se cotiza por hora.
 
    [servicio, nombre, capacidadTexto, detalle, icono, unidad, toneladas] */
 const FLOTA_INICIAL = [
-  ['alquiler', 'Excavadora', '18 a 22 toneladas', 'Excavación, zanjas y carga de material. Con operador o sin él.', 'i-excavadora', 'día', null],
-  ['alquiler', 'Retroexcavadora 4x4', 'Pala de 1 m³ · brazo de 4,5 m', 'Zanjas, relleno y carga en espacios reducidos. Admite martillo.', 'i-retro', 'día', null],
-  ['alquiler', 'Cargador frontal', 'Cucharón de 2,5 a 3 m³', 'Acopio, carga de camiones y movimiento de agregados.', 'i-cargador', 'día', null],
-  ['alquiler', 'Camión volteo', '14 a 16 m³', 'Traslado de tierra, arena y escombro. Incluye chofer.', 'i-volteo', 'viaje', null],
-  ['alquiler', 'Rodillo compactador', '10 a 12 toneladas', 'Compactación de terraplenes y bases. Vibratorio liso.', 'i-rodillo', 'día', null],
-  ['alquiler', 'Planta eléctrica', '80 a 100 kW', 'Energía en obra sin red. Insonorizada, con tablero de transferencia.', 'i-generador', 'semana', null],
+  ['alquiler', 'Excavadora', null, 'Excavación, zanjas y carga de material.', 'i-excavadora', 'hora', null],
+  ['alquiler', 'Retroexcavadora', null, 'Zanjas, relleno y carga en espacios reducidos. Admite martillo.', 'i-retro', 'hora', null],
+  ['alquiler', 'Cargador frontal', null, 'Acopio, carga de camiones y movimiento de agregados.', 'i-cargador', 'hora', null],
+  ['alquiler', 'Camión volteo', null, 'Traslado de tierra, arena y escombro.', 'i-volteo', 'hora', null],
+  ['alquiler', 'Rodillo compactador', null, 'Compactación de terraplenes y bases. Vibratorio liso.', 'i-rodillo', 'hora', null],
+  ['alquiler', 'Planta eléctrica', null, 'Energía en obra sin red. Insonorizada, con tablero de transferencia.', 'i-generador', 'hora', null],
 
   ['transporte', 'Lowboy', '40 toneladas', 'Excavadoras de 20 t en adelante, grúas y equipo de oruga.', 'i-lowboy', null, 40],
   ['transporte', 'Cama baja', '25 toneladas', 'Retroexcavadoras, cargadores medianos y rodillos.', 'i-lowboy', null, 25],

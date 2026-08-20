@@ -48,6 +48,7 @@ const SPRITE = `
 <symbol id="i-ojo" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
 <symbol id="i-pausa" viewBox="0 0 24 24"><path d="M9 5v14"/><path d="M15 5v14"/></symbol>
 <symbol id="i-edificio" viewBox="0 0 24 24"><path d="M4 21V5.5L13 3v18"/><path d="M13 9h7v12"/><path d="M7.5 8h2M7.5 12h2M7.5 16h2M16 13h1.5M16 17h1.5"/></symbol>
+<symbol id="i-whatsapp" viewBox="0 0 24 24"><path d="M3.5 20.5l1.3-4.4A8.2 8.2 0 1 1 8 19.3z"/><path d="M9 8.4c.3-.1.6 0 .8.4l.7 1.3c.1.3.1.5-.1.8l-.4.5a5.6 5.6 0 0 0 2.6 2.6l.5-.4c.3-.2.5-.2.8-.1l1.3.7c.4.2.5.5.4.8-.2.8-1 1.4-1.9 1.4-2.8 0-5.9-3.1-5.9-5.9 0-.9.5-1.7 1.2-2.1z"/></symbol>
 `;
 
 function inyectarSprite() {
@@ -66,6 +67,12 @@ function inyectarSprite() {
 if (document.body) inyectarSprite();
 
 /* ── Utilidades ─────────────────────────────────────────── */
+
+/* Número de WhatsApp del negocio, en formato internacional y sin
+   signos, que es como lo quiere wa.me. Está aquí y no repartido por
+   las páginas para que cambiarlo sea tocar una línea.
+   PENDIENTE: sigue siendo el número de relleno. */
+const WHATSAPP = '18090000000';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -487,6 +494,90 @@ function montarSelects() {
   });
   $$('select[data-provincias]').forEach((sel) => {
     PROVINCIAS.forEach((p) => sel.add(new Option(p, p)));
+  });
+  montarTiposEquipo();
+  montarNoAplica();
+}
+
+/* ── Tipo de equipo al detalle (importación) ────────────────
+
+   El selector de categorías ofrece los 17 grandes grupos, y para
+   importar eso se queda corto: quien quiere una planta eléctrica busca
+   «planta eléctrica» y encuentra «Generadores y compresores», que
+   parece otra cosa. Aquí se ofrece el último nivel de la taxonomía,
+   agrupado por su categoría, que es donde están los nombres que la
+   gente usa.
+
+   El valor que viaja es el nombre legible, porque acaba en un correo
+   que lee una persona; el id queda en `data-sub` para encadenar las
+   marcas. */
+function montarTiposEquipo() {
+  $$('select[data-tipos-equipo]').forEach((sel) => {
+    CATEGORIAS.forEach((c) => {
+      const grupo = document.createElement('optgroup');
+      grupo.label = c.nombre;
+      c.subcategorias.forEach((s) => {
+        const op = new Option(s.nombre, s.nombre);
+        op.dataset.sub = s.id;
+        grupo.appendChild(op);
+      });
+      sel.appendChild(grupo);
+    });
+  });
+
+  /* Marcas encadenadas. Se ofrecen TODAS las que fabrican ese equipo,
+     no solo las que hoy tienen inventario publicado: en importación no
+     se busca en el catálogo, se encarga una máquina que no está aquí.
+     «Otra marca» se descarta porque como preferencia no dice nada. */
+  $$('select[data-marcas-del-tipo]').forEach((sel) => {
+    const tipo = document.getElementById(sel.dataset.marcasDelTipo);
+    if (!tipo) return;
+
+    tipo.addEventListener('change', () => {
+      const op = tipo.selectedOptions[0];
+      const idSub = op && op.dataset.sub;
+      sel.length = 0;
+
+      if (!idSub) {
+        sel.add(new Option('Elija primero el tipo de equipo', ''));
+        sel.disabled = true;
+        return;
+      }
+      sel.add(new Option('Sin preferencia', ''));
+      marcasDe(idSub)
+        .filter((m) => m.id !== 'otra')
+        .forEach((m) => sel.add(new Option(m.nombre, m.nombre)));
+      sel.disabled = false;
+    });
+  });
+}
+
+/* ── Campos que a veces no aplican ──────────────────────────
+
+   «Año mínimo» y «horas máximas» no siempre tienen respuesta: en un
+   equipo nuevo no hay horas que limitar. Dejarlos en blanco era la
+   única salida, y en blanco no se distingue de un descuido.
+
+   La casilla apaga el campo visible y enciende uno oculto con el mismo
+   `name` y el valor «No aplica». Solo uno de los dos está activo, así
+   que el formulario manda siempre una respuesta y nunca dos. */
+function montarNoAplica() {
+  $$('input[type="checkbox"][data-no-aplica]').forEach((casilla) => {
+    const campo = document.getElementById(casilla.dataset.noAplica);
+    if (!campo) return;
+    const oculto = campo.parentElement.querySelector('input[type="hidden"]');
+
+    const aplicar = () => {
+      const apagado = casilla.checked;
+      if (apagado) campo.value = '';
+      campo.disabled = apagado;
+      if (oculto) oculto.disabled = !apagado;
+      const contenedor = campo.closest('.campo-v');
+      if (contenedor) contenedor.classList.toggle('campo-v--inactivo', apagado);
+    };
+
+    casilla.addEventListener('change', aplicar);
+    aplicar();
   });
 }
 
@@ -1138,25 +1229,23 @@ async function montarAlquiler() {
     ? datos.flota
     : (typeof EQUIPOS_ALQUILER !== 'undefined' ? EQUIPOS_ALQUILER : []);
 
-  /* Se elige un TIPO de equipo y su capacidad, no una máquina concreta.
+  /* Se elige una FUNCIÓN, no una máquina y ni siquiera un tamaño.
 
-     Antes cada ficha decía «Clase CAT 320» y eso prometía un modelo
-     que nadie se comprometió a entregar: se alquila una excavadora de
-     veinte toneladas y va la que esté libre ese día. Por eso las fotos
-     son varias y de marcas distintas — enseñar una sola vuelve a
-     prometer esa misma máquina.
+     Antes cada ficha decía «Clase CAT 320», y después «Excavadora · 18
+     a 22 toneladas». Las dos cosas prometían algo que nadie se
+     comprometió a entregar: quien alquila necesita excavar, no
+     necesita veinte toneladas. Del tamaño decidimos nosotros al
+     recibir la solicitud, con la accesibilidad y el trabajo delante.
 
-     El valor que viaja al servidor incluye la capacidad: «Excavadora ·
-     18 a 22 toneladas» es lo que hay que cotizar, y sin ella el
-     correo llega diciendo solo «Excavadora». */
+     Por eso tampoco se anuncia la capacidad aunque la ficha la tenga
+     guardada, y por eso las fotos son varias y de marcas distintas:
+     enseñar una sola vuelve a prometer esa misma máquina. */
   cont.innerHTML = flota.map((a) => {
     const fotos = (a.fotos || []).slice(0, 4);
-    const capacidad = a.capacidad_texto || (a.capacidad ? `${a.capacidad} toneladas` : '');
-    const valor = [a.nombre, capacidad].filter(Boolean).join(' · ');
 
     return `<li>
       <label class="alq">
-        <input type="checkbox" name="equipo" value="${esc(valor)}">
+        <input type="checkbox" name="equipo" value="${esc(a.nombre)}" data-rotulo="Equipos requeridos">
         <span class="alq__galeria">
           ${fotos.length
             ? fotos.map((f) => `<img src="${esc(f.url)}" alt="${esc(f.alt || a.nombre)}" loading="lazy" decoding="async">`).join('')
@@ -1164,13 +1253,9 @@ async function montarAlquiler() {
         </span>
         <span class="alq__cuerpo">
           <span class="alq__nombre">${esc(a.nombre)}</span>
-          ${capacidad ? `<span class="alq__capacidad num">${esc(capacidad)}</span>` : ''}
           <span class="alq__detalle">${esc(a.detalle || '')}</span>
-          ${fotos.length > 1
-            ? '<span class="alq__nota">Se asigna la unidad disponible; la marca puede variar.</span>'
-            : ''}
+          <span class="alq__nota">Asignamos el tamaño y la unidad disponibles según su trabajo.</span>
         </span>
-        <span class="alq__unidad">por ${esc(a.unidad || 'día')}</span>
       </label>
     </li>`;
   }).join('');
@@ -1552,34 +1637,58 @@ function montarNav() {
 
 /* ── Formularios de cotización ──────────────────────────── */
 
-/* Sin backend todavía: confirmamos en pantalla y dejamos el resumen
-   listo para enviar por WhatsApp o correo. No fingimos un envío. */
 /* Cotizaciones de alquiler, transporte e importación.
 
    ESTO NO MANDABA NADA. Pintaba un resumen en pantalla y le pedía al
    cliente que lo copiara a WhatsApp. Quien no lo copiaba —que es casi
    todo el mundo— se perdía, y encima sin dejar rastro de cuántos se
    perdían. Ahora la solicitud llega al equipo por correo, queda
-   guardada y el cliente recibe una referencia. */
+   guardada y el cliente recibe una referencia.
+
+   El botón de WhatsApp hace el mismo recorrido por otro canal: exige
+   el formulario completo y abre el chat con la solicitud ya escrita.
+   Antes era un enlace suelto a un chat en blanco, y quien lo pulsaba
+   perdía todo lo que acababa de rellenar. */
+const ROTULO_SERVICIO = {
+  alquiler: 'alquiler de equipo',
+  transporte: 'transporte de equipo',
+  importacion: 'importación de maquinaria',
+  contacto: 'contacto',
+};
+
 function montarCotizaciones() {
   $$('form[data-cotizacion]').forEach((form) => {
     const servicio = form.dataset.servicio || 'alquiler';
 
-    /* El rótulo se saca de la propia etiqueta del campo: así el correo
-       dice «Provincia de la obra» y no «Provincia», sin mantener una
-       segunda lista de nombres que se desincroniza con el formulario. */
+    /* El rótulo sale de `data-rotulo` si el campo lo trae, y si no de
+       su propia etiqueta: así el correo dice «Provincia de la obra» y
+       no «Provincia», sin mantener una segunda lista de nombres que se
+       desincroniza con el formulario.
+
+       El `data-rotulo` existe por las casillas de equipo: cada una
+       vive dentro de una etiqueta que envuelve la ficha entera, y sin
+       esto el correo llegaba con el nombre, el detalle y la nota de la
+       ficha metidos como si fueran el rótulo del campo. */
     const etiquetaDe = (clave) => {
       const campo = form.querySelector(`[name="${clave}"]`);
+      if (campo && campo.dataset.rotulo) return campo.dataset.rotulo;
       const lab = campo && (campo.closest('label') || form.querySelector(`label[for="${campo.id}"]`));
-      return lab ? lab.textContent.trim().replace(/\s+/g, ' ').replace(/\s*\*$/, '') : clave;
+      if (!lab) return clave;
+
+      /* El campo va DENTRO de su etiqueta, así que su texto cuenta como
+         texto del rótulo. En un <select> eso son todas las opciones: el
+         correo llegaba diciendo «Provincia de la obra Seleccione
+         unaDistrito NacionalSanto Domingo…: Santiago». Se copia la
+         etiqueta, se le quitan los campos y se lee lo que queda. */
+      const copia = lab.cloneNode(true);
+      copia.querySelectorAll('input, select, textarea').forEach((c) => c.remove());
+      return copia.textContent.trim().replace(/\s+/g, ' ').replace(/\s*\*$/, '') || clave;
     };
 
-    form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const destino = $('#' + form.dataset.cotizacion);
-      const boton = form.querySelector('button[type="submit"]');
-      if (!destino) return;
-
+    /* Lee el formulario una vez y lo parte en contacto y detalle. Lo
+       usan el envío al servidor y el envío por WhatsApp, que tienen
+       que mandar exactamente lo mismo. */
+    const leer = () => {
       const valores = {};
       new FormData(form).forEach((valor, clave) => {
         if (!valor) return;
@@ -1593,7 +1702,34 @@ function montarCotizaciones() {
         if (['Nombre', 'Teléfono', 'Correo', 'Empresa'].includes(k)) return;
         detalle[etiquetaDe(k)] = v;
       });
+      return { valores, detalle };
+    };
 
+    /* Enviar por WhatsApp: mismo formulario, mismas validaciones, y el
+       chat se abre con la solicitud ya redactada. */
+    const wa = form.querySelector('[data-whatsapp]');
+    if (wa) wa.addEventListener('click', () => {
+      if (!form.reportValidity()) return;
+      const { valores, detalle } = leer();
+
+      const lineas = [`*Solicitud de ${ROTULO_SERVICIO[servicio] || servicio}* · TuEquipoRD`, ''];
+      Object.entries(detalle).forEach(([k, v]) => lineas.push(`${k}: ${v}`));
+      lineas.push('', 'Mis datos:');
+      ['Nombre', 'Teléfono', 'Correo', 'Empresa'].forEach((k) => {
+        if (valores[k]) lineas.push(`${k}: ${valores[k]}`);
+      });
+
+      window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(lineas.join('\n'))}`,
+        '_blank', 'noopener');
+    });
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const destino = $('#' + form.dataset.cotizacion);
+      const boton = form.querySelector('button[type="submit"]');
+      if (!destino) return;
+
+      const { valores, detalle } = leer();
       const antes = boton ? boton.innerHTML : '';
       if (boton) { boton.disabled = true; boton.textContent = 'Enviando…'; }
 
@@ -1628,7 +1764,7 @@ function montarCotizaciones() {
             ${Object.entries(detalle).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}
           </dl>
           <p class="resumen__nota">Guarde la referencia. Si prefiere adelantarlo, escríbanos por
-            <a href="https://wa.me/18090000000" rel="noopener">WhatsApp</a> citándola.</p>`;
+            <a href="https://wa.me/${WHATSAPP}" rel="noopener">WhatsApp</a> citándola.</p>`;
         destino.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (e) {
         fallar(e.message);

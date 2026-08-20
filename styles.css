@@ -1280,7 +1280,12 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
    vecino, que no lo tiene, queda descolgado unos píxeles. */
 .campo-v { display: grid; gap: 5px; align-content: start; }
 .campo-v--ancho { grid-column: 1 / -1; }
-.campo-v > span { font-size: 12.5px; font-weight: 600; color: var(--gris-acero); }
+/* `.campo-v__rotulo` es un <label for> y hace de rótulo cuando el campo
+   no puede ir envuelto en la etiqueta: un <label> dentro de otro
+   <label> no es HTML válido, y el campo con casilla de «No aplica»
+   lleva dos etiquetas. */
+.campo-v > span,
+.campo-v > .campo-v__rotulo { font-size: 12.5px; font-weight: 600; color: var(--gris-acero); }
 .campo-v input, .campo-v textarea, .campo-v select {
   width: 100%;
   padding: 8px 10px;
@@ -1301,11 +1306,35 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   outline: none; border-color: var(--ambar); box-shadow: 0 0 0 2px rgba(242, 169, 0, .2);
 }
 
+/* Campo con salida: el dato a la izquierda y «No aplica» a la derecha,
+   que lo apaga. La casilla no puede empujar al campo a otra línea en
+   móvil, o deja de leerse como una sola pregunta. */
+.campo-na { display: flex; align-items: center; gap: 10px; }
+.campo-na > input:not([type="hidden"]) { flex: 1 1 auto; min-width: 0; }
+.campo-na__op {
+  display: flex; align-items: center; gap: 5px;
+  flex: none;
+  font-size: 12px; color: var(--gris-acero);
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* Anula el `padding` y el borde que `.campo-v input` le pone a todo
+   campo de texto: en una casilla sobran. */
+.campo-na__op input {
+  width: 15px; height: 15px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  accent-color: var(--ambar-hondo);
+}
+.campo-v--inactivo > .campo-v__rotulo { opacity: .55; }
+.campo-v--inactivo .campo-na > input:disabled { background: var(--hueso); color: var(--gris-neutro); }
+
 .alquiler-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
 
 .alq {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -1327,7 +1356,6 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 }
 .alq__nombre { display: block; font-size: 13px; font-weight: 600; }
 .alq__detalle { display: block; font-size: 11.5px; color: var(--gris-acero); }
-.alq__unidad { font-size: 11px; color: var(--gris-acero); white-space: nowrap; }
 
 .resumen {
   margin-top: 16px;
@@ -3198,10 +3226,11 @@ body.sin-scroll { overflow: hidden; }
 .campo-v--clave:has(.campo-v__ayuda) .ver-clave,
 .campo-v--clave:has(.campo-v__error) .ver-clave { bottom: auto; top: 26px; }
 
-/* ── Alquiler: elegir un tipo de equipo ─────────────────────
-   No se alquila una máquina concreta, se alquila un tipo con su
-   capacidad, y va la que esté libre. Por eso la ficha lleva VARIAS
-   fotos de marcas distintas: una sola volvería a prometer ese modelo. */
+/* ── Alquiler: elegir una función ───────────────────────────
+   No se alquila una máquina concreta ni un tamaño: se alquila lo que
+   el equipo hace, y nosotros asignamos la unidad. Por eso la ficha
+   lleva VARIAS fotos de marcas distintas: una sola volvería a
+   prometer ese modelo. */
 .alq__galeria {
   display: grid;
   grid-auto-flow: column;
@@ -3216,11 +3245,6 @@ body.sin-scroll { overflow: hidden; }
 .alq__galeria img { display: block; width: 100%; height: 74px; object-fit: cover; }
 .alq__galeria .alq__ico { display: grid; place-items: center; height: 74px; color: var(--gris-acero); }
 
-.alq__capacidad {
-  display: block;
-  margin-top: 2px;
-  font-size: 12.5px; font-weight: 700; color: var(--ambar-hondo);
-}
 .alq__nota { display: block; margin-top: 4px; font-size: 11.5px; color: var(--gris-acero); }
 
 @media (max-width: 700px) {

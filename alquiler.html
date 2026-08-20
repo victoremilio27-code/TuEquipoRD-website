@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cotizar alquiler de equipo · TuEquipoRD</title>
-<meta name="description" content="Alquila maquinaria de nuestra propia flota en República Dominicana. Excavadoras, retroexcavadoras, cargadores, volteos, rodillos y plantas eléctricas, por día, semana o mes.">
+<meta name="description" content="Alquila maquinaria de nuestra propia flota en República Dominicana. Excavadoras, retroexcavadoras, cargadores, volteos, rodillos y plantas eléctricas, siempre con operador y cotizados por hora.">
 <meta name="theme-color" content="#071A2B">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,20 +52,22 @@
     <section class="panel" aria-labelledby="t-como">
       <h2 class="panel__titulo" id="t-como"><em>Cómo</em> funciona</h2>
       <ul class="servicio__puntos">
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Con operador o sin operador, según su necesidad. La modalidad con operador incluye el combustible del turno.</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Por día, semana o mes. La tarifa mejora a mayor plazo contratado.</li>
-        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> El transporte de ida y vuelta se cotiza aparte según la distancia a la obra.</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Todos nuestros equipos se alquilan con operador. La tarifa incluye el combustible del turno.</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Se cotiza por hora. La tarifa puede variar de la estándar según la ubicación de la obra, sus condiciones y el tipo de trabajo.</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> El transporte se cotiza aparte y por viaje, según la distancia a la obra y la dificultad de acceso.</li>
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Mantenimiento preventivo y averías mecánicas por nuestra cuenta.</li>
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Si el equipo se detiene por una falla imputable a nosotros, ese tiempo no se factura.</li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Si el daño o la falla se produce por negligencia del cliente, la reparación corre íntegra por su cuenta y las horas que el equipo pase en taller se siguen facturando.</li>
       </ul>
-      <p class="panel__nota">Los daños por uso indebido, el combustible fuera del turno con operador y las horas extra corren por cuenta del cliente. Todo queda establecido por contrato antes de movilizar la máquina.</p>
+      <p class="panel__nota">Las horas extra y el combustible fuera del turno acordado corren por cuenta del cliente. Todo queda establecido por contrato antes de movilizar la máquina.</p>
     </section>
 
     <section class="panel" aria-labelledby="t-flota">
       <h2 class="panel__titulo" id="t-flota"><em>Nuestra</em> flota</h2>
-      <p class="panel__texto">Esta es la flota disponible para alquiler. Si requiere un equipo que no figura aquí, indíquelo en la solicitud y evaluamos su disponibilidad.</p>
+      <p class="panel__texto">Estos son los tipos de equipo que tenemos disponibles en nuestra flota para alquiler. Si necesita uno que no figura aquí, indíquelo en la solicitud: evaluamos su disponibilidad y, si no lo tenemos, le hacemos las gestiones del servicio.</p>
       <div class="prosa" style="margin-top:12px">
-        <p>Marca los equipos que necesitas en el formulario de abajo. Puedes pedir más de uno en la misma solicitud.</p>
+        <p>Marque abajo el equipo que necesita. Puede pedir más de uno en la misma solicitud.</p>
+        <p>Si no está seguro de la cantidad, lo orientamos y le hacemos una sugerencia según su proyecto. Descríbalo en «Qué trabajo va a hacer» al enviar su solicitud y nos pondremos en contacto lo antes posible.</p>
       </div>
     </section>
   </div>
@@ -81,29 +83,34 @@
         <label class="campo-v"><span>Fecha de inicio</span>
           <input type="date" name="Fecha de inicio" required>
         </label>
-        <label class="campo-v"><span>Duración</span>
-          <select name="Duración" required>
+        <label class="campo-v"><span>Duración estimada del trabajo</span>
+          <select name="Duración estimada" required>
             <option value="">Seleccione una</option>
+            <option>Unas horas</option>
             <option>1 a 3 días</option>
             <option>Una semana</option>
             <option>Dos semanas</option>
-            <option>Un mes</option>
-            <option>Más de un mes</option>
+            <option>Un mes o más</option>
+            <option>No estoy seguro</option>
           </select>
         </label>
         <label class="campo-v"><span>Provincia de la obra</span>
           <select name="Provincia" data-provincias required><option value="">Seleccione una</option></select>
         </label>
-        <label class="campo-v"><span>¿Con operador?</span>
-          <select name="Operador" required>
+        <!-- La accesibilidad decide qué equipo se puede meter y cómo se
+             cotiza el viaje. Antes aquí se preguntaba por el operador,
+             que ya no es una opción: todo va con operador. -->
+        <label class="campo-v"><span>Accesibilidad de la obra</span>
+          <select name="Accesibilidad" required>
             <option value="">Seleccione una</option>
-            <option>Con operador</option>
-            <option>Sin operador</option>
+            <option>Alta — acceso cómodo para cualquier equipo</option>
+            <option>Media — difícil para los equipos más grandes</option>
+            <option>Baja — difícil de introducir y extraer equipos</option>
             <option>No estoy seguro</option>
           </select>
         </label>
-        <label class="campo-v campo-v--ancho"><span>Qué trabajo va a hacer</span>
-          <textarea name="Trabajo" placeholder="Ej. movimiento de tierra para una nave de 800 m², terreno con roca suelta, acceso por camino de tierra."></textarea>
+        <label class="campo-v campo-v--ancho"><span>Qué trabajo va a hacer y/u otras especificaciones importantes y referencias</span>
+          <textarea name="Trabajo" placeholder="Ej. movimiento de tierra para una nave de 800 m², terreno con roca suelta, acceso por camino de tierra. Si no está seguro de cuántos equipos necesita, dígalo aquí y le sugerimos."></textarea>
         </label>
       </div>
 
@@ -130,7 +137,9 @@
         <button class="btn btn--ambar btn--grande" type="submit">
           <svg class="ico" aria-hidden="true"><use href="#i-llave"/></svg> Preparar mi cotización
         </button>
-        <a class="btn btn--linea btn--grande" href="https://wa.me/18090000000" rel="noopener">Escribir por WhatsApp</a>
+        <button class="btn btn--linea btn--grande" type="button" data-whatsapp>
+          <svg class="ico" aria-hidden="true"><use href="#i-whatsapp"/></svg> Enviar solicitud por WhatsApp
+        </button>
       </div>
     </form>
 
@@ -155,7 +164,7 @@
     <div class="pie__col">
       <h3 class="pie__titulo">Otros servicios</h3>
       <ul class="pie__lista">
-        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="alquiler.html">Alquiler de equipos con operador, por hora</a></li>
         <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
         <li><a href="importar.html">Importación de maquinaria</a></li>
         <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
@@ -172,7 +181,7 @@
       <h3 class="pie__titulo">Enlaces</h3>
       <ul class="pie__lista pie__lista--marcada">
         <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
-        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia con operador, por hora</a></li>
         <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
         <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
         <li><a href="planes.html"><b>Planes y precios:</b> cupos, niveles y beneficios</a></li>

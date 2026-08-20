@@ -640,7 +640,9 @@ async function crearSolicitudServicio(req, res) {
      recorta y se limita: es texto libre que acaba en un correo. */
   const detalle = {};
   Object.entries(c.detalle || {}).slice(0, 25).forEach(([k, v]) => {
-    const rotulo = texto(k, 60);
+    // 60 caracteres cortaban rótulos legítimos a media palabra: «Qué
+    // trabajo va a hacer y/u otras especificaciones importante».
+    const rotulo = texto(k, 120);
     const valor = texto(v, 600);
     if (rotulo && valor) detalle[rotulo] = valor;
   });

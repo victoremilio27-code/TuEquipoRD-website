@@ -67,6 +67,7 @@
       </div>
       <ul class="lista-punteada lista-punteada--pasos">
         <li>Precio del equipo más la comisión de la subasta o el dealer.</li>
+        <li>Servicio de inspección independiente, si aplica.</li>
         <li>Transporte interno en origen hasta el puerto de embarque.</li>
         <li>Flete marítimo y seguro de la carga.</li>
         <li>Aranceles e impuestos de aduana según la partida del equipo.</li>
@@ -82,11 +83,20 @@
 
     <form class="form-largo" data-servicio="importacion" data-cotizacion="resumenImportar">
       <div class="campos">
+        <!-- Tipo y marca van encadenados. El tipo se ofrece hasta el
+             último nivel —«Planta eléctrica diésel», no «Generadores y
+             compresores»— y de él salen TODAS las marcas que fabrican
+             ese equipo, no solo las que hoy tienen algo publicado: aquí
+             no se busca en el catálogo, se encarga una importación. -->
         <label class="campo-v"><span>Tipo de equipo</span>
-          <select name="Tipo de equipo" data-categorias required><option value="">Seleccione uno</option></select>
+          <select id="imp-tipo" name="Tipo de equipo" data-tipos-equipo required>
+            <option value="">Seleccione uno</option>
+          </select>
         </label>
         <label class="campo-v"><span>Marca preferida (opcional)</span>
-          <select name="Marca preferida" data-marcas="todas"><option value="">Sin preferencia</option></select>
+          <select id="imp-marca" name="Marca preferida" data-marcas-del-tipo="imp-tipo" disabled>
+            <option value="">Elija primero el tipo de equipo</option>
+          </select>
         </label>
         <label class="campo-v"><span>Presupuesto total (RD$)</span>
           <select name="Presupuesto" required>
@@ -98,12 +108,30 @@
             <option>Más de 20,000,000</option>
           </select>
         </label>
-        <label class="campo-v"><span>Año mínimo aceptable</span>
-          <input type="number" name="Año mínimo" min="1990" max="2026" placeholder="Ej. 2016">
-        </label>
-        <label class="campo-v"><span>Horas máximas aceptables</span>
-          <input type="text" name="Horas máximas" placeholder="Ej. 5,000 h">
-        </label>
+        <!-- Año y horas no siempre aplican: en un equipo nuevo, o cuando
+             al cliente le da igual con tal de que sirva. Marcar «No
+             aplica» apaga el campo y manda esa respuesta en claro, que
+             es distinto de dejarlo en blanco por descuido. -->
+        <div class="campo-v">
+          <label class="campo-v__rotulo" for="imp-anio">Año mínimo aceptable</label>
+          <div class="campo-na">
+            <input type="number" id="imp-anio" name="Año mínimo" min="1990" max="2026" placeholder="Ej. 2016">
+            <input type="hidden" name="Año mínimo" value="No aplica" disabled>
+            <label class="campo-na__op">
+              <input type="checkbox" data-no-aplica="imp-anio"> <span>No aplica</span>
+            </label>
+          </div>
+        </div>
+        <div class="campo-v">
+          <label class="campo-v__rotulo" for="imp-horas">Horas máximas aceptables</label>
+          <div class="campo-na">
+            <input type="text" id="imp-horas" name="Horas máximas" placeholder="Ej. 5,000 h">
+            <input type="hidden" name="Horas máximas" value="No aplica" disabled>
+            <label class="campo-na__op">
+              <input type="checkbox" data-no-aplica="imp-horas"> <span>No aplica</span>
+            </label>
+          </div>
+        </div>
         <label class="campo-v"><span>¿Para cuándo lo necesitas?</span>
           <select name="Urgencia" required>
             <option value="">Seleccione una</option>
@@ -156,7 +184,7 @@
     <div class="pie__col">
       <h3 class="pie__titulo">Otros servicios</h3>
       <ul class="pie__lista">
-        <li><a href="alquiler.html">Alquiler de equipos por día o semana</a></li>
+        <li><a href="alquiler.html">Alquiler de equipos con operador, por hora</a></li>
         <li><a href="transporte.html">Transporte de equipos (lowboy)</a></li>
         <li><a href="importar.html">Importación de maquinaria</a></li>
         <li><a href="dealers.html">Talleres y dealers de maquinaria</a></li>
@@ -173,7 +201,7 @@
       <h3 class="pie__titulo">Enlaces</h3>
       <ul class="pie__lista pie__lista--marcada">
         <li><a href="transporte.html"><b>Transporte:</b> cotización con seguimiento por GPS</a></li>
-        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia, por día o mes</a></li>
+        <li><a href="alquiler.html"><b>Alquiler de equipos:</b> flota propia con operador, por hora</a></li>
         <li><a href="importar.html"><b>Importación:</b> cotización según presupuesto</a></li>
         <li><a href="financiamiento.html"><b>Financiamiento:</b> entidades y requisitos</a></li>
         <li><a href="planes.html"><b>Planes y precios:</b> cupos, niveles y beneficios</a></li>

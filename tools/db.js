@@ -352,6 +352,48 @@ const MIGRACIONES = [
      SELECT lower(hex(randomblob(16))), id, foto, nombre, 0
        FROM flota WHERE foto IS NOT NULL AND foto <> ''`,
   ]],
+
+  /* Alquiler por FUNCIÓN, con operador y por hora.
+
+     El paso anterior quitó la marca —«Clase CAT 320» pasó a
+     «Excavadora · 18 a 22 toneladas»— pero dejó el tamaño, y el tamaño
+     sigue siendo una promesa. Quien alquila necesita excavar; si hay
+     una de 20 t, una de 30 y una de 55, la que va la decidimos
+     nosotros al ver la accesibilidad de la obra y el trabajo. Ofrecer
+     el tonelaje era darle a elegir una máquina concreta por la puerta
+     de atrás.
+
+     Se reescriben los seis tipos sembrados, incluidos los detalles:
+     decían «con operador o sin él» y ya no existe la modalidad sin
+     operador. Si alguno se había editado desde /admin.html, este paso
+     lo devuelve al texto vigente; es lo correcto, porque el texto
+     viejo contradice la política que hoy se anuncia en la página. */
+  ['2026-08-alquiler-por-funcion', [
+    `UPDATE flota SET nombre = CASE nombre
+        WHEN 'Excavadora 20 t'         THEN 'Excavadora'
+        WHEN 'Retroexcavadora 4x4'     THEN 'Retroexcavadora'
+        WHEN 'Cargador frontal 3 m³'   THEN 'Cargador frontal'
+        WHEN 'Camión volteo 16 m³'     THEN 'Camión volteo'
+        WHEN 'Planta eléctrica 100 kW' THEN 'Planta eléctrica'
+        ELSE nombre END
+      WHERE servicio = 'alquiler'`,
+
+    `UPDATE flota SET detalle = CASE nombre
+        WHEN 'Excavadora'         THEN 'Excavación, zanjas y carga de material.'
+        WHEN 'Retroexcavadora'    THEN 'Zanjas, relleno y carga en espacios reducidos. Admite martillo.'
+        WHEN 'Cargador frontal'   THEN 'Acopio, carga de camiones y movimiento de agregados.'
+        WHEN 'Camión volteo'      THEN 'Traslado de tierra, arena y escombro.'
+        WHEN 'Rodillo compactador' THEN 'Compactación de terraplenes y bases. Vibratorio liso.'
+        WHEN 'Planta eléctrica'   THEN 'Energía en obra sin red. Insonorizada, con tablero de transferencia.'
+        ELSE detalle END
+      WHERE servicio = 'alquiler'`,
+
+    /* La capacidad deja de anunciarse y la tarifa pasa a ser horaria.
+       El transporte no se toca: allí la capacidad de la cama sí es el
+       dato que decide qué se puede montar. */
+    `UPDATE flota SET capacidad_texto = NULL, unidad = 'hora'
+      WHERE servicio = 'alquiler'`,
+  ]],
 ];
 
 function migrar() {

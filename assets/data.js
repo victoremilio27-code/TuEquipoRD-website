@@ -90,12 +90,12 @@ const PROVINCIAS = [
 /* Flota propia de alquiler. No son anuncios de terceros: son los
    únicos equipos que se alquilan a través de la página. */
 const EQUIPOS_ALQUILER = [
-  { id: 'alq-exc-20t',  nombre: 'Excavadora 20 t',        detalle: 'Clase CAT 320 · brazo estándar · con operador', icono: 'i-excavadora',  unidad: 'día' },
-  { id: 'alq-retro',    nombre: 'Retroexcavadora 4x4',    detalle: 'Clase JCB 3CX · martillo opcional',             icono: 'i-retro',       unidad: 'día' },
-  { id: 'alq-cargador', nombre: 'Cargador frontal 3 m³',  detalle: 'Clase WA200 · ideal para acopio',               icono: 'i-cargador',    unidad: 'día' },
-  { id: 'alq-volteo',   nombre: 'Camión volteo 16 m³',    detalle: 'Con chofer · movimiento de material',           icono: 'i-volteo',      unidad: 'viaje' },
-  { id: 'alq-rodillo',  nombre: 'Rodillo compactador',    detalle: '11 t · vibratorio liso',                        icono: 'i-rodillo',     unidad: 'día' },
-  { id: 'alq-planta',   nombre: 'Planta eléctrica 100 kW', detalle: 'Insonorizada · diésel · tablero incluido',     icono: 'i-generador',   unidad: 'semana' },
+  { id: 'alq-exc',      nombre: 'Excavadora',          detalle: 'Excavación, zanjas y carga de material.',                            icono: 'i-excavadora', unidad: 'hora' },
+  { id: 'alq-retro',    nombre: 'Retroexcavadora',     detalle: 'Zanjas, relleno y carga en espacios reducidos. Admite martillo.',    icono: 'i-retro',      unidad: 'hora' },
+  { id: 'alq-cargador', nombre: 'Cargador frontal',    detalle: 'Acopio, carga de camiones y movimiento de agregados.',               icono: 'i-cargador',   unidad: 'hora' },
+  { id: 'alq-volteo',   nombre: 'Camión volteo',       detalle: 'Traslado de tierra, arena y escombro.',                              icono: 'i-volteo',     unidad: 'hora' },
+  { id: 'alq-rodillo',  nombre: 'Rodillo compactador', detalle: 'Compactación de terraplenes y bases. Vibratorio liso.',              icono: 'i-rodillo',    unidad: 'hora' },
+  { id: 'alq-planta',   nombre: 'Planta eléctrica',    detalle: 'Energía en obra sin red. Insonorizada, con tablero de transferencia.', icono: 'i-generador', unidad: 'hora' },
 ];
 
 /* ── Transporte ───────────────────────────────────────────
