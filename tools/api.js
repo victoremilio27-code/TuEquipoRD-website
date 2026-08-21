@@ -14,6 +14,7 @@
 const db = require('./db');
 const correo = require('./correo');
 const fotos = require('./fotos');
+const chat = require('./chat');
 
 /* El cálculo del importe es el MISMO módulo que carga el navegador.
    La cifra que se enseña y la que se cobra salen de la misma función:
@@ -31,6 +32,12 @@ const LIMITES = {
   codigos:  { tope: 5,  minutos: 15 },   // códigos pedidos por correo
   acceso:   { tope: 10, minutos: 15 },   // contraseñas probadas por IP
   registro: { tope: 5,  minutos: 60 },   // cuentas creadas por IP
+
+  /* Cada mensaje del asistente cuesta dinero de verdad, así que el
+     tope es más generoso que los de arriba pero existe: una consulta
+     normal se resuelve en cinco o seis preguntas, y treinta en un
+     cuarto de hora ya no es una persona con una duda. */
+  chat:     { tope: 30, minutos: 15 },
 };
 
 /* ── Utilidades de transporte ───────────────────────────── */
@@ -658,6 +665,46 @@ async function crearSolicitudServicio(req, res) {
       ? 'Recibimos su solicitud. Le enviamos copia por correo y le respondemos con precio y disponibilidad.'
       : 'Recibimos su solicitud. Le respondemos con precio y disponibilidad.',
   });
+}
+
+/* ── Ruta: asistente de soporte ─────────────────────────── */
+
+/* Va sin sesión a propósito: quien tiene una duda sobre cómo funciona
+   el sitio todavía no tiene cuenta, y obligarle a crearla para
+   preguntar es justo lo contrario de lo que hace un soporte.
+ *
+ * La clave de Anthropic no sale de tools/chat.js. El navegador manda
+ * texto y recibe texto; nunca ve el prompt del sistema ni la clave.
+ *
+ * El historial llega del cliente porque no se guarda en la base. Eso
+ * significa que se puede falsificar: alguien puede inventarse turnos
+ * del asistente y hacerle decir cosas. Es aceptable aquí —solo se
+ * engañaría a sí mismo, no hay datos de nadie más de por medio— y lo
+ * que de verdad manda, el prompt del sistema, se arma en el servidor
+ * en cada petición. */
+async function conversarConSoporte(req, res) {
+  const ip = origen(req);
+  if (!db.permitir(`chat:${ip}`, LIMITES.chat.tope, LIMITES.chat.minutos)) {
+    return fallo(res, 429, 'Ha hecho muchas consultas seguidas. Espere unos minutos '
+      + `o escríbanos a ${chat.CORREO_GENERAL}.`);
+  }
+
+  const c = await leerCuerpo(req);
+  const { error, turnos } = chat.limpiarTurnos(c.mensajes);
+  if (error) return fallo(res, 400, error);
+
+  const r = await chat.conversar(turnos);
+  if (!r.ok) {
+    /* Un fallo del asistente no puede dejar a la persona en un
+       callejón: el mensaje amable lleva siempre los dos contactos, que
+       es lo mismo que haría el asistente si no supiera la respuesta.
+       El motivo técnico queda en el registro del servidor, no en
+       pantalla. */
+    return fallo(res, 503, 'Ahora mismo no puedo responder. Escríbanos a '
+      + `${chat.CORREO_GENERAL} o llame al ${chat.TELEFONO} y le atendemos.`);
+  }
+
+  return responder(res, 200, { respuesta: r.texto });
 }
 
 const listarSolicitudesServicio = conAdmin((req, res, ctx, consulta) => {
@@ -1573,6 +1620,10 @@ const RUTAS = [
   // Cotizaciones de alquiler, transporte e importación. Crearlas va sin
   // sesión —pedir precio no debe exigir cuenta—; leerlas, no.
   ['POST',  /^\/api\/solicitudes$/,                      crearSolicitudServicio],
+
+  // Asistente de soporte. Público y sin sesión: quien pregunta cómo
+  // funciona el sitio todavía no tiene cuenta.
+  ['POST',  /^\/api\/chat$/,                             conversarConSoporte],
   ['GET',   /^\/api\/admin\/solicitudes-servicio$/,      listarSolicitudesServicio],
   ['PATCH', /^\/api\/admin\/solicitudes-servicio\/([\w-]+)$/, marcarSolicitudServicio],
 
