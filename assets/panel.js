@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Panel del anunciante
+   MercaMaquinarias · Panel del anunciante
    Lo que un vendedor necesita saber sin llamar a nadie: cuántas
    visitas tiene cada equipo, cuántos contactos generó, cuánto le
    queda de vigencia y qué está publicado y qué no.

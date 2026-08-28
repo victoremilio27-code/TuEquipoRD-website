@@ -1,4 +1,4 @@
-# Despliegue de TuEquipoRD en un VPS
+# Despliegue de MercaMaquinarias en un VPS
 
 Ubuntu 24.04. El dominio ya está puesto en todos los archivos: `tuequipord.com`.
 
@@ -36,7 +36,7 @@ chown -R tuequipord:tuequipord /var/lib/tuequipord
 ## 2. Código
 
 ```bash
-git clone https://github.com/victoremilio27-code/TuEquipoRD-website.git /var/www/tuequipord
+git clone https://github.com/victoremilio27-code/MercaMaquinarias-website.git /var/www/tuequipord
 chown -R tuequipord:tuequipord /var/www/tuequipord
 ```
 
@@ -45,7 +45,7 @@ más limpio es una *deploy key*: genera una clave en el servidor con
 `ssh-keygen -t ed25519 -C tuequipord-vps`, copia el contenido de
 `~/.ssh/id_ed25519.pub` y añádelo en GitHub bajo
 **Settings → Deploy keys** del repositorio. Luego clona por SSH:
-`git@github.com:victoremilio27-code/TuEquipoRD-website.git`.
+`git@github.com:victoremilio27-code/MercaMaquinarias-website.git`.
 
 No hace falta `npm install`: el servidor y la API no usan dependencias.
 Puppeteer es solo para capturas en desarrollo.
@@ -64,7 +64,7 @@ TUEQUIPO_SECRETO=<el valor generado arriba>
 
 TUEQUIPO_CORREO=brevo
 BREVO_API_KEY=<la clave de Brevo>
-TUEQUIPO_REMITENTE=TuEquipoRD <no-responder@tuequipord.com>
+TUEQUIPO_REMITENTE=MercaMaquinarias <no-responder@tuequipord.com>
 TUEQUIPO_REVISION=dealers@tuequipord.com
 TUEQUIPO_SITIO=https://tuequipord.com
 ```
@@ -123,7 +123,7 @@ Se crean desde el servidor, con el correo ya verificado:
 cd /var/www/tuequipord
 
 sudo -u tuequipord node tools/admin.js crear principal@tuequipord.com \
-  "Administración TuEquipoRD" --admin --exenta --empresa "TuEquipoRD"
+  "Administración MercaMaquinarias" --admin --exenta --empresa "MercaMaquinarias"
 
 sudo -u tuequipord node tools/admin.js crear <tu-correo> "<Tu nombre>" --exenta
 sudo -u tuequipord node tools/admin.js crear <correo-socio> "<Nombre>" --exenta

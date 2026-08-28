@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Planes y precios
+   MercaMaquinarias · Planes y precios
 
    EL ÚNICO SITIO DONDE SE COMPRA CAPACIDAD. Antes el cobro vivía
    dentro del asistente de publicación: el anunciante montaba la ficha

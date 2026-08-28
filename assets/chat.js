@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Asistente de soporte
+   MercaMaquinarias · Asistente de soporte
 
    Widget flotante que responde preguntas sobre cómo funciona el
    sitio. Habla con /api/chat; la clave de Anthropic vive en el
@@ -33,7 +33,7 @@
     'Quiero importar una máquina',
   ];
 
-  const BIENVENIDA = 'Buenas. Soy el asistente de TuEquipoRD. '
+  const BIENVENIDA = 'Buenas. Soy el asistente de MercaMaquinarias. '
     + 'Le puedo explicar cómo publicar un equipo, cómo funcionan los planes '
     + 'y los servicios de alquiler, transporte e importación. ¿En qué le ayudo?';
 
@@ -86,7 +86,7 @@
              aria-labelledby="chatTitulo" hidden>
       <header class="chat__cab">
         <div>
-          <h2 class="chat__titulo" id="chatTitulo">Asistente TuEquipoRD</h2>
+          <h2 class="chat__titulo" id="chatTitulo">Asistente MercaMaquinarias</h2>
           <p class="chat__sub">Responde sobre el sitio y nuestros servicios</p>
         </div>
         <button class="chat__cerrar" id="chatCerrar" type="button" aria-label="Cerrar el asistente">

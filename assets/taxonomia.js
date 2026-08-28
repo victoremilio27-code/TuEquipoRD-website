@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Taxonomía de equipos
+   MercaMaquinarias · Taxonomía de equipos
    Categoría → Subcategoría → Marca → Modelo
 
    FUENTE ÚNICA. Este archivo lo carga el navegador con <script> y lo

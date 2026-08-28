@@ -314,7 +314,7 @@ servidor.on('error', (e) => {
 });
 
 servidor.listen(args.port, () => {
-  console.log(`TuEquipoRD en http://localhost:${args.port}`);
+  console.log(`MercaMaquinarias en http://localhost:${args.port}`);
   console.log(`Sirviendo   ${RAIZ}`);
   console.log(`API         ${api ? 'activa en /api' : 'desactivada'}`);
   console.log('Ctrl+C para detener.\n');

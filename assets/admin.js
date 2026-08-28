@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Revisión de solicitudes de dealer
+   MercaMaquinarias · Revisión de solicitudes de dealer
 
    Pantalla interna. Quien no tenga el permiso recibe 404 de la API y
    aquí ve lo mismo: la página no revela que exista una cola de
@@ -655,7 +655,7 @@ function pintarHeroe(heroe) {
   const candidatas = (heroe && heroe.delCatalogo ? heroe.delCatalogo : []).filter((o) => o.fijable);
   sel.length = 1;
   candidatas.forEach((o) => {
-    sel.add(new Option(o.alt.replace(' publicado en TuEquipoRD', ''), o.imagen));
+    sel.add(new Option(o.alt.replace(' publicado en MercaMaquinarias', ''), o.imagen));
   });
 
   sel.disabled = !candidatas.length;
@@ -708,7 +708,7 @@ async function montarHeroe() {
     entrada.value = '';
     $('#heroeEstadoImagen').textContent = 'JPG, PNG o WebP. Apaisada y de al menos 1600 px de ancho.';
     const texto = e.target.options[e.target.selectedIndex].text;
-    if (!$('#heroe-alt').value) $('#heroe-alt').value = `${texto} publicado en TuEquipoRD`;
+    if (!$('#heroe-alt').value) $('#heroe-alt').value = `${texto} publicado en MercaMaquinarias`;
   });
 
   form.addEventListener('submit', async (ev) => {

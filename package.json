@@ -1,7 +1,7 @@
 {
   "name": "tuequipord-landing",
   "version": "1.0.0",
-  "description": "Página de aterrizaje de TuEquipoRD, marketplace de maquinaria y equipo pesado.",
+  "description": "Página de aterrizaje de MercaMaquinarias, marketplace de maquinaria y equipo pesado.",
   "private": true,
   "type": "commonjs",
   "scripts": {

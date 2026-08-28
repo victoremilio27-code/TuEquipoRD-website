@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Cómo se cobra
+   MercaMaquinarias · Cómo se cobra
    Fuente única del cálculo. La carga el navegador con <script> y el
    servidor con require(): la cifra que se enseña y la que se cobra
    salen de la misma función, no de dos copias que se desincronizan.

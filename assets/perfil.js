@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Página pública del dealer
+   MercaMaquinarias · Página pública del dealer
    La presencia de la empresa dentro de la plataforma: quién es, dónde
    está y todo lo que tiene publicado, en una sola dirección que puede
    compartir en su publicidad.
@@ -23,7 +23,7 @@ function pintarPerfil(datos) {
   const anuncios = datos.anuncios || [];
   const sucursales = datos.sucursales || [];
 
-  document.title = `${d.nombre} · TuEquipoRD`;
+  document.title = `${d.nombre} · MercaMaquinarias`;
 
   // Lo que un comprador quiere saber de un vendedor antes de llamarlo:
   // desde cuándo opera, cuánto inventario tiene y de qué tipo.
@@ -45,7 +45,7 @@ function pintarPerfil(datos) {
                comprueba al aprobar la empresa y no se enseña a nadie.
                Lo que el comprador necesita saber —que la empresa fue
                revisada— lo dice el sello de verificada. -->
-          <span>En TuEquipoRD desde ${desde}</span>
+          <span>En MercaMaquinarias desde ${desde}</span>
           <span><b class="num">${anuncios.length}</b> ${anuncios.length === 1 ? 'equipo publicado' : 'equipos publicados'}</span>
         </p>
         ${d.descripcion ? `<p class="perfil__texto">${esc(d.descripcion)}</p>` : ''}

@@ -1,5 +1,5 @@
 /**
- * api.js — API HTTP de TuEquipoRD. Sin dependencias.
+ * api.js — API HTTP de MercaMaquinarias. Sin dependencias.
  *
  * La monta serve.js bajo /api. Cada ruta valida su entrada, llama a
  * db.js y devuelve JSON. Aquí no hay SQL: solo reglas de negocio,
@@ -125,7 +125,7 @@ const conSesion = (manejador) => (req, res, ctx, ...resto) => {
   return manejador(req, res, ctx, ...resto);
 };
 
-/* Solo el personal de TuEquipoRD. La marca `es_admin` no se concede
+/* Solo el personal de MercaMaquinarias. La marca `es_admin` no se concede
    desde ninguna pantalla: se pone con tools/admin.js. Se comprueba
    contra la base en cada petición y no contra la cookie, para que
    quitar el permiso tenga efecto inmediato.
@@ -556,6 +556,9 @@ const subirFoto = conSesion(async (req, res, ctx) => {
    La pantalla toma UNA al azar en cada visita. El equipo puede fijar
    otra desde /admin.html y entonces manda esa. */
 const FONDOS_HEROE = [
+  // La fotografía del paquete de marca, sin texto quemado: el titular
+  // lo pone el HTML encima. Va primera por ser la imagen oficial.
+  { imagen: '/brand_assets/img/hero-limpio.jpg', alt: 'Maquinaria pesada de MercaMaquinarias en obra' },
   { imagen: '/brand_assets/portada/heroe-1.jpg', alt: 'Maquinaria pesada de movimiento de tierra en obra' },
   { imagen: '/brand_assets/portada/heroe-2.jpg', alt: 'Excavadora trabajando sobre terreno abierto' },
   { imagen: '/brand_assets/portada/heroe-3.jpg', alt: 'Flota de equipo pesado alineada en un patio' },

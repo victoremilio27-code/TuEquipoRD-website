@@ -15,8 +15,11 @@ correos/
 *.png
 *.jpg
 *.jpeg
-!brand_assets/*.png
-!brand_assets/portada/*.jpg
+# El paquete de marca se versiona ENTERO. Antes se salvaban a mano dos
+# rutas sueltas, y al llegar brand_assets/img/ sus imágenes quedaron
+# fuera sin avisar: la vista previa al compartir habría dado 404 en
+# producción con todo el HTML apuntando a ella.
+!brand_assets/**
 
 # Entorno
 .env

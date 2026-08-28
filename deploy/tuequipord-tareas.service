@@ -2,7 +2,7 @@
 # Instalar junto al .timer en /etc/systemd/system/
 
 [Unit]
-Description=TuEquipoRD — mantenimiento diario
+Description=MercaMaquinarias — mantenimiento diario
 After=network.target
 
 [Service]

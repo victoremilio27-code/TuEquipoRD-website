@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Cliente de la API y estado de sesión
+   MercaMaquinarias · Cliente de la API y estado de sesión
    Se carga antes que app.js en todas las páginas. Deja dos cosas
    globales: `api()` para hablar con el servidor y `SESION` con quién
    ha iniciado sesión.

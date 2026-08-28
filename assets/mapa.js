@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Mapa de seguimiento
+   MercaMaquinarias · Mapa de seguimiento
    Mapa esquemático de República Dominicana en SVG, sin librerías.
    Depende de SILUETA_RD y CIUDADES_RD de data.js.
 

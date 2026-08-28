@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Asistente de publicación
+   MercaMaquinarias · Asistente de publicación
 
    Cinco pasos y ninguno cobra. La capacidad se contrata en
    planes.html, que es el único sitio del portal donde entra dinero;
@@ -46,6 +46,9 @@ const CALIDAD_FOTO = 0.82;
 const ANCHO_MINIATURA = 900;
 const CALIDAD_MINIATURA = 0.78;
 
+/* NO se renombra con el cambio de marca. Quien tenga un anuncio a
+   medio escribir lo guardó bajo esta clave: cambiarla le borra el
+   borrador sin avisarle. El nombre viejo aquí no lo ve nadie. */
 const CLAVE_BORRADOR = 'tuequipord:borrador';
 
 /* ── Estado ─────────────────────────────────────────────── */
@@ -708,7 +711,7 @@ function pintarIdentidad() {
     caja.innerHTML = `
       ${icono('i-usuario')}
       <span>
-        <b>Publicará con una cuenta de TuEquipoRD.</b>
+        <b>Publicará con una cuenta de MercaMaquinarias.</b>
         Puede completar la ficha ahora y entrar al final: lo que escriba se guarda.
         La cuenta es lo que le permite después editar el anuncio, medir sus visitas y renovarlo.
       </span>`;

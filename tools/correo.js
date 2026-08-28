@@ -21,7 +21,7 @@ const path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const BANDEJA = path.join(RAIZ, '.tmp', 'correos');
 
-const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'TuEquipoRD <no-responder@tuequipord.com>';
+const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'MercaMaquinarias <no-responder@tuequipord.com>';
 const TRANSPORTE = process.env.TUEQUIPO_CORREO || 'archivo';
 
 // Buzón interno que recibe las solicitudes de dealer para revisar.
@@ -107,7 +107,7 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
     <!-- Banner -->
     <tr><td bgcolor="${AZUL}" style="padding:26px 26px 24px;border-bottom:4px solid ${AMBAR}">
       <div style="font-family:${TIPO};font-size:27px;font-weight:800;letter-spacing:-.02em;color:#FFFFFF;line-height:1">
-        TuEquipo<span style="color:${AMBAR}">RD</span>
+        Merca<span style="color:${AMBAR}">Maquinarias</span>
       </div>
       <div style="margin-top:6px;font-family:${TIPO};font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#8FA3B3">
         Maquinaria y equipo pesado
@@ -127,7 +127,7 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
     <!-- Pie -->
     <tr><td bgcolor="${AZUL}" style="padding:20px 26px">
       <p style="margin:0;font-family:${TIPO};font-size:12px;line-height:1.6;color:#8FA3B3">
-        TuEquipoRD · República Dominicana<br>
+        MercaMaquinarias · República Dominicana<br>
         <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">tuequipord.com</a>
       </p>
     </td></tr>
@@ -145,17 +145,17 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
 function plantillaCodigo({ codigo, tipo, nombre, minutos }) {
   const textos = {
     verificacion: {
-      asunto: `${codigo} es su código de verificación · TuEquipoRD`,
+      asunto: `${codigo} es su código de verificación · MercaMaquinarias`,
       titulo: 'Confirme su correo',
-      cuerpo: 'Use este código para terminar de crear su cuenta en TuEquipoRD.',
+      cuerpo: 'Use este código para terminar de crear su cuenta en MercaMaquinarias.',
     },
     acceso: {
-      asunto: `${codigo} es su código de acceso · TuEquipoRD`,
+      asunto: `${codigo} es su código de acceso · MercaMaquinarias`,
       titulo: 'Código de acceso',
       cuerpo: 'Alguien está iniciando sesión en su cuenta desde un equipo nuevo. Use este código para continuar.',
     },
     restablecer: {
-      asunto: `${codigo} es su código para cambiar la contraseña · TuEquipoRD`,
+      asunto: `${codigo} es su código para cambiar la contraseña · MercaMaquinarias`,
       titulo: 'Cambio de contraseña',
       cuerpo: 'Use este código para establecer una contraseña nueva en su cuenta.',
     },
@@ -170,7 +170,7 @@ function plantillaCodigo({ codigo, tipo, nombre, minutos }) {
     `Vence en ${minutos} minutos y solo sirve una vez.`, '',
     'Si no fue usted, ignore este mensaje y no comparta el código con nadie.',
     'Nunca le pediremos este código por teléfono ni por WhatsApp.', '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].join('\n');
 
   const html = envoltura({
@@ -315,13 +315,13 @@ function enviarAvisoCambioClave({ para, nombre }) {
   const saludo = nombre ? `Hola, ${nombre}:` : 'Hola:';
   return enviar({
     para,
-    asunto: 'Su contraseña de TuEquipoRD cambió',
+    asunto: 'Su contraseña de MercaMaquinarias cambió',
     texto: [
       saludo, '',
-      'La contraseña de su cuenta de TuEquipoRD acaba de cambiar y se cerraron todas las sesiones abiertas.', '',
+      'La contraseña de su cuenta de MercaMaquinarias acaba de cambiar y se cerraron todas las sesiones abiertas.', '',
       'Si fue usted, no hay nada que hacer.',
       'Si no fue usted, escriba de inmediato a hola@tuequipord.com.', '',
-      'TuEquipoRD',
+      'MercaMaquinarias',
     ].join('\n'),
     html: envoltura({
       titulo: 'Su contraseña cambió',
@@ -503,7 +503,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       'en cuanto contrate un plan que la incluya.',
       slug ? `Su dirección será: https://tuequipord.com/dealer.html?d=${slug}` : null,
       '',
-      'TuEquipoRD',
+      'MercaMaquinarias',
     ]
     : [
       nombre ? `Hola, ${nombre}:` : 'Hola:', '',
@@ -513,7 +513,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       'Su cuenta sigue activa y puede escribirnos a dealers@tuequipord.com con la',
       'documentación corregida para que la revisemos de nuevo.',
       '',
-      'TuEquipoRD',
+      'MercaMaquinarias',
     ];
 
   const saludo = nombre ? `Hola, ${nombre}:` : 'Hola:';
@@ -521,8 +521,8 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
   return enviar({
     para,
     asunto: aprobada
-      ? `Su cuenta de dealer quedó aprobada · TuEquipoRD`
-      : `Sobre su solicitud de cuenta de dealer · TuEquipoRD`,
+      ? `Su cuenta de dealer quedó aprobada · MercaMaquinarias`
+      : `Sobre su solicitud de cuenta de dealer · MercaMaquinarias`,
     texto: texto.filter((l) => l !== null).join('\n'),
     html: aprobada
       ? envoltura({
@@ -564,7 +564,7 @@ const fecha = (iso) => (iso
    compartirla. */
 const enviarAnuncioPublicado = ({ para, nombre, equipo, idAnuncio, vence, plan }) => enviar({
   para,
-  asunto: `Su ${equipo} ya está publicado · TuEquipoRD`,
+  asunto: `Su ${equipo} ya está publicado · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
     `Su anuncio de ${equipo} está publicado y visible en el catálogo.`, '',
@@ -574,7 +574,7 @@ const enviarAnuncioPublicado = ({ para, nombre, equipo, idAnuncio, vence, plan }
     '',
     'Desde su panel puede editarlo, pausarlo, marcarlo como vendido y ver',
     `cuánta gente lo está mirando: ${SITIO}/panel.html`, '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].filter((l) => l !== null).join('\n'),
   html: envoltura({
     titulo: 'Su equipo ya está publicado',
@@ -596,7 +596,7 @@ const enviarAnuncioPublicado = ({ para, nombre, equipo, idAnuncio, vence, plan }
    eso se encarga quien llama, anotándolo en la base. */
 const enviarAnuncioPorVencer = ({ para, nombre, equipo, idAnuncio, vence, dias }) => enviar({
   para,
-  asunto: `Su ${equipo} vence en ${dias} ${dias === 1 ? 'día' : 'días'} · TuEquipoRD`,
+  asunto: `Su ${equipo} vence en ${dias} ${dias === 1 ? 'día' : 'días'} · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
     `Su anuncio de ${equipo} deja de publicarse el ${fecha(vence)}.`, '',
@@ -604,7 +604,7 @@ const enviarAnuncioPorVencer = ({ para, nombre, equipo, idAnuncio, vence, dias }
     'apareciendo en el catálogo sin perder las visitas acumuladas:',
     `${SITIO}/panel.html`, '',
     'Si ya lo vendió, márquelo como vendido y así no le volvemos a escribir.', '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].join('\n'),
   html: envoltura({
     titulo: `Su anuncio vence en ${dias} ${dias === 1 ? 'día' : 'días'}`,
@@ -621,13 +621,13 @@ const enviarAnuncioPorVencer = ({ para, nombre, equipo, idAnuncio, vence, dias }
 
 const enviarAnuncioVencido = ({ para, nombre, equipo, idAnuncio }) => enviar({
   para,
-  asunto: `Su ${equipo} dejó de publicarse · TuEquipoRD`,
+  asunto: `Su ${equipo} dejó de publicarse · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
     `El anuncio de ${equipo} llegó al final de su vigencia y ya no aparece en el catálogo.`, '',
     'Sus fotos, su descripción y sus estadísticas siguen guardadas: renovarlo',
     `lo vuelve a publicar tal como estaba. ${SITIO}/panel.html`, '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].join('\n'),
   html: envoltura({
     titulo: 'Su anuncio dejó de publicarse',
@@ -644,7 +644,7 @@ const enviarAnuncioVencido = ({ para, nombre, equipo, idAnuncio }) => enviar({
    que el anunciante tenga por escrito qué contrató y por cuánto. */
 const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referencia, fin }) => enviar({
   para,
-  asunto: `Comprobante de su plan ${plan} · TuEquipoRD`,
+  asunto: `Comprobante de su plan ${plan} · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
     `Confirmamos la contratación del plan ${plan}.`, '',
@@ -655,7 +655,7 @@ const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referen
     fin ? `Vigente hasta el ${fecha(fin)}.` : null,
     '',
     `Su historial de pagos está en ${SITIO}/panel.html`, '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].filter((l) => l !== null).join('\n'),
   html: envoltura({
     titulo: 'Comprobante de su plan',
@@ -686,7 +686,7 @@ const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referen
    alguien renueva. */
 const enviarContactoRecibido = ({ para, nombre, equipo, idAnuncio, via }) => enviar({
   para,
-  asunto: `Alguien pidió su contacto por el ${equipo} · TuEquipoRD`,
+  asunto: `Alguien pidió su contacto por el ${equipo} · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
     `Una persona interesada pidió su ${via === 'whatsapp' ? 'WhatsApp' : 'teléfono'}`,
@@ -694,7 +694,7 @@ const enviarContactoRecibido = ({ para, nombre, equipo, idAnuncio, via }) => env
     'No tenemos sus datos: el contacto ocurre directamente entre ustedes.',
     'Le avisamos para que esté pendiente de la llamada o del mensaje.', '',
     `Ver el anuncio y sus estadísticas: ${SITIO}/panel.html`, '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].join('\n'),
   html: envoltura({
     titulo: 'Alguien pidió su contacto',
@@ -714,7 +714,7 @@ const enviarContactoRecibido = ({ para, nombre, equipo, idAnuncio, via }) => env
    en vez de limitarse a celebrar el registro. */
 const enviarBienvenida = ({ para, nombre, esDealer }) => enviar({
   para,
-  asunto: 'Su cuenta de TuEquipoRD está lista',
+  asunto: 'Su cuenta de MercaMaquinarias está lista',
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
     'Su correo quedó confirmado y ya puede usar su cuenta.', '',
@@ -731,7 +731,7 @@ const enviarBienvenida = ({ para, nombre, esDealer }) => enviar({
     '',
     `Publicar un equipo: ${SITIO}/publicar.html`,
     `Su panel:           ${SITIO}/panel.html`, '',
-    'TuEquipoRD',
+    'MercaMaquinarias',
   ].join('\n'),
   html: envoltura({
     titulo: 'Su cuenta está lista',

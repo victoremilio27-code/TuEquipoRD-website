@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Render y comportamiento
+   MercaMaquinarias · Render y comportamiento
    Depende de assets/data.js. Sin librerías.
    ═══════════════════════════════════════════════════════════ */
 
@@ -52,9 +52,9 @@ const SPRITE = `
 `;
 
 function inyectarSprite() {
-  if (document.getElementById('sprite-tuequipord')) return;
+  if (document.getElementById('sprite-mercamaquinarias')) return;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.id = 'sprite-tuequipord';
+  svg.id = 'sprite-mercamaquinarias';
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   svg.style.display = 'none';
@@ -814,7 +814,7 @@ function contactosHTML(e) {
     return d.length === 10 ? '1' + d : d;
   };
   const mensaje = encodeURIComponent(
-    `Hola, le escribo por el ${nombreEquipo(e)} publicado en TuEquipoRD (${precioTexto(e)}).`);
+    `Hola, le escribo por el ${nombreEquipo(e)} publicado en MercaMaquinarias (${precioTexto(e)}).`);
 
   return `<div class="contactos">
     <p class="etiqueta etiqueta--bloque">Contacto directo con el anunciante</p>
@@ -900,7 +900,7 @@ async function montarDetalle() {
     return;
   }
 
-  document.title = `${nombreEquipo(e)} · TuEquipoRD`;
+  document.title = `${nombreEquipo(e)} · MercaMaquinarias`;
 
   cont.innerHTML = `
     <nav class="miga" aria-label="Ruta"><a href="index.html">Inicio</a> › <a href="equipos.html?categoria=${e.categoria}">${esc(nombreCategoria(e.categoria))}</a> › <span>${esc(nombreEquipo(e))}</span></nav>
@@ -929,7 +929,7 @@ async function montarDetalle() {
 
         ${fichaTecnicaHTML(e)}
 
-        ${e.verificado ? `<p class="nota-verificado"><span class="pastilla pastilla--verde">${icono('i-check')} Anunciante verificado</span> Identidad y titularidad del equipo comprobadas por TuEquipoRD.</p>` : ''}
+        ${e.verificado ? `<p class="nota-verificado"><span class="pastilla pastilla--verde">${icono('i-check')} Anunciante verificado</span> Identidad y titularidad del equipo comprobadas por MercaMaquinarias.</p>` : ''}
 
         ${contactosHTML(e)}
 
@@ -937,12 +937,12 @@ async function montarDetalle() {
           ? `Publicado por <a href="dealer.html?d=${encodeURIComponent(e.dealerSlug)}">${esc(e.dealer)}</a>`
           : 'Publicado por un anunciante particular.'}</p>
 
-        <p class="etiqueta etiqueta--bloque">Servicios de TuEquipoRD</p>
+        <p class="etiqueta etiqueta--bloque">Servicios de MercaMaquinarias</p>
         ${e.precio != null ? `<a class="btn btn--linea btn--bloque" href="financiamiento.html?monto=${e.precio}">Calcular el financiamiento</a>` : ''}
         <a class="btn btn--linea btn--bloque" href="transporte.html?equipo=${encodeURIComponent(e.id)}">Cotizar el traslado</a>
 
         <p class="detalle__aviso">Verifique el equipo y su documentación antes de pagar.
-          TuEquipoRD publica el anuncio pero no interviene en la transacción ni retiene fondos.
+          MercaMaquinarias publica el anuncio pero no interviene en la transacción ni retiene fondos.
           <a href="contacto.html?equipo=${encodeURIComponent(e.id)}&amp;motivo=reporte">Reportar este anuncio</a>.</p>
       </aside>
     </div>`;
@@ -1712,7 +1712,7 @@ function montarCotizaciones() {
       if (!form.reportValidity()) return;
       const { valores, detalle } = leer();
 
-      const lineas = [`*Solicitud de ${ROTULO_SERVICIO[servicio] || servicio}* · TuEquipoRD`, ''];
+      const lineas = [`*Solicitud de ${ROTULO_SERVICIO[servicio] || servicio}* · MercaMaquinarias`, ''];
       Object.entries(detalle).forEach(([k, v]) => lineas.push(`${k}: ${v}`));
       lineas.push('', 'Mis datos:');
       ['Nombre', 'Teléfono', 'Correo', 'Empresa'].forEach((k) => {

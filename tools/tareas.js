@@ -178,7 +178,7 @@ const TAREAS = {
     process.exit(1);
   }
 
-  console.log(`\nTuEquipoRD · mantenimiento ${new Date().toISOString()}${SECO ? ' (simulación)' : ''}\n`);
+  console.log(`\nMercaMaquinarias · mantenimiento ${new Date().toISOString()}${SECO ? ' (simulación)' : ''}\n`);
   db.abrir();
 
   let fallos = 0;

@@ -1,8 +1,8 @@
-# systemd unit para TuEquipoRD.
+# systemd unit para MercaMaquinarias.
 # Instalar en /etc/systemd/system/tuequipord.service
 
 [Unit]
-Description=TuEquipoRD — sitio y API
+Description=MercaMaquinarias — sitio y API
 After=network.target
 
 [Service]

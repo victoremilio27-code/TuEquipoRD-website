@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Catálogos fijos de la interfaz
+   MercaMaquinarias · Catálogos fijos de la interfaz
 
    Aquí vive lo que es TEXTO y CLASIFICACIÓN: nombres de categorías y
    subcategorías, escala de condición, provincias, marcas admitidas y

@@ -1,9 +1,9 @@
 /**
- * make-favicon.js — rasteriza assets/favicon.svg y arma favicon.ico.
+ * make-favicon.js — rasteriza el favicon de marca y arma favicon.ico.
  *
  * Los navegadores piden /favicon.ico aunque la página declare un icono
  * SVG, así que conviene tener los dos. Se corre una sola vez, o cuando
- * cambie el hexágono de marca.
+ * cambie el icono de marca.
  *
  * Uso: node tools/make-favicon.js
  */
@@ -36,7 +36,7 @@ function empaquetarIco(png, lado) {
 }
 
 async function main() {
-  const svg = fs.readFileSync(path.join(RAIZ, 'assets', 'favicon.svg'), 'utf8');
+  const svg = fs.readFileSync(path.join(RAIZ, 'brand_assets', 'svg', 'favicon-512.svg'), 'utf8');
 
   const navegador = await puppeteer.launch({ headless: true });
   const pagina = await navegador.newPage();

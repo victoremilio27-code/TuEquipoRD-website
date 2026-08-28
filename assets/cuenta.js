@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Entrar, crear cuenta y recuperar la contraseña
+   MercaMaquinarias · Entrar, crear cuenta y recuperar la contraseña
 
    Cinco formularios en la misma pantalla y una sola vista visible a
    la vez. El servidor manda: aquí solo se evita el viaje de ida y

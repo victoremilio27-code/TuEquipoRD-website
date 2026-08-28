@@ -1,10 +1,25 @@
 /* ═══════════════════════════════════════════════════════════
-   TuEquipoRD · Portal de maquinaria y equipo pesado
+   MercaMaquinarias · Portal de maquinaria y equipo pesado
    Tokens de la Guía de Marca v1.0 (2026)
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* Paleta de marca */
+  /* Paleta de marca · MercaMaquinarias, guía v1.0.
+     Los valores son EXACTAMENTE los de la guía; solo cambia el nombre
+     del token. Se conservan los nombres de aquí porque están usados en
+     3.500 líneas y renombrarlos no cambiaría un pixel:
+
+       guía          aquí            valor
+       --mm-noche    --azul          #071A2B
+       --mm-ambar    --ambar         #F2A900
+       --mm-ambar-2  --ambar-hondo   #C98A00
+       --mm-hueso    --hueso         #F7F5EF
+       --mm-neutro   --gris-neutro   #E7E6E0
+       --mm-acero    --gris-acero    #60717D
+       --mm-verde    --verde         #157A4B
+       --mm-display  --display       Archivo 700-800
+       --mm-texto    --cuerpo        Inter 400-600
+       --mm-radio    --r-tarjeta / --r-pildora   16px / 999px  */
   --azul:        #071A2B;
   --blanco:      #FFFFFF;
   --ambar:       #F2A900;
@@ -30,6 +45,14 @@
   --pad: 16px;
   --gap: 14px;
   --r: 6px;
+
+  /* Radios de la guía de marca de MercaMaquinarias: 16 px en tarjetas,
+     999 px en píldoras. El botón usa 10 px, como en la guía.
+     --r (6 px) se queda para los controles pequeños —campos, chips,
+     miniaturas—: a 16 px un input de 36 px de alto parece una cápsula. */
+  --r-tarjeta:  16px;
+  --r-boton:    10px;
+  --r-pildora:  999px;
 }
 
 /* ── Base ───────────────────────────────────────────────── */
@@ -131,7 +154,9 @@ button { font: inherit; }
   padding-block: 9px;
 }
 
-.cab__logo img { height: 25px; width: auto; }
+/* 32 px de alto = 190 px de ancho. La guía fija el ancho mínimo del
+   lockup horizontal en 180 px; a los 25 px de antes medía 148 px. */
+.cab__logo img { height: 32px; width: auto; }
 
 .cab__nav { display: flex; align-items: center; gap: 21px; margin-right: auto; }
 .cab__nav a {
@@ -190,7 +215,7 @@ main { padding-block: 16px 40px; }
 .panel {
   background: var(--blanco);
   border: 1px solid var(--linea);
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
   padding: 16px 18px 18px;
   margin-bottom: var(--gap);
 }
@@ -277,7 +302,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   height: 36px;
   padding: 0 18px;
   border: 1px solid transparent;
-  border-radius: var(--r);
+  border-radius: var(--r-boton);
   font-family: var(--cuerpo);
   font-size: 13.5px;
   font-weight: 600;
@@ -348,7 +373,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   gap: 11px;
   padding: 8px;
   border: 1px solid var(--linea-suave);
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
   transition: border-color .15s ease, background-color .15s ease;
 }
 .dest:hover { border-color: var(--ambar); background: #FFFDF7; }
@@ -501,7 +526,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   min-height: 96px;
   background: repeating-linear-gradient(135deg, #F2F0EA 0 10px, #EDEBE4 10px 20px);
   border: 1px dashed #CFCCC2;
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: .1em;
@@ -734,7 +759,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   padding: 14px;
   background: var(--hueso);
   border: 1px solid var(--linea-suave);
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
   transition: border-color .15s ease, background-color .15s ease;
 }
 .dealer:hover { border-color: var(--ambar); background: var(--blanco); }
@@ -772,7 +797,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   gap: 36px;
 }
 
-.pie__logo { height: 25px; width: auto; margin-bottom: 14px; }
+.pie__logo { height: 32px; width: auto; margin-bottom: 14px; }
 .pie__legal { font-size: 12.5px; font-weight: 600; color: var(--blanco); margin-bottom: 8px; }
 .pie__texto { font-size: 12.5px; line-height: 1.6; max-width: 44ch; margin-bottom: 14px; }
 
@@ -1045,7 +1070,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   height: 100%;
   background: var(--blanco);
   border: 1px solid var(--linea);
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
   overflow: hidden;
   transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
@@ -1178,7 +1203,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   padding: 22px 16px 18px;
   background: var(--blanco);
   border: 1px solid var(--linea);
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
 }
 .plan--destacado { border-color: var(--ambar); box-shadow: 0 0 0 3px rgba(242, 169, 0, .16); }
 .plan--oferta { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(21, 122, 75, .12); }
@@ -2779,7 +2804,7 @@ main { position: relative; }
   display: flex; flex-direction: column; gap: 7px;
   padding: 13px 15px;
   background: var(--hueso); border: 1px solid var(--linea-suave);
-  border-radius: var(--r);
+  border-radius: var(--r-tarjeta);
 }
 .membresia--llena { border-color: var(--linea); background: var(--blanco); }
 .membresia__cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -3135,7 +3160,7 @@ body.sin-scroll { overflow: hidden; }
 /* ── Banda oscura a todo el ancho ───────────────────────────
    Corta la sucesión de recuadros blancos. Los tres servicios propios
    —alquiler, transporte, importación— viven aquí: son lo que hace
-   TuEquipoRD además del catálogo, y en tres paneles blancos más se
+   MercaMaquinarias además del catálogo, y en tres paneles blancos más se
    perdían entre los demás. */
 .banda {
   margin: clamp(20px, 3vw, 34px) 0;

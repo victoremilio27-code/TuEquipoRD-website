@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════
--- TuEquipoRD · Esquema de la base de datos
+-- MercaMaquinarias · Esquema de la base de datos
 --
 -- Escrito para SQLite (node:sqlite, sin dependencias) pero sin usar
 -- nada que no exista en PostgreSQL: los tipos son los mínimos comunes
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   clave_hash     TEXT NOT NULL,
   clave_sal      TEXT NOT NULL,
   correo_verificado INTEGER NOT NULL DEFAULT 0,
-  -- Personal de TuEquipoRD que revisa las solicitudes de dealer. No se
+  -- Personal de MercaMaquinarias que revisa las solicitudes de dealer. No se
   -- otorga desde ninguna pantalla: se pone a mano con tools/admin.js,
   -- de modo que nadie pueda concedérselo registrándose.
   es_admin       INTEGER NOT NULL DEFAULT 0,
@@ -139,7 +139,7 @@ CREATE INDEX IF NOT EXISTS ix_sucursales_org ON sucursales (organizacion_id);
 
 -- ── Flota propia ───────────────────────────────────────────
 
--- Los equipos que TuEquipoRD alquila y las camas con las que
+-- Los equipos que MercaMaquinarias alquila y las camas con las que
 -- transporta. No son anuncios de terceros: son los servicios propios
 -- de la plataforma.
 --
@@ -300,7 +300,7 @@ CREATE TABLE IF NOT EXISTS solicitudes_dealer (
   tipos_equipo     TEXT,
 
   -- Contexto libre
-  origen           TEXT,                    -- cómo llegó a TuEquipoRD
+  origen           TEXT,                    -- cómo llegó a MercaMaquinarias
   comentario       TEXT,
 
   -- Revisión

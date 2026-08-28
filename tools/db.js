@@ -1056,7 +1056,7 @@ function heroePortada(candidatas = 6) {
     alt: a.heroe_alt || null,
     opciones: filas.filter((f) => f.foto).map((f) => ({
       imagen: f.foto,
-      alt: `${f.anio} ${taxonomia.nombreMarca(f.marca) || f.marca} ${f.modelo} publicado en TuEquipoRD`,
+      alt: `${f.anio} ${taxonomia.nombreMarca(f.marca) || f.marca} ${f.modelo} publicado en MercaMaquinarias`,
       /* Fijable solo si es un archivo del propio sitio. Las fotos
          antiguas guardadas como data URI sirven de fondo rotatorio,
          pero no se pueden fijar: la ruta que se guarda en `ajustes`
