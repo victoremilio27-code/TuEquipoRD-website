@@ -337,11 +337,28 @@ function montarMosaicoCategorias() {
     // fotografía y el rótulo «Sin equipos» se contradice a sí misma.
     const fotos = hay ? (FOTOS_CATEGORIA[c.id] || []) : [];
     const foto = fotos.length ? alAzar(fotos) : null;
+    const fotosEditoriales = {
+      excavadoras: 'brand_assets/generated/categoria-excavadoras-v2.png',
+      retroexcavadoras: 'brand_assets/generated/categoria-excavadoras-v2.png',
+      bulldozers: 'brand_assets/generated/categoria-bulldozers-v2.png',
+      compactadoras: 'brand_assets/generated/categoria-compactadoras-v2.png',
+      camiones: 'brand_assets/generated/categoria-camiones-v2.png',
+      autobuses: 'brand_assets/generated/categoria-autobuses-v2.png',
+      remolques: 'brand_assets/generated/categoria-camiones-v2.png',
+      cargadores: 'brand_assets/generated/categoria-cargadores-v2.png',
+      montacargas: 'brand_assets/generated/categoria-cargadores-v2.png',
+      elevacion: 'brand_assets/generated/categoria-cargadores-v2.png',
+      generadores: 'brand_assets/generated/categoria-generadores-v2.png',
+    };
+    const esMovil = matchMedia('(max-width: 700px)').matches;
+    const fotoVisible = esMovil
+      ? (fotosEditoriales[c.id] || (foto && foto.foto) || 'brand_assets/generated/categoria-cargadores-v2.png')
+      : (foto && foto.foto);
 
     return `<li>
       <a class="mosaico__pieza${hay ? '' : ' mosaico__pieza--vacia'}" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
-        ${foto
-          ? `<img src="${esc(foto.foto)}" alt="${esc(foto.titulo)}, publicado en ${esc(c.nombre)}" loading="lazy" decoding="async">`
+        ${fotoVisible
+          ? `<img src="${esc(fotoVisible)}" alt="${esc(c.nombre)}" loading="${esMovil ? 'eager' : 'lazy'}" decoding="async">`
           : `<span class="mosaico__ico">${icono(c.icono)}</span>`}
         <span class="mosaico__cuerpo">
           <span class="mosaico__nombre">${esc(c.nombre)}</span>
@@ -1847,6 +1864,38 @@ function refrescarMarcasActivas() {
 const anotar = (idAnuncio, tipo) =>
   api('/eventos', { metodo: 'POST', cuerpo: { anuncio: idAnuncio, tipo }, silencioso: true });
 
+function montarNavMovil() {
+  if (document.querySelector('.nav-movil')) return;
+  const pagina = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  const items = [
+    ['index.html', 'Inicio', '<path d="M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5z"/><path d="M8.5 21v-6h7v6"/>'],
+    ['equipos.html', 'Equipos', '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>'],
+    ['publicar.html', 'Publicar', '<path d="M12 3v18M3 12h18"/>'],
+    ['financiamiento.html', 'Financiar', '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3"/>'],
+    ['cuenta.html', 'Cuenta', '<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>'],
+  ];
+  const activo = ['categorias.html', 'equipo.html'].includes(pagina) ? 'equipos.html' : pagina;
+  const nav = document.createElement('nav');
+  nav.className = 'nav-movil';
+  nav.setAttribute('aria-label', 'Navegación móvil');
+  nav.innerHTML = items.map(([href, nombre, trazos]) =>
+    `<a href="${href}"${activo === href ? ' class="is-activo" aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${trazos}</svg><span>${nombre}</span></a>`
+  ).join('');
+  document.body.appendChild(nav);
+}
+
+async function montarSaludoUsuario() {
+  const saludo = document.querySelector('#saludoUsuario');
+  if (!saludo) return;
+  if (SESION.cargando) await cargarSesion();
+  if (!haySesion()) return;
+  const nombreCompleto = SESION.usuario && SESION.usuario.nombre;
+  const nombre = (nombreCompleto || '').trim().split(/\s+/)[0];
+  if (!nombre) return;
+  saludo.textContent = `Hola, ${nombre}`;
+  saludo.hidden = false;
+}
+
 /* ── Arranque ───────────────────────────────────────────── */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1855,6 +1904,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // encuentre los <select> ya poblados al arrancar.
   inyectarSprite();
   montarNav();
+  montarNavMovil();
+  montarSaludoUsuario();
   montarSelects();
   montarAlquiler();
   montarFinanciadoras();
