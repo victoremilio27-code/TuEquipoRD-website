@@ -22,6 +22,17 @@ cd "$REPO"
 comoDueno() { sudo -u "$DUENO" "$@"; }
 version() { comoDueno git log --oneline -1; }
 
+# El repositorio tiene que ser de quien lo usa. Si alguien entra al
+# servidor y hace un `git pull` como root, git escribe objetos nuevos
+# con dueno root y a partir de ahi el despliegue falla con
+# "insufficient permission for adding an object". Paso una vez, con 82
+# archivos y 15 subcarpetas de .git/objects en manos de root.
+#
+# Se corrige en cada despliegue en vez de avisar: el sentido de todo
+# esto es no tener que entrar al servidor a arreglar nada. Es
+# idempotente y no toca ni la base ni los secretos, que viven fuera.
+chown -R "$DUENO:$DUENO" "$REPO"
+
 ANTES=$(comoDueno git rev-parse HEAD)
 
 comoDueno git fetch --quiet origin main
