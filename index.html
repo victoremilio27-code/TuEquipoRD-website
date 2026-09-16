@@ -189,22 +189,31 @@
 </section>
 
 <!-- ==== PUBLICIDAD ====
-     Tres espacios que administra el equipo desde /admin.html. Los
-     rellena app.js con lo que devuelva /api/publicidad.
+     Los espacios que administra el equipo desde /admin.html. Los
+     rellena app.js con lo que devuelva /api/publicidad. Las letras son
+     las del tarifario que se le enseña al anunciante.
 
      SI NO HAY CAMPAÑA, EL HUECO NO EXISTE. Nada de recuadros con
      «espacio disponible»: un sitio con marcos vacíos parece a medio
      hacer, y quien llega a comprar una excavadora no está buscando
      dónde anunciarse.
 
-     Los laterales solo aparecen a partir de 1500 px, donde de verdad
+     La única excepción es el MODO MUESTRA (`?muestra=publicidad`), que
+     hay que pedir a propósito y sirve para enseñarle a un anunciante
+     dónde quedaría su banner. El visitante normal no lo ve nunca.
+
+     Los laterales solo aparecen a partir de 1600 px, donde de verdad
      sobra margen. Por debajo de eso no se muestran: robarle ancho al
      catálogo para meter un banner es cambiar ventas por impresiones. -->
 <aside class="pub pub--lateral pub--izq" id="pubIzq" aria-label="Publicidad" hidden></aside>
 <aside class="pub pub--lateral pub--der" id="pubDer" aria-label="Publicidad" hidden></aside>
 
 <div class="envoltura">
+  <!-- A · 1216×160, escritorio. -->
   <aside class="pub pub--superior" id="pubSuperior" aria-label="Publicidad" hidden></aside>
+  <!-- F · 320×180, solo teléfono: justo debajo del buscador del héroe,
+       que es donde termina de leer quien llega desde el celular. -->
+  <aside class="pub pub--movil-superior" id="pubMovilSuperior" aria-label="Publicidad" hidden></aside>
 </div>
 
 <div class="envoltura">
@@ -276,6 +285,10 @@
     </div>
     <ul class="mosaico" id="mosaicoCategorias" data-top="7"></ul>
   </section>
+
+  <!-- G · 336×336, solo teléfono: entre las categorías y los
+       destacados, en la costura natural entre dos bloques. -->
+  <aside class="pub pub--movil-cuadro" id="pubMovilCuadro" aria-label="Publicidad" hidden></aside>
 
   <!-- ==== DESTACADOS EN CARRUSEL ====
        Antes era una columna vertical de ocho renglones dentro de un
