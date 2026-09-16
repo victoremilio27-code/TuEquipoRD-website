@@ -331,34 +331,35 @@ function montarMosaicoCategorias() {
   const conteo = conteoCategorias().slice(0, tope);
   if (!conteo.length) return;
 
-  cont.innerHTML = conteo.map((c) => {
+  cont.innerHTML = conteo.map((c, i) => {
     const hay = c.total > 0;
     // La foto solo si de verdad hay inventario: una pieza con
     // fotografía y el rótulo «Sin equipos» se contradice a sí misma.
     const fotos = hay ? (FOTOS_CATEGORIA[c.id] || []) : [];
     const foto = fotos.length ? alAzar(fotos) : null;
     const fotosEditoriales = {
-      excavadoras: 'brand_assets/generated/categoria-excavadoras-v2.png',
-      retroexcavadoras: 'brand_assets/generated/categoria-excavadoras-v2.png',
-      bulldozers: 'brand_assets/generated/categoria-bulldozers-v2.png',
-      compactadoras: 'brand_assets/generated/categoria-compactadoras-v2.png',
-      camiones: 'brand_assets/generated/categoria-camiones-v2.png',
-      autobuses: 'brand_assets/generated/categoria-autobuses-v2.png',
-      remolques: 'brand_assets/generated/categoria-camiones-v2.png',
-      cargadores: 'brand_assets/generated/categoria-cargadores-v2.png',
-      montacargas: 'brand_assets/generated/categoria-cargadores-v2.png',
-      elevacion: 'brand_assets/generated/categoria-cargadores-v2.png',
-      generadores: 'brand_assets/generated/categoria-generadores-v2.png',
+      excavadoras: 'brand_assets/generated/categoria-excavadoras-v2.webp',
+      retroexcavadoras: 'brand_assets/generated/categoria-excavadoras-v2.webp',
+      bulldozers: 'brand_assets/generated/categoria-bulldozers-v2.webp',
+      compactadoras: 'brand_assets/generated/categoria-compactadoras-v2.webp',
+      camiones: 'brand_assets/generated/categoria-camiones-v2.webp',
+      autobuses: 'brand_assets/generated/categoria-autobuses-v2.webp',
+      remolques: 'brand_assets/generated/categoria-camiones-v2.webp',
+      cargadores: 'brand_assets/generated/categoria-cargadores-v2.webp',
+      montacargas: 'brand_assets/generated/categoria-cargadores-v2.webp',
+      elevacion: 'brand_assets/generated/categoria-cargadores-v2.webp',
+      generadores: 'brand_assets/generated/categoria-generadores-v2.webp',
     };
+    // Fotos de estudio en todos los tamaños: el escritorio usa ya la
+    // misma estética que el móvil.
     const esMovil = matchMedia('(max-width: 700px)').matches;
-    const fotoVisible = esMovil
-      ? (fotosEditoriales[c.id] || (foto && foto.foto) || 'brand_assets/generated/categoria-cargadores-v2.png')
-      : (foto && foto.foto);
+    const fotoVisible = fotosEditoriales[c.id] || (foto && foto.foto)
+      || 'brand_assets/generated/categoria-cargadores-v2.webp';
 
     return `<li>
       <a class="mosaico__pieza${hay ? '' : ' mosaico__pieza--vacia'}" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
         ${fotoVisible
-          ? `<img src="${esc(fotoVisible)}" alt="${esc(c.nombre)}" loading="${esMovil ? 'eager' : 'lazy'}" decoding="async">`
+          ? `<img src="${esc(fotoVisible)}" alt="${esc(c.nombre)}" loading="${esMovil && i < 4 ? 'eager' : 'lazy'}" decoding="async">`
           : `<span class="mosaico__ico">${icono(c.icono)}</span>`}
         <span class="mosaico__cuerpo">
           <span class="mosaico__nombre">${esc(c.nombre)}</span>
@@ -2073,6 +2074,11 @@ async function montarSaludoUsuario() {
 }
 
 /* ── Arranque ───────────────────────────────────────────── */
+
+/* Transporte está en pausa: quien llegue por un enlace viejo va a la
+   portada. Para reactivarlo, borrar esta línea y el bloque
+   «Transporte: servicio pausado» de styles.css. */
+if (/\/transporte\.html$/i.test(location.pathname)) location.replace('index.html');
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Primero lo que no depende del catálogo, para que la página sea
