@@ -1,0 +1,66 @@
+#!/bin/bash
+# Despliegue de MercaMaquinarias.
+#
+# Lo unico que el usuario `deploy` puede ejecutar como root, y lo unico
+# que GitHub Actions puede hacer en esta maquina: su llave lleva la
+# orden forzada en authorized_keys, asi que aunque se filtrara no
+# serviria para nada mas.
+#
+# Si el sitio no responde despues de actualizar, se vuelve solo a la
+# version anterior. Es la diferencia entre "el despliegue fallo" y "el
+# sitio esta caido y hay que entrar a arreglarlo", que es justo lo que
+# este montaje existe para evitar.
+set -euo pipefail
+
+REPO=/var/www/tuequipord
+DUENO=tuequipord
+SALUD=http://127.0.0.1:8080/
+INTENTOS=15
+
+cd "$REPO"
+
+comoDueno() { sudo -u "$DUENO" "$@"; }
+version() { comoDueno git log --oneline -1; }
+
+ANTES=$(comoDueno git rev-parse HEAD)
+
+comoDueno git fetch --quiet origin main
+NUEVO=$(comoDueno git rev-parse origin/main)
+
+if [ "$ANTES" = "$NUEVO" ]; then
+  echo "Ya estaba al dia: $(version)"
+  exit 0
+fi
+
+echo "Actualizando de ${ANTES:0:7} a ${NUEVO:0:7}"
+
+# --ff-only a proposito: si alguien commiteo a mano en el servidor, es
+# preferible que el despliegue falle a que se fusione a ciegas.
+comoDueno git merge --ff-only origin/main
+
+systemctl restart tuequipord
+
+# Se espera a que levante en vez de dormir una cantidad fija: arrancar
+# tarda distinto segun lo que haya que migrar en la base.
+for _ in $(seq 1 "$INTENTOS"); do
+  sleep 1
+  if curl -fsS -o /dev/null --max-time 3 "$SALUD"; then
+    echo "Sitio arriba: $(version)"
+    exit 0
+  fi
+done
+
+echo "ERROR: el sitio no respondio en ${INTENTOS}s. Volviendo a ${ANTES:0:7}" >&2
+comoDueno git reset --hard "$ANTES"
+systemctl restart tuequipord
+
+for _ in $(seq 1 "$INTENTOS"); do
+  sleep 1
+  if curl -fsS -o /dev/null --max-time 3 "$SALUD"; then
+    echo "Restaurada la version anterior. El sitio esta arriba: $(version)" >&2
+    exit 1
+  fi
+done
+
+echo "ATENCION: ni la version anterior responde. Hace falta mirar el servidor." >&2
+exit 1

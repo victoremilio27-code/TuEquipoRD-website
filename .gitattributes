@@ -1,0 +1,10 @@
+# Estos archivos se ejecutan en Linux y NO pueden llevar saltos de linea
+# de Windows: bash lee el \r como parte del comando y falla con
+# `$'\r': command not found`. Git en Windows convierte a CRLF por
+# defecto (core.autocrlf=true), asi que aqui se le dice que no lo haga.
+*.sh                             text eol=lf
+deploy/desplegar-mercamaquinarias text eol=lf
+deploy/*.service                 text eol=lf
+deploy/*.timer                   text eol=lf
+deploy/nginx.conf                text eol=lf
+.github/workflows/*.yml          text eol=lf
