@@ -40,7 +40,7 @@ function abrir() {
 /* Fin de la promoción de lanzamiento del nivel Estándar. Cuando la
    fecha pase, los planes vuelven solos a su tarifa sin tocar código:
    el importe se calcula contra ella en cada cobro. */
-const PROMO_LANZAMIENTO = process.env.TUEQUIPO_PROMO_HASTA || '2026-12-31';
+const PROMO_LANZAMIENTO = process.env.TUEQUIPO_PROMO_HASTA || '2026-11-30';
 
 const MIGRACIONES = [
   ['2026-08-sucursales-contacto', [
@@ -393,6 +393,21 @@ const MIGRACIONES = [
        dato que decide qué se puede montar. */
     `UPDATE flota SET capacidad_texto = NULL, unidad = 'hora'
       WHERE servicio = 'alquiler'`,
+  ]],
+
+  /* La promoción de lanzamiento cierra el 30 de noviembre de 2026.
+
+     Va como migración y no cambiando PROMO_LANZAMIENTO porque
+     '2026-08-promociones' ya se aplicó en producción: esa entrada no
+     vuelve a correr, y la constante solo sirve para bases nuevas. Sin
+     esto, el sitio seguiría anunciando el 31 de diciembre.
+
+     La fecha va escrita y no leída del entorno a propósito: una
+     migración tiene que dar el mismo resultado en la base de Victor,
+     en la del servidor y en la de quien clone el repo mañana. */
+  ['2026-09-promo-hasta-noviembre', [
+    `UPDATE planes SET promo_hasta = '2026-11-30'
+       WHERE nivel = 'estandar' AND precio_promocional IS NOT NULL`,
   ]],
 ];
 
