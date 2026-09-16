@@ -35,7 +35,7 @@
 
   const BIENVENIDA = 'Buenas. Soy el asistente de MercaMaquinarias. '
     + 'Le puedo explicar cómo publicar un equipo, cómo funcionan los planes '
-    + 'y los servicios de alquiler, transporte e importación. ¿En qué le ayudo?';
+    + 'y los servicios de alquiler e importación. ¿En qué le ayudo?';
 
   /* ── Utilidades ─────────────────────────────────────────── */
 
