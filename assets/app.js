@@ -1330,13 +1330,43 @@ const finPromo = () => (NIVELES_SITIO.find((p) => p.en_promo) || {}).promo_hasta
 /* Rótulos de la promoción de lanzamiento. Si no hay promoción viva, el
    aviso entero se retira en vez de quedarse anunciando algo que ya no
    rige. */
+/* Días que faltan para una fecha AAAA-MM-DD, contando días de
+   calendario y no horas: a las 11 de la noche del día 29 faltaba «0
+   días» para el 30 porque quedaban menos de 24 horas.
+
+   Se compara en UTC contra la medianoche local de hoy para que el
+   resultado no cambie con la zona horaria del visitante. */
+function diasHasta(iso) {
+  const [a, m, d] = String(iso).split('-').map(Number);
+  if (!a || !m || !d) return null;
+  const hoy = new Date();
+  return Math.round(
+    (Date.UTC(a, m - 1, d) - Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))
+    / 86400000);
+}
+
 function montarPromo() {
   const fin = finPromo();
+
   $$('[data-promo-hasta]').forEach((el) => {
-    const aviso = el.closest('.realce') || el;
+    // El bloque entero, no solo la fecha: un anuncio de oferta al que
+    // se le quita la fecha sigue anunciando una oferta.
+    const aviso = el.closest('[data-promo-aviso]') || el.closest('.realce') || el;
     if (!fin) { aviso.hidden = true; return; }
     aviso.hidden = false;
     el.textContent = fechaLarga(fin);
+  });
+
+  /* Cuánto queda. Es lo que convierte «hay una oferta» en «conviene
+     hacerlo esta semana», y sale de la misma fecha que se cobra, así
+     que no puede desmentir a la caja. */
+  const quedan = fin === null ? null : diasHasta(fin);
+  $$('[data-promo-quedan]').forEach((el) => {
+    if (quedan === null || quedan < 0) { el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = quedan === 0 ? 'Último día'
+      : quedan === 1 ? 'Queda 1 día'
+      : `Quedan ${quedan} días`;
   });
 }
 

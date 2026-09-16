@@ -83,6 +83,18 @@
       </fieldset>
     </div>
 
+    <!-- Aquí el nivel Estándar aparece a RD$0 por la promoción de
+         lanzamiento, y sin esta línea no había forma de saber que es
+         temporal ni hasta cuándo: alguien podía contratar creyendo que
+         ese es el precio de siempre. La fecha sale de /api/planes, la
+         misma que se aplica al cobrar, y cuando la promoción termine
+         montarPromo() retira el aviso solo. -->
+    <p class="realce" data-promo-aviso hidden>
+      <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
+      <span>Por la <b>oferta de lanzamiento</b>, los cupos del nivel Estándar no se cobran hasta el
+        <b data-promo-hasta>fecha por definir</b>. <b data-promo-quedan hidden></b></span>
+    </p>
+
     <ul class="planes-op planes-op--pagina" id="nivelesLista"></ul>
 
     <p class="invitacion-dealer" id="notaPremium" hidden>

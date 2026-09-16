@@ -324,10 +324,31 @@
       <h2 class="panel__titulo" id="t-vende"><em>Publicación</em> de equipos</h2>
       <p class="panel__texto">Publique su maquinaria ante contratistas, constructoras y administradores de flota. No se paga por anuncio: se contratan <b>cupos</b>, y un cupo libre se reutiliza sin volver a pagar.</p>
 
-      <p class="realce">
-        <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
-        <span>Los cupos del nivel <b>Estándar</b> no se cobran hasta <b data-promo-hasta>fecha por definir</b></span>
-      </p>
+      <!-- Oferta de lanzamiento. Va como anuncio y no como nota al pie:
+           es la razón por la que a alguien le compensa publicar hoy en
+           vez de dentro de tres meses, y escondida en un renglón gris
+           no la leía nadie.
+
+           La fecha y los días que quedan los escribe app.js desde
+           /api/planes: son los mismos que se aplican al cobrar. Si la
+           promoción termina, montarPromo() retira el bloque entero en
+           vez de dejarlo anunciando algo que ya no rige.
+
+           Se dice «sin costo» y no «RD$0» a propósito: es la misma
+           regla que sigue el asistente. Un precio de cero escrito con
+           cifras se lee como un error de la página. -->
+      <aside class="oferta" data-promo-aviso aria-label="Oferta de lanzamiento" hidden>
+        <p class="oferta__sello">
+          <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
+          Oferta de lanzamiento
+        </p>
+        <p class="oferta__titulo">Publique <em>sin costo</em></p>
+        <p class="oferta__texto">Los cupos del nivel <b>Estándar</b> no se cobran. Su equipo sale en el catálogo, en la portada y en las búsquedas igual que los demás.</p>
+        <p class="oferta__plazo">
+          <span>Hasta el <b data-promo-hasta>fecha por definir</b></span>
+          <b class="oferta__quedan" data-promo-quedan hidden></b>
+        </p>
+      </aside>
 
       <ul class="servicio__puntos">
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Uno de cada cinco cupos no se cobra</li>

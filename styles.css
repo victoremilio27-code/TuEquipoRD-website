@@ -847,6 +847,97 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 .realce .ico { margin-top: 1px; color: var(--ambar-hondo); width: 16px; height: 16px; }
 .realce b { font-weight: 700; }
 
+/* ── Oferta de lanzamiento (portada) ─────────────────────────
+   Un anuncio, no una nota al pie. Es la razón por la que a alguien le
+   compensa publicar hoy en vez de dentro de tres meses, y como renglón
+   gris junto a los demás no la leía nadie.
+
+   La caja va SIEMPRE en ámbar con tinta azul noche, en los dos temas.
+   Los valores van literales y no por token a propósito: en oscuro,
+   `--azul` pasa a ser #F7F5EF y `--blanco` a #0B0C0C —los roles se
+   invierten— así que `color: var(--azul)` habría dejado texto casi
+   blanco sobre ámbar al cambiar de tema. El ámbar de marca no se
+   redefine, de modo que con la tinta fija el contraste es el mismo
+   siempre: 10.4:1. */
+.oferta {
+  --oferta-tinta: #071A2B;
+
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+  padding: 18px 20px;
+  border-radius: var(--r-tarjeta);
+  background: linear-gradient(135deg, #E09C00 0%, var(--ambar) 45%, #FFCF63 100%);
+  color: var(--oferta-tinta);
+  box-shadow: 0 12px 30px rgba(242, 169, 0, .3);
+}
+.oferta[hidden] { display: none; }
+
+/* Trama diagonal de cartel. Decorativa: por eso vive en un
+   pseudoelemento y no intercepta el ratón. */
+.oferta::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(135deg,
+    rgba(255, 255, 255, .13) 0 10px, transparent 10px 24px);
+  pointer-events: none;
+}
+.oferta > * { position: relative; z-index: 1; }
+
+.oferta__sello {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px;
+  background: var(--oferta-tinta);
+  color: var(--ambar);
+  border-radius: var(--r-pildora);
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.oferta__sello .ico { width: 13px; height: 13px; }
+
+.oferta__titulo {
+  margin-top: 11px;
+  font-family: var(--display);
+  font-size: clamp(24px, 2.6vw, 34px);
+  font-weight: 800; line-height: 1.02; letter-spacing: -.035em;
+}
+/* «sin costo» en su propia línea: es la palabra por la que se lee el
+   anuncio, y en la misma línea se perdía dentro de la frase. */
+.oferta__titulo em { display: block; font-style: normal; }
+
+.oferta__texto { margin-top: 8px; max-width: 62ch; font-size: 13px; line-height: 1.5; }
+.oferta__texto b { font-weight: 700; }
+
+/* La fecha a un extremo y los días al otro: el renglón ocupa el ancho
+   entero de la caja. El panel cambia de ancho según haya campaña en el
+   bloque de al lado —media fila o fila entera—, así que se reparte con
+   `space-between` en vez de con una media query contra la ventana, que
+   no sabe nada del ancho real de este panel. */
+.oferta__plazo {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 8px 14px;
+  margin-top: 15px; padding-top: 12px;
+  border-top: 1px solid rgba(7, 26, 43, .22);
+  font-size: 12.5px; font-weight: 600;
+}
+
+/* Los días que quedan, en píldora oscura: es el dato que mueve a
+   actuar y tiene que verse antes que la fecha. */
+.oferta__quedan {
+  padding: 4px 11px;
+  background: var(--oferta-tinta); color: var(--ambar);
+  border-radius: var(--r-pildora);
+  font-size: 11.5px; font-weight: 700;
+  white-space: nowrap;
+}
+.oferta__quedan[hidden] { display: none; }
+
+@media (max-width: 700px) {
+  .oferta { padding: 16px; }
+  .oferta__titulo { font-size: 26px; }
+  .oferta__texto { font-size: 12.5px; }
+}
+
 /* Dato que todavía no está confirmado. Se marca, no se inventa. */
 .pendiente {
   font-style: italic;
