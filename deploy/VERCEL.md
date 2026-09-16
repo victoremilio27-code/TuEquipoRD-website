@@ -10,10 +10,10 @@ Eso dejaba el dominio en un estado peor que estar caído. Comprobado
 contra el sitio en vivo:
 
 ```
-https://www.tuequipord.com               → 200   las páginas se ven
-https://www.tuequipord.com/api/planes    → 404
-https://www.tuequipord.com/api/anuncios  → 404
-https://www.tuequipord.com/api/sesion    → 404
+https://www.mercamaquinarias.com               → 200   las páginas se ven
+https://www.mercamaquinarias.com/api/planes    → 404
+https://www.mercamaquinarias.com/api/anuncios  → 404
+https://www.mercamaquinarias.com/api/sesion    → 404
 ```
 
 Las páginas cargaban, pero el catálogo salía vacío y nadie podía
@@ -54,8 +54,8 @@ la página no puede depender de nada más.
 El sitio real no vive en Vercel, sino en el VPS (ver `README.md` de
 esta misma carpeta). Cuando el VPS esté sirviendo:
 
-1. En Vercel: **Settings → Domains**, quitar `tuequipord.com` y
-   `www.tuequipord.com` del proyecto.
+1. En Vercel: **Settings → Domains**, quitar `mercamaquinarias.com` y
+   `www.mercamaquinarias.com` del proyecto.
 2. Apuntar el DNS a la IP del VPS:
 
    | Tipo | Nombre | Valor      |

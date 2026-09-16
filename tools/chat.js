@@ -54,8 +54,8 @@ const LARGO_MAXIMO = 1000;
 /* PENDIENTE: sigue siendo el número de relleno de todo el sitio.
    Cambiarlo aquí y en assets/app.js (WHATSAPP). */
 const TELEFONO = '(809) 000-0000';
-const CORREO_GENERAL = 'hola@tuequipord.com';
-const CORREO_COTIZAR = process.env.TUEQUIPO_REVISION || 'dealers@tuequipord.com';
+const CORREO_GENERAL = 'hola@mercamaquinarias.com';
+const CORREO_COTIZAR = process.env.TUEQUIPO_REVISION || 'dealers@mercamaquinarias.com';
 
 /* Los precios salen de la tabla `planes`, que es la misma fila que
    después se cobra. Escribirlos a mano aquí sería crear una cuarta

@@ -21,7 +21,7 @@
   'use strict';
 
   const TELEFONO = '(809) 000-0000';   // PENDIENTE: número de relleno
-  const CORREO = 'hola@tuequipord.com';
+  const CORREO = 'hola@mercamaquinarias.com';
 
   /* Las preguntas de arranque no son decoración: enseñan de un
      vistazo qué sabe el asistente, que es la forma más barata de

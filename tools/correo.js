@@ -21,14 +21,14 @@ const path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const BANDEJA = path.join(RAIZ, '.tmp', 'correos');
 
-const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'MercaMaquinarias <no-responder@tuequipord.com>';
+const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'MercaMaquinarias <no-reply@mercamaquinarias.com>';
 const TRANSPORTE = process.env.TUEQUIPO_CORREO || 'archivo';
 
 // Buzón interno que recibe las solicitudes de dealer para revisar.
-const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@tuequipord.com';
+const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@mercamaquinarias.com';
 
 // URL pública, para los enlaces que van dentro de los correos.
-const SITIO = process.env.TUEQUIPO_SITIO || 'https://tuequipord.com';
+const SITIO = process.env.TUEQUIPO_SITIO || 'https://mercamaquinarias.com';
 
 /* Escapa lo que venga del usuario antes de meterlo en el HTML del
    correo: un nombre con "<script>" no debe llegar a la bandeja de
@@ -128,7 +128,7 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
     <tr><td bgcolor="${AZUL}" style="padding:20px 26px">
       <p style="margin:0;font-family:${TIPO};font-size:12px;line-height:1.6;color:#8FA3B3">
         MercaMaquinarias · República Dominicana<br>
-        <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">tuequipord.com</a>
+        <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">mercamaquinarias.com</a>
       </p>
     </td></tr>
 
@@ -320,7 +320,7 @@ function enviarAvisoCambioClave({ para, nombre }) {
       saludo, '',
       'La contraseña de su cuenta de MercaMaquinarias acaba de cambiar y se cerraron todas las sesiones abiertas.', '',
       'Si fue usted, no hay nada que hacer.',
-      'Si no fue usted, escriba de inmediato a hola@tuequipord.com.', '',
+      'Si no fue usted, escriba de inmediato a hola@mercamaquinarias.com.', '',
       'MercaMaquinarias',
     ].join('\n'),
     html: envoltura({
@@ -331,7 +331,7 @@ function enviarAvisoCambioClave({ para, nombre }) {
         'Si fue usted, no hay nada que hacer.',
       ],
       nota: `Si <b style="color:${AZUL}">no</b> fue usted, escríbanos de inmediato a `
-        + `<a href="mailto:hola@tuequipord.com" style="color:${AMBAR}">hola@tuequipord.com</a>.`,
+        + `<a href="mailto:hola@mercamaquinarias.com" style="color:${AMBAR}">hola@mercamaquinarias.com</a>.`,
     }),
   });
 }
@@ -501,7 +501,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       `Revisamos los datos de ${empresa} y su cuenta de dealer quedó aprobada.`, '',
       'Ya puede publicar equipos y su página de empresa aparecerá en el directorio',
       'en cuanto contrate un plan que la incluya.',
-      slug ? `Su dirección será: https://tuequipord.com/dealer.html?d=${slug}` : null,
+      slug ? `Su dirección será: https://mercamaquinarias.com/dealer.html?d=${slug}` : null,
       '',
       'MercaMaquinarias',
     ]
@@ -510,7 +510,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       `Revisamos la solicitud de ${empresa} y por ahora no podemos aprobarla.`, '',
       motivo ? `Motivo: ${motivo}` : 'No pudimos confirmar los datos de la empresa.',
       '',
-      'Su cuenta sigue activa y puede escribirnos a dealers@tuequipord.com con la',
+      'Su cuenta sigue activa y puede escribirnos a dealers@mercamaquinarias.com con la',
       'documentación corregida para que la revisemos de nuevo.',
       '',
       'MercaMaquinarias',

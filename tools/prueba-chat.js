@@ -68,7 +68,7 @@ const respuestaBuena = (txt) => ({ estado: 200, datos: { stop_reason: 'end_turn'
 
   /* El prompt tiene que llevar las dos vías de contacto y los ejemplos. */
   const sis = cuerpo.system[0].text;
-  comprobar(sis.includes('hola@tuequipord.com') && sis.includes('dealers@tuequipord.com'),
+  comprobar(sis.includes('hola@mercamaquinarias.com') && sis.includes('dealers@mercamaquinarias.com'),
     'el prompt lleva los dos correos');
   comprobar(sis.includes('(809)'), 'el prompt lleva el teléfono');
   comprobar((sis.match(/DENTRO de alcance/g) || []).length === 1

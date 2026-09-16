@@ -1,6 +1,6 @@
 # Despliegue de MercaMaquinarias en un VPS
 
-Ubuntu 24.04. El dominio ya está puesto en todos los archivos: `tuequipord.com`.
+Ubuntu 24.04. El dominio ya está puesto en todos los archivos: `mercamaquinarias.com` (antes `tuequipord.com`).
 
 El sitio corre como un proceso Node en el puerto 8080, escuchando solo
 en local. Nginx lo publica hacia fuera en los puertos 80 y 443 y se
@@ -64,9 +64,9 @@ TUEQUIPO_SECRETO=<el valor generado arriba>
 
 TUEQUIPO_CORREO=brevo
 BREVO_API_KEY=<la clave de Brevo>
-TUEQUIPO_REMITENTE=MercaMaquinarias <no-responder@tuequipord.com>
-TUEQUIPO_REVISION=dealers@tuequipord.com
-TUEQUIPO_SITIO=https://tuequipord.com
+TUEQUIPO_REMITENTE=MercaMaquinarias <no-reply@mercamaquinarias.com>
+TUEQUIPO_REVISION=dealers@mercamaquinarias.com
+TUEQUIPO_SITIO=https://mercamaquinarias.com
 ```
 
 Ciérralo para que solo root lo lea:
@@ -122,7 +122,7 @@ Se crean desde el servidor, con el correo ya verificado:
 ```bash
 cd /var/www/tuequipord
 
-sudo -u tuequipord node tools/admin.js crear principal@tuequipord.com \
+sudo -u tuequipord node tools/admin.js crear principal@mercamaquinarias.com \
   "Administración MercaMaquinarias" --admin --exenta --empresa "MercaMaquinarias"
 
 sudo -u tuequipord node tools/admin.js crear <tu-correo> "<Tu nombre>" --exenta
@@ -141,7 +141,7 @@ Para ver quién tiene permisos internos: `node tools/admin.js listar`.
 
 ```bash
 cp /var/www/tuequipord/deploy/nginx.conf /etc/nginx/sites-available/tuequipord
-# El archivo ya trae tuequipord.com; no hace falta sustituir nada
+# El archivo ya trae mercamaquinarias.com; no hace falta sustituir nada
 ln -s /etc/nginx/sites-available/tuequipord /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
@@ -158,13 +158,13 @@ En el panel del registrador, apuntando a la IP del VPS:
 
 Espera a que propague antes del paso siguiente; certbot falla si el
 dominio todavía no resuelve al servidor. Verifica con
-`dig +short tuequipord.com`.
+`dig +short mercamaquinarias.com`.
 
 ## 7. HTTPS
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d tuequipord.com -d www.tuequipord.com
+certbot --nginx -d mercamaquinarias.com -d www.mercamaquinarias.com
 ```
 
 Certbot reescribe la configuración de nginx para servir por HTTPS y
