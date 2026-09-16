@@ -2854,6 +2854,177 @@ main { position: relative; }
    cargó. */
 .fila--dos:has(> .pub[hidden]) { grid-template-columns: minmax(0, 1fr); }
 
+/* Banner de catálogo (B · 970×90), encima de los resultados. */
+.pub--catalogo { margin-bottom: var(--gap); }
+.pub--catalogo > a,
+.pub--catalogo > img { aspect-ratio: 970 / 90; max-width: 970px; max-height: 90px; }
+
+/* Recuadro de la ficha (D · 300×250), en la columna del vendedor. */
+.pub--ficha { margin: var(--gap) 0; }
+.pub--ficha > a,
+.pub--ficha > img { aspect-ratio: 300 / 250; max-width: 300px; }
+
+/* Formatos de teléfono (F, G, H). El cuadro de la lista es un <li> de
+   la rejilla, así que ocupa la fila entera en vez de media. */
+.pub--movil-superior { margin-top: var(--gap); }
+.pub--movil-cuadro   { margin: var(--gap) 0; }
+.pub--movil-lista    { grid-column: 1 / -1; }
+
+.pub--movil-superior > a,
+.pub--movil-superior > img { aspect-ratio: 320 / 180; max-width: 320px; }
+.pub--movil-cuadro > a,
+.pub--movil-cuadro > img,
+.pub--movil-lista > a,
+.pub--movil-lista > img { aspect-ratio: 1 / 1; max-width: 336px; }
+
+.pub--movil-superior,
+.pub--movil-cuadro { margin-inline: auto; max-width: 336px; }
+
+/* Un formato de teléfono no se enseña en escritorio ni aunque esté
+   vendido: se compró para el celular, y estirado a 1216 px se ve como
+   un error de maquetación. */
+@media (min-width: 701px) {
+  .pub--movil-superior,
+  .pub--movil-cuadro,
+  .pub--movil-lista { display: none; }
+}
+
+/* Y al revés. El banner de catálogo mide 970 px de ancho: en un
+   teléfono de 390 no cabe, así que no se ofrece ahí. El superior y el
+   bloque conservan el comportamiento que ya tenían para las campañas
+   de verdad; lo que se retira en el teléfono es su RECUADRO DE
+   MUESTRA, porque el tarifario los vende como formatos de escritorio y
+   enseñarlos en el móvil prometería algo que no se está vendiendo. */
+@media (max-width: 700px) {
+  .pub--catalogo { display: none; }
+  .pub--superior.pub--muestra,
+  .pub--bloque.pub--muestra { display: none; }
+}
+
+/* ── Modo muestra de espacios publicitarios ─────────────────
+   Nada de esto se le enseña al visitante. Solo aparece con
+   `?muestra=publicidad`, para sentarse con un anunciante y enseñarle
+   dónde y de qué tamaño quedaría su banner. Ver assets/app.js. */
+
+/* El rótulo «Publicidad» sobra encima de un recuadro que ya dice
+   «Espacio publicitario»: repetiría la misma palabra dos veces. */
+.pub--muestra::before { content: none; }
+
+.pub-muestra {
+  /* Toma el ámbar del tema cuando exista (rama de interfaz clara) y,
+     mientras tanto, el de la guía de marca. Así el recuadro no habrá
+     que retocarlo cuando entre el tema oscuro. */
+  --pub-acento: var(--app-accent, var(--ambar));
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+
+  width: 100%;
+  /* La proporción EXACTA del formato: lo que se ve en la pantalla es lo
+     que se compra, no una aproximación. */
+  max-width: calc(var(--pub-ancho) * 1px);
+  aspect-ratio: var(--pub-ancho) / var(--pub-alto);
+  margin-inline: auto;
+  padding: 10px;
+
+  border: 2px dashed var(--pub-acento);
+  border-radius: var(--r);
+  background: rgba(242, 169, 0, .08);
+  text-align: center;
+
+  /* El color NO se fija: se toma del tema. Por debajo de 700 px la piel
+     móvil es oscura (--app-text es hueso claro) y en escritorio es
+     clara (--azul). Con un azul fijo, «Espacio publicitario» quedaba
+     azul marino sobre fondo casi negro, ilegible en el teléfono. */
+  color: var(--app-text, var(--azul));
+}
+
+/* Y cuando el recuadro cae sobre una superficie clara aunque el tema
+   sea oscuro —la ficha del equipo en el teléfono, que conserva el
+   panel blanco—, se vuelve al azul de marca. La clase la pone
+   ajustarContraste() en app.js midiendo el fondo de verdad. */
+.pub-muestra--claro { color: var(--azul); }
+.pub-muestra--claro .pub-muestra__medida,
+.pub-muestra--claro .pub-muestra__pie { color: var(--gris-acero); }
+
+.pub-muestra__letra {
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
+  border-radius: var(--r-pildora);
+  background: var(--pub-acento);
+  color: var(--azul);
+  font-family: var(--display); font-weight: 800; font-size: 13px;
+  line-height: 1;
+}
+
+.pub-muestra__nombre { font-weight: 600; font-size: 13px; letter-spacing: -.01em; }
+.pub-muestra__medida { font-size: 12px; color: var(--app-muted, var(--gris-acero)); }
+.pub-muestra__pie    { font-size: 10.5px; color: var(--app-muted, var(--gris-acero)); line-height: 1.45; }
+
+/* 90 px de alto no dan para cuatro renglones apilados: en el banner de
+   catálogo el contenido se pone en fila. */
+.pub--catalogo .pub-muestra {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* El riel mide 160 px de ancho: ahí el correo no cabe en una línea y
+   tampoco hace falta, porque al lado está el mismo dato en el resto de
+   los recuadros. */
+.pub--lateral .pub-muestra__pie { display: none; }
+
+/* El recuadro del riel acompaña la lectura igual que lo haría el banner
+   vendido, que es `sticky` por la regla de más arriba. */
+.pub--lateral .pub-muestra { position: sticky; top: 90px; }
+
+.muestra-barra {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-height: 30px;
+  padding: 6px 14px;
+
+  background: var(--azul);
+  border-bottom: 2px solid var(--ambar);
+  color: var(--blanco);
+  font-size: 11.5px; font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: .04em;
+  text-align: center;
+}
+
+.muestra-barra__salir {
+  color: var(--ambar);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+/* En el teléfono el rótulo no cabe al lado del enlace y se parte en dos
+   líneas. Se deja partir a propósito: acortarlo con CSS obligaba a
+   escribir el texto dos veces y un lector de pantalla lo leía dos
+   veces. El alto lo absorbe --muestra-alto. */
+@media (max-width: 700px) {
+  .muestra-barra { font-size: 10.5px; letter-spacing: 0; gap: 2px 10px; padding-inline: 10px; }
+}
+
+/* El alto real lo mide app.js y lo deja en --muestra-alto: el rótulo
+   puede ocupar dos líneas según el ancho, y con un 30 px fijo la
+   cabecera se montaba encima y cortaba el texto. Los 30 px son el
+   respaldo para el primer pintado, antes de medir. */
+.muestra-pub body { padding-top: var(--muestra-alto, 30px); }
+.muestra-pub .cab { top: var(--muestra-alto, 30px); }
+
 /* ── Fotografía del héroe ───────────────────────────────────
    Una máquina publicada de verdad, detrás del titular. Sustituye al
    plano técnico cuando hay catálogo; el plano se queda de respaldo.

@@ -222,12 +222,23 @@
 
             <label class="campo-v"><span>Espacio *</span>
               <select id="pub-espacio">
-                <option value="superior">Horizontal, bajo el héroe · 1216 × 160</option>
-                <option value="bloque">Bloque de portada, media columna · 600 × 500</option>
-                <option value="lateral-izq">Lateral izquierdo · 160 × 600</option>
-                <option value="lateral-der">Lateral derecho · 160 × 600</option>
+                <optgroup label="Escritorio">
+                  <option value="superior">A · Banner superior, portada bajo el héroe · 1216 × 160</option>
+                  <option value="catalogo">B · Banner de catálogo, sobre los resultados · 970 × 90</option>
+                  <option value="bloque">C · Bloque de portada, media columna · 600 × 500</option>
+                  <option value="lateral-izq">E · Rascacielos izquierdo · 160 × 600</option>
+                  <option value="lateral-der">E · Rascacielos derecho · 160 × 600</option>
+                </optgroup>
+                <optgroup label="Móvil">
+                  <option value="movil-superior">F · Banner superior móvil, bajo el buscador · 320 × 180</option>
+                  <option value="movil-cuadro">G · Cuadro de portada, entre categorías y destacados · 336 × 336</option>
+                  <option value="movil-lista">H · Cuadro intercalado en las listas de anuncios · 336 × 336</option>
+                </optgroup>
+                <optgroup label="Escritorio y móvil">
+                  <option value="ficha">D · Recuadro en la ficha del equipo · 300 × 250</option>
+                </optgroup>
               </select>
-              <small class="campo-v__ayuda">Los laterales solo se ven en pantallas de 1648 px o más. El bloque ocupa media fila junto a «Publicación de equipos».</small>
+              <small class="campo-v__ayuda">Las letras son las del tarifario de ventas. Los rascacielos solo se ven a partir de 1600 px; los espacios «móvil» solo por debajo de 700 px. El bloque ocupa media fila junto a «Publicación de equipos».</small>
             </label>
             <label class="campo-v"><span>Imagen *</span>
               <input type="file" id="pub-imagen" accept="image/jpeg,image/png,image/webp">
