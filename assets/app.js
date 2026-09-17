@@ -1202,15 +1202,18 @@ const ESPACIOS_PUB = {
 
 /* El correo NO va escrito aquí: se lee del pie de la página.
  *
- * Escrito a mano, el día que el sitio pase a mercamaquinarias.com habría
- * que acordarse de cambiarlo justo en este renglón, y el recuadro
- * seguiría invitando a escribir a un buzón muerto. Leyéndolo del pie
- * —que sí cambia con el dominio— el espacio publicitario dice siempre la
- * dirección que de verdad se atiende. */
+ * Escrito a mano, el día que cambie el buzón habría que acordarse de
+ * cambiarlo justo en este renglón, y el recuadro seguiría invitando a
+ * escribir a una dirección muerta. Leyéndolo del pie —que es lo que se
+ * actualiza cuando cambia el dominio— el espacio publicitario dice
+ * siempre la dirección que de verdad se atiende.
+ *
+ * Y ya pasó una vez: el sitio se mudó de dominio y este renglón fue de
+ * los pocos que no hubo que tocar. */
 function correoPublicidad() {
   const enlace = document.querySelector('.pie a[href^="mailto:"]');
   const correo = enlace && enlace.getAttribute('href').replace(/^mailto:/i, '').trim();
-  return correo || 'hola@tuequipord.com';
+  return correo || 'hola@mercamaquinarias.com';
 }
 
 /* LOS ESPACIOS VACÍOS SE VEN.

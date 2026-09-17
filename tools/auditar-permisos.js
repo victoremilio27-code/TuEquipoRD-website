@@ -43,7 +43,7 @@ const comprobar = (titulo, condicion, detalle) => {
 };
 
 /* Entra con una cuenta ya verificada de la demostración.
-   Solo funciona con TUEQUIPO_CORREO=archivo, porque lee el código del
+   Solo funciona con MERCA_CORREO=archivo, porque lee el código del
    buzón en disco. Contra un entorno con correo real no hay forma —ni
    debe haberla— de leer el código de nadie. */
 async function entrar(correo, clave) {
@@ -65,7 +65,7 @@ async function entrar(correo, clave) {
       .filter((f) => f.endsWith('.txt') && f.includes(correo.split('@')[0])).sort().pop();
   if (!arch) {
     console.log(`\n  No hay código en ${dir} para ${correo}.`);
-    console.log('  Esta auditoría necesita TUEQUIPO_CORREO=archivo.\n');
+    console.log('  Esta auditoría necesita MERCA_CORREO=archivo.\n');
     return null;
   }
 
@@ -79,8 +79,8 @@ async function entrar(correo, clave) {
 (async () => {
   console.log('\n═══ Autorización entre cuentas ═══\n');
 
-  const caribe = await entrar('caribe@demo.tuequipord.do', 'demostracion2026');
-  const cibao = await entrar('cibao@demo.tuequipord.do', 'demostracion2026');
+  const caribe = await entrar('caribe@demo.mercamaquinarias.do', 'demostracion2026');
+  const cibao = await entrar('cibao@demo.mercamaquinarias.do', 'demostracion2026');
 
   if (!caribe || !cibao) {
     console.log('No se pudo abrir sesión con las cuentas de demostración.');
@@ -182,14 +182,14 @@ async function entrar(correo, clave) {
 
   /* 9. Archivos que no deben servirse nunca.
      El servidor llegó a publicar el proyecto entero: /.env con la
-     clave de Brevo, /db/tuequipord.db con los hashes y los RNC, y
+     clave de Brevo, /db/mercamaquinarias.db con los hashes y los RNC, y
      /.git con el repositorio. Se comprueba en cada auditoría porque
      basta con añadir una ruta a la lista blanca de serve.js sin
      pensarla para volver a abrir el agujero. */
   console.log('');
   const privados = [
     '/.env', '/.env.example', '/.git/config', '/.gitignore',
-    '/db/tuequipord.db', '/db/schema.sql',
+    '/db/mercamaquinarias.db', '/db/schema.sql',
     '/package.json', '/package-lock.json',
     '/tools/db.js', '/tools/serve.js', '/tools/api.js', '/tools/correo.js',
     '/deploy/README.md', '/node_modules/puppeteer/package.json',
@@ -228,7 +228,7 @@ async function entrar(correo, clave) {
 
   // 11. Cookie de sesión
   const login = await pedir('/cuenta/entrar', {
-    metodo: 'POST', cuerpo: { correo: 'caribe@demo.tuequipord.do', clave: 'demostracion2026' },
+    metodo: 'POST', cuerpo: { correo: 'caribe@demo.mercamaquinarias.do', clave: 'demostracion2026' },
   });
   console.log(`\n  cookie emitida: ${login.cookie || '(ninguna en este paso)'}`);
 

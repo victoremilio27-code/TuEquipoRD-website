@@ -24,9 +24,9 @@ const db = require('./db');
 const correo = require('./correo');
 
 const SECO = process.argv.includes('--seco');
-const DIAS_AVISO = Number(process.env.TUEQUIPO_DIAS_AVISO) || 5;
-const RESPALDOS = process.env.TUEQUIPO_RESPALDOS || path.resolve(__dirname, '..', '.tmp', 'respaldos');
-const RESPALDOS_MAX = Number(process.env.TUEQUIPO_RESPALDOS_MAX) || 14;
+const DIAS_AVISO = Number(process.env.MERCA_DIAS_AVISO) || 5;
+const RESPALDOS = process.env.MERCA_RESPALDOS || path.resolve(__dirname, '..', '.tmp', 'respaldos');
+const RESPALDOS_MAX = Number(process.env.MERCA_RESPALDOS_MAX) || 14;
 
 const registro = [];
 const anotar = (tarea, mensaje) => {
@@ -111,7 +111,7 @@ function limpiar() {
  * nunca se verifica es una carpeta que ocupa disco. */
 function respaldar() {
   const sello = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  const destino = path.join(RESPALDOS, `tuequipord-${sello}.db`);
+  const destino = path.join(RESPALDOS, `mercamaquinarias-${sello}.db`);
 
   if (SECO) return anotar('respaldo', `escribiría ${destino}`);
 
@@ -139,7 +139,7 @@ function respaldar() {
 
   // Rotación: se conservan los últimos RESPALDOS_MAX.
   const viejos = fs.readdirSync(RESPALDOS)
-    .filter((f) => f.startsWith('tuequipord-') && f.endsWith('.db'))
+    .filter((f) => f.startsWith('mercamaquinarias-') && f.endsWith('.db'))
     .sort().reverse().slice(RESPALDOS_MAX);
   viejos.forEach((f) => fs.rmSync(path.join(RESPALDOS, f), { force: true }));
   if (viejos.length) anotar('respaldo', `${viejos.length} respaldo(s) antiguos eliminados`);

@@ -1,0 +1,25 @@
+# Mantenimiento diario. Lo dispara mercamaquinarias-tareas.timer.
+# Instalar junto al .timer en /etc/systemd/system/
+
+[Unit]
+Description=MercaMaquinarias — mantenimiento diario
+After=network.target
+
+[Service]
+Type=oneshot
+User=mercamaquinarias
+Group=mercamaquinarias
+WorkingDirectory=/var/www/mercamaquinarias
+
+Environment=NODE_ENV=production
+Environment=MERCA_DB=/var/lib/mercamaquinarias/mercamaquinarias.db
+Environment=MERCA_RESPALDOS=/var/backups/mercamaquinarias
+EnvironmentFile=/etc/mercamaquinarias.env
+
+ExecStart=/usr/bin/node tools/tareas.js
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mercamaquinarias /var/backups/mercamaquinarias

@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const RUTA = process.env.TUEQUIPO_ENV || path.resolve(__dirname, '..', '.env');
+const RUTA = process.env.MERCA_ENV || path.resolve(__dirname, '..', '.env');
 
 function cargar(ruta = RUTA) {
   let crudo;
@@ -66,7 +66,7 @@ function cargar(ruta = RUTA) {
    Así que si la unidad está instalada, se leen de ahí. La unidad es
    la autoridad sobre cómo corre el servicio; que la herramienta mire
    el mismo sitio es lo correcto, no un atajo. */
-const UNIDAD = '/etc/systemd/system/tuequipord.service';
+const UNIDAD = '/etc/systemd/system/mercamaquinarias.service';
 
 function cargarUnidad(ruta = UNIDAD) {
   let crudo;
