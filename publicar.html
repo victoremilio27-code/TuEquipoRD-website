@@ -191,12 +191,30 @@
           <p class="contador-fotos" id="contadorFotos"></p>
           <ul class="fotos" id="listaFotos"></ul>
 
-          <div class="campos campos--uno">
-            <label class="campo-v"><span>Enlace de video (YouTube o Drive)</span>
-              <input type="url" id="e-video" placeholder="https://youtube.com/watch?v=">
+          <!-- Video del equipo.
+               Antes aquí había un campo para pegar un enlace de YouTube.
+               Se guardaba y no se enseñaba en ninguna parte: llevaba
+               tiempo pidiendo un dato que nadie llegaba a ver. Y un
+               enlace a otro sitio saca al comprador de la ficha.
+
+               Ahora el video se sube y se queda aquí. Se recorta a 720p
+               en el propio navegador antes de subirlo: ver el porqué,
+               con los números, en la cabecera de assets/publicar.js. -->
+          <div class="zona-fotos zona-videos" id="zonaVideos" hidden>
+            <svg class="zona-fotos__ico" aria-hidden="true"><use href="#i-subir"/></svg>
+            <p class="zona-fotos__titulo">Suba un video del equipo</p>
+            <p class="zona-fotos__nota">Encendido y en movimiento es lo que más contactos genera. Se oye el motor, que en maquinaria usada es medio diagnóstico.</p>
+            <label class="btn btn--ambar zona-fotos__btn" id="botonVideo">
+              Seleccionar video
+              <input type="file" id="inputVideo" accept="video/*" class="visualmente-oculto">
             </label>
+            <p class="zona-fotos__nota zona-videos__limite"><b>Máximo 30 segundos.</b> Si dura más, recórtelo antes desde la galería de su teléfono. Se reduce a 720p automáticamente.</p>
+            <progress class="video-progreso" id="progresoVideo" max="1" value="0" hidden></progress>
           </div>
-          <p class="panel__nota">Un video corto con el equipo encendido y en movimiento multiplica los contactos. Disponible desde el plan Destacado.</p>
+
+          <p class="acceso__aviso" id="avisoVideo" role="alert" hidden></p>
+          <p class="contador-fotos" id="contadorVideos"></p>
+          <ul class="videos-sub" id="listaVideos"></ul>
         </section>
 
         <!-- Paso 3 · Precio -->

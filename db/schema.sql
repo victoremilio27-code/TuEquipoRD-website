@@ -405,6 +405,10 @@ CREATE TABLE IF NOT EXISTS planes (
   promo_hasta        TEXT,
   anuncios_incluidos INTEGER,
   fotos_maximas      INTEGER NOT NULL DEFAULT 20,
+  -- Videos por anuncio. Por defecto 0: un plan que no lo diga no los
+  -- ofrece. Un video de 30 s a 720p ocupa unos 6 MB, doce veces lo que
+  -- una foto, así que el número se reparte con cuidado y no se regala.
+  videos_maximos     INTEGER NOT NULL DEFAULT 0,
   destacado          INTEGER NOT NULL DEFAULT 0,
   perfil_publico     INTEGER NOT NULL DEFAULT 0,
   solo_dealer        INTEGER NOT NULL DEFAULT 0,
@@ -626,6 +630,28 @@ CREATE TABLE IF NOT EXISTS anuncio_fotos (
 );
 
 CREATE INDEX IF NOT EXISTS ix_fotos_anuncio ON anuncio_fotos (anuncio_id, orden);
+
+-- Videos del anuncio. Tabla aparte y no una columna más en `anuncios`
+-- porque son varios por anuncio y cuántos depende del plan.
+--
+-- `duracion` se guarda en segundos aunque el tope sea de 30: sirve para
+-- pintar el reproductor con su tamaño antes de descargar nada, y para
+-- poder auditar después si algo se coló por encima del límite.
+--
+-- `poster` es el primer fotograma, guardado como una foto normal. Sin
+-- él, `<video>` enseña un rectángulo negro hasta que el usuario pulsa,
+-- y en una ficha de maquinaria eso se lee como algo que no cargó.
+CREATE TABLE IF NOT EXISTS anuncio_videos (
+  id         TEXT PRIMARY KEY,
+  anuncio_id TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
+  url        TEXT NOT NULL,
+  poster     TEXT,
+  duracion   REAL,
+  orden      INTEGER NOT NULL DEFAULT 0,
+  creada     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_videos_anuncio ON anuncio_videos (anuncio_id, orden);
 
 -- Los teléfonos cuelgan del anuncio y no de la organización porque un
 -- dealer puede querer que el volteo lo atienda un vendedor y la

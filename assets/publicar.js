@@ -46,6 +46,61 @@ const CALIDAD_FOTO = 0.82;
 const ANCHO_MINIATURA = 900;
 const CALIDAD_MINIATURA = 0.78;
 
+/* ── Video ──────────────────────────────────────────────────
+   Un video del equipo encendido vale más que diez fotos: se oye el
+   motor y se ve si se mueve. Pero también pesa doce veces más, así que
+   se recorta por los dos lados.
+
+   30 SEGUNDOS. Suficiente para dar una vuelta a la máquina y arrancarla.
+   El tope se comprueba antes de procesar nada, porque rechazar un video
+   de dos minutos después de tenerlo codificando medio minuto sería una
+   pérdida de tiempo para quien lo sube.
+
+   720p. Un teléfono actual graba a 1080p o 4K: 30 s a 4K son 150 MB. A
+   720 la ficha se ve igual de bien —el reproductor no pasa de 700 px de
+   ancho— y el archivo baja a unos 6 MB.
+
+   SE REDUCE AQUÍ Y NO EN EL SERVIDOR. El VPS tiene 512 MB de RAM y un
+   solo núcleo; pasarle ffmpeg a cada video lo dejaría sin responder
+   durante minutos. El navegador de quien sube, en cambio, está ocioso.
+   El precio es que la reducción va en tiempo real: un video de 30 s
+   tarda unos 30 s, y por eso hay barra de progreso. */
+const SEGUNDOS_MAXIMOS_VIDEO = 30;
+const ALTURA_VIDEO = 720;
+
+/* 1,5 Mb/s a 720p. MediaRecorder por defecto usa el doble largo, y para
+   una máquina parada o moviéndose despacio no hace falta: sube el peso
+   sin que se note en pantalla. */
+const BITRATE_VIDEO = 1_500_000;
+
+/* Orden de preferencia de formatos. MP4 primero porque lo reproduce
+   todo, incluidos los iPhone con iOS antiguo; WebM es el respaldo,
+   porque Chrome y Firefox llevan años grabando en él y hasta hace poco
+   era lo único que ofrecían.
+ *
+ * DOS LISTAS, y no es un detalle cosmético: declarar un códec de audio
+ * en un video que no lleva pista de audio produce un archivo que luego
+ * NO SE PUEDE LEER. Se descubrió probando con un video mudo, que es
+ * exactamente lo que sube quien graba con el micrófono tapado o desde
+ * una app que no captura sonido. */
+const FORMATOS_VIDEO_CON_AUDIO = [
+  'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+  'video/mp4',
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
+  'video/webm',
+];
+
+const FORMATOS_VIDEO_SIN_AUDIO = [
+  'video/mp4;codecs=avc1.42E01E',
+  'video/mp4',
+  'video/webm;codecs=vp9',
+  'video/webm;codecs=vp8',
+  'video/webm',
+];
+
+const FORMATOS_VIDEO = [...FORMATOS_VIDEO_CON_AUDIO, ...FORMATOS_VIDEO_SIN_AUDIO];
+
 /* NO se renombra con el cambio de marca. Quien tenga un anuncio a
    medio escribir lo guardó bajo esta clave: cambiarla le borra el
    borrador sin avisarle. El nombre viejo aquí no lo ve nadie. */
@@ -62,7 +117,7 @@ function estadoInicial() {
       provincia: '', ciudad: '', implementos: '', descripcion: '',
     },
     fotos: [],
-    video: '',
+    videos: [],
     precio: {
       modalidad: 'fijo', monto: '', moneda: 'DOP', minimo: '',
       itbisIncluido: false, permuta: false, financiamiento: false,
@@ -113,6 +168,11 @@ function leerBorrador() {
       precio: { ...base.precio, ...(datos.precio || {}) },
       contacto: { ...base.contacto, ...(datos.contacto || {}) },
       fotos: Array.isArray(datos.fotos) ? datos.fotos : [],
+      // Los borradores guardados antes de que hubiera video traen la
+      // clave `video` con un enlace de YouTube y ninguna lista. Sin
+      // esto, el primer `estado.videos.map` reventaría el formulario a
+      // quien tuviera un anuncio a medio escribir.
+      videos: Array.isArray(datos.videos) ? datos.videos : [],
     };
   } catch (_) {
     return null;
@@ -439,6 +499,238 @@ function procesarImagen(archivo) {
   });
 }
 
+/* ── Video: reducción en el navegador ───────────────────── */
+
+/* ¿Puede este navegador reducir un video? Hacen falta tres cosas que no
+   están en todas partes. Se comprueba antes de enseñar el botón: es
+   mejor no ofrecerlo que ofrecerlo y fallar al final. */
+function puedeReducirVideo() {
+  return typeof MediaRecorder !== 'undefined'
+    && typeof HTMLCanvasElement.prototype.captureStream === 'function'
+    // Basta con poder grabar sin audio: es el caso más restrictivo y el
+    // que siempre hace falta.
+    && !!FORMATOS_VIDEO_SIN_AUDIO.find((f) => MediaRecorder.isTypeSupported(f));
+}
+
+/* El formato se elige SEGÚN HAYA AUDIO O NO. Ver el porqué donde se
+   declaran las dos listas. */
+const formatoVideo = (conAudio) =>
+  (conAudio ? FORMATOS_VIDEO_CON_AUDIO : FORMATOS_VIDEO_SIN_AUDIO)
+    .find((f) => MediaRecorder.isTypeSupported(f));
+
+/* Carga los metadatos de un archivo de video. Se usa para saber la
+   duración ANTES de procesar: así un video de dos minutos se rechaza al
+   instante en vez de después de medio minuto codificando. */
+function leerVideo(archivo) {
+  return new Promise((resolver, rechazar) => {
+    const url = URL.createObjectURL(archivo);
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.muted = true;
+    v.playsInline = true;
+    v.onloadedmetadata = () => resolver({ video: v, url });
+    v.onerror = () => {
+      URL.revokeObjectURL(url);
+      rechazar(new Error('No se pudo leer el video. Pruebe con otro archivo.'));
+    };
+    v.src = url;
+  });
+}
+
+const aBlobDataUrl = (blob) => new Promise((ok, err) => {
+  const l = new FileReader();
+  l.onerror = () => err(new Error('No se pudo preparar el video'));
+  l.onload = () => ok(l.result);
+  l.readAsDataURL(blob);
+});
+
+/* Dibuja el video en un lienzo de 720p y graba lo dibujado.
+ *
+ * Va en tiempo real a propósito: `requestVideoFrameCallback` o un bucle
+ * de seek darían un resultado más rápido, pero el primero no está en
+ * Firefox y el segundo produce saltos de audio. Reproducir y grabar es
+ * lo que funciona igual en todas partes.
+ *
+ * EL AUDIO IMPORTA: en maquinaria usada, oír el motor es medio
+ * diagnóstico. Y conservarlo tiene una trampa: hay que reproducir el
+ * video para grabarlo, pero quien está subiendo no tiene por qué oírlo
+ * sonar treinta segundos. La salida fácil —`v.muted = true`— también
+ * silencia lo que se graba, y el video acabaría mudo.
+ *
+ * Por eso el sonido se desvía con la API de audio: se enchufa al
+ * grabador y NO a los altavoces. Se graba con audio y no se oye nada.
+ * Si algo de eso falla, se sigue sin audio en vez de no subir nada. */
+function reducirVideo(v, alProgreso) {
+  return new Promise((resolver, rechazar) => {
+    const escala = Math.min(1, ALTURA_VIDEO / v.videoHeight);
+    // Pares: algunos codificadores rechazan dimensiones impares.
+    const ancho = Math.max(2, Math.round((v.videoWidth * escala) / 2) * 2);
+    const alto = Math.max(2, Math.round((v.videoHeight * escala) / 2) * 2);
+
+    const lienzo = document.createElement('canvas');
+    lienzo.width = ancho;
+    lienzo.height = alto;
+    const ctx = lienzo.getContext('2d');
+
+    const flujo = lienzo.captureStream(30);
+
+    let audioCtx = null;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        audioCtx = new AC();
+        const destino = audioCtx.createMediaStreamDestination();
+        audioCtx.createMediaElementSource(v).connect(destino);
+        // Sin `connect(audioCtx.destination)` a propósito: eso es lo
+        // que lo mandaría a los altavoces.
+        destino.stream.getAudioTracks().forEach((t) => flujo.addTrack(t));
+      }
+    } catch (_) {
+      audioCtx = null;              // se sigue, mudo
+    }
+
+    // Se pregunta al flujo, no a lo que se intentó: si añadir la pista
+    // falló, aquí se ve, y el formato se elige en consecuencia.
+    const conAudio = flujo.getAudioTracks().length > 0;
+
+    let grabador;
+    try {
+      grabador = new MediaRecorder(flujo, {
+        mimeType: formatoVideo(conAudio),
+        videoBitsPerSecond: BITRATE_VIDEO,
+      });
+    } catch (e) {
+      rechazar(new Error('Su navegador no puede preparar el video'));
+      return;
+    }
+
+    const trozos = [];
+    grabador.ondataavailable = (e) => { if (e.data && e.data.size) trozos.push(e.data); };
+
+    /* El dibujo va por dos vías a la vez, y no es redundancia inútil:
+       `requestAnimationFrame` SE CONGELA cuando la pestaña pierde el
+       foco. Sin la segunda vía, quien cambia de pestaña mientras se
+       prepara el video vuelve y se encuentra un video congelado en el
+       fotograma donde se fue —el reproductor sigue avanzando y la
+       grabación también, pero el lienzo ya no se actualiza—.
+
+       El intervalo también se frena en segundo plano (a una vez por
+       segundo), pero un video a un fotograma por segundo es mucho mejor
+       que uno congelado. */
+    const fotograma = () => {
+      if (v.ended || v.paused) return;
+      ctx.drawImage(v, 0, 0, ancho, alto);
+      if (alProgreso && v.duration) alProgreso(Math.min(1, v.currentTime / v.duration));
+    };
+
+    const porIntervalo = setInterval(fotograma, 1000 / 30);
+
+    const dibujar = () => {
+      if (v.ended || v.paused) return;
+      fotograma();
+      requestAnimationFrame(dibujar);
+    };
+
+    // Red de seguridad: si el video no termina —un archivo con duración
+    // mal declarada— se corta igual al llegar al tope.
+    const corte = setTimeout(() => {
+      if (grabador.state !== 'inactive') { v.pause(); grabador.stop(); }
+    }, (SEGUNDOS_MAXIMOS_VIDEO + 3) * 1000);
+
+    /* Un solo sitio donde se suelta todo. El intervalo y el contexto de
+       audio siguen vivos si no se cierran, y treinta segundos de video
+       repetidos dejan al navegador con temporizadores y contextos
+       colgando. */
+    const recoger = () => {
+      clearInterval(porIntervalo);
+      clearTimeout(corte);
+      if (audioCtx) { try { audioCtx.close(); } catch (_) { /* ya cerrado */ } }
+    };
+
+    grabador.onstop = () => {
+      recoger();
+      resolver({ blob: new Blob(trozos, { type: grabador.mimeType }), ancho, alto });
+    };
+    grabador.onerror = () => { recoger(); rechazar(new Error('Falló la preparación del video')); };
+
+    v.onended = () => {
+      // Un último fotograma: sin esto, el final se corta en negro.
+      ctx.drawImage(v, 0, 0, ancho, alto);
+      if (grabador.state !== 'inactive') grabador.stop();
+    };
+
+    v.currentTime = 0;
+    v.play().then(() => {
+      grabador.start();
+      dibujar();
+    }).catch(() => {
+      recoger();
+      rechazar(new Error('No se pudo reproducir el video para prepararlo'));
+    });
+  });
+}
+
+/* El primer fotograma, como imagen. `<video>` sin póster enseña un
+   rectángulo negro hasta que alguien pulsa, y en una ficha de
+   maquinaria eso se lee como algo que no cargó. */
+function posterDe(v, ancho, alto) {
+  try {
+    const lienzo = document.createElement('canvas');
+    lienzo.width = ancho;
+    lienzo.height = alto;
+    lienzo.getContext('2d').drawImage(v, 0, 0, ancho, alto);
+    return lienzo.toDataURL(FORMATO_FOTO, CALIDAD_FOTO);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function procesarVideo(archivo, alProgreso) {
+  if (!archivo.type.startsWith('video/')) throw new Error('No es un video');
+  if (!puedeReducirVideo()) {
+    throw new Error('Su navegador no puede preparar videos. Pruebe desde Chrome, Edge o Safari actualizados.');
+  }
+
+  const { video: v, url } = await leerVideo(archivo);
+
+  try {
+    // Medio segundo de margen: los teléfonos declaran 30,04 s para un
+    // video de 30, y rechazarlo por eso seria incomprensible.
+    if (v.duration > SEGUNDOS_MAXIMOS_VIDEO + 0.5) {
+      throw new Error(
+        `El video dura ${Math.round(v.duration)} segundos y el máximo son ${SEGUNDOS_MAXIMOS_VIDEO}. Recórtelo antes de subirlo.`,
+      );
+    }
+    if (!v.videoHeight) throw new Error('Ese archivo no tiene imagen de video');
+
+    const { blob, ancho, alto } = await reducirVideo(v, alProgreso);
+
+    // El póster se saca del primer fotograma, ya con el video al final:
+    // se rebobina para capturarlo.
+    v.currentTime = 0;
+    await new Promise((ok) => { v.onseeked = ok; setTimeout(ok, 400); });
+    const poster = posterDe(v, ancho, alto);
+
+    const r = await api('/videos', {
+      metodo: 'POST',
+      cuerpo: { video: await aBlobDataUrl(blob), poster, duracion: v.duration },
+    });
+    if (!r) throw new Error('No hay conexión con el servidor');
+
+    return {
+      id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      nombre: archivo.name,
+      url: r.url,
+      poster: r.poster,
+      duracion: r.duracion || v.duration,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+    v.removeAttribute('src');
+    v.load();
+  }
+}
+
 function pintarFotos() {
   const lista = $('#listaFotos');
   const cuenta = $('#contadorFotos');
@@ -466,6 +758,118 @@ function pintarFotos() {
     : `Mínimo ${FOTOS_MINIMAS} fotografías · máximo ${tope}`;
 
   pintarVistaPrevia();
+}
+
+const segundos = (n) => `${Math.round(n || 0)} s`;
+
+function pintarVideos() {
+  const lista = $('#listaVideos');
+  const cuenta = $('#contadorVideos');
+  const zona = $('#zonaVideos');
+  if (!lista || !zona) return;
+
+  const tope = limiteVideos();
+
+  /* Sin plan con video no se enseña la zona de subida: ofrecer un botón
+     que al final va a decir que no se puede es peor que no ofrecerlo. */
+  zona.hidden = tope === 0;
+
+  lista.innerHTML = estado.videos.map((v, i) => `
+    <li class="video-sub" data-id="${esc(v.id)}">
+      <video class="video-sub__vista" src="${esc(v.url)}"
+             ${v.poster ? `poster="${esc(v.poster)}"` : ''} controls preload="none" playsinline></video>
+      <span class="video-sub__pie">
+        <span class="video-sub__dato num">${esc(segundos(v.duracion))}</span>
+        <button type="button" class="foto__btn foto__btn--quitar" data-quitar-video
+                aria-label="Quitar el video ${i + 1}">${icono('i-equis')}</button>
+      </span>
+    </li>`).join('');
+
+  if (cuenta) {
+    cuenta.innerHTML = tope === 0
+      ? 'Su plan no incluye video.'
+      : estado.videos.length
+        ? `<b class="num">${estado.videos.length}</b> de ${tope} ${tope === 1 ? 'video' : 'videos'}`
+        : `Hasta ${tope} ${tope === 1 ? 'video' : 'videos'} · máximo ${SEGUNDOS_MAXIMOS_VIDEO} segundos cada uno`;
+  }
+
+  const boton = $('#botonVideo');
+  if (boton) boton.hidden = estado.videos.length >= tope;
+}
+
+function avisarVideo(mensaje, malo = true) {
+  const aviso = $('#avisoVideo');
+  if (!aviso) return;
+  aviso.hidden = !mensaje;
+  aviso.textContent = mensaje || '';
+  aviso.classList.toggle('acceso__aviso--bien', !malo);
+}
+
+async function agregarVideos(archivos) {
+  const pendientes = [...archivos].filter((a) => a.type.startsWith('video/'));
+  if (!pendientes.length) return;
+
+  const tope = limiteVideos();
+  const sitio = tope - estado.videos.length;
+  if (sitio <= 0) {
+    avisarVideo(`Su plan admite ${tope} ${tope === 1 ? 'video' : 'videos'}. Quite uno para subir otro.`);
+    return;
+  }
+
+  const barra = $('#progresoVideo');
+  const zona = $('#zonaVideos');
+  avisarVideo('');
+
+  for (const archivo of pendientes.slice(0, sitio)) {
+    zona.classList.add('zona-fotos--cargando');
+    if (barra) { barra.hidden = false; barra.value = 0; }
+    try {
+      const v = await procesarVideo(archivo, (p) => { if (barra) barra.value = p; });
+      estado.videos.push(v);
+      pintarVideos();
+      guardarBorrador();
+    } catch (e) {
+      avisarVideo(e.message);
+    } finally {
+      zona.classList.remove('zona-fotos--cargando');
+      if (barra) barra.hidden = true;
+    }
+  }
+}
+
+function montarPasoVideos() {
+  const zona = $('#zonaVideos');
+  const input = $('#inputVideo');
+  const lista = $('#listaVideos');
+  if (!zona || !input) return;
+
+  /* El navegador que no puede preparar videos lo dice aquí y no al
+     final del proceso. Safari viejo y algún navegador de fabricante no
+     traen MediaRecorder. */
+  if (!puedeReducirVideo()) {
+    const boton = $('#botonVideo');
+    if (boton) boton.hidden = true;
+    avisarVideo('Este navegador no puede preparar videos. Pruebe desde Chrome, Edge o Safari actualizados.');
+    return;
+  }
+
+  input.addEventListener('change', () => {
+    agregarVideos(input.files);
+    input.value = '';
+  });
+
+  lista.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-quitar-video]');
+    if (!btn) return;
+    const li = btn.closest('li');
+    const i = estado.videos.findIndex((v) => v.id === li.dataset.id);
+    if (i < 0) return;
+    estado.videos.splice(i, 1);
+    pintarVideos();
+    guardarBorrador();
+  });
+
+  pintarVideos();
 }
 
 function agregarArchivos(archivos) {
@@ -802,6 +1206,16 @@ function limiteFotos() {
   return m ? m.fotos_maximas : FOTOS_MAXIMAS;
 }
 
+/* Cuántos videos admite el plan. Al revés que con las fotos, sin cupo
+   elegido se permite UNO y no el máximo: el video es lo que más pesa y
+   lo que más tarda en prepararse, y dejar que alguien suba tres para
+   luego decirle que su plan solo admite uno es hacerle perder minutos
+   de su tiempo, no kilobytes. */
+function limiteVideos() {
+  const m = membresiaElegida();
+  return m ? (m.videos_maximos || 0) : 1;
+}
+
 async function cargarMembresias() {
   if (!haySesion()) { MEMBRESIAS = []; return; }
   const r = await api('/membresias', { silencioso: true });
@@ -1003,11 +1417,16 @@ function anuncioParaApi() {
     itbisIncluido: estado.precio.itbisIncluido,
     permuta: estado.precio.permuta,
     financiamiento: estado.precio.financiamiento,
-    video: estado.video,
 
     // Van los dos tamaños: el catálogo pinta la miniatura y la ficha
     // la completa. Son rutas, no imágenes; las subió procesarImagen().
     fotos: estado.fotos.slice(0, limiteFotos()).map((f) => ({ url: f.url, miniatura: f.miniatura })),
+
+    // Rutas también: el archivo lo subió procesarVideo(). El servidor
+    // vuelve a recortar al tope del plan, porque esto viene del
+    // navegador y ahí no se decide qué se contrató.
+    videos: estado.videos.slice(0, limiteVideos())
+      .map((v) => ({ url: v.url, poster: v.poster, duracion: v.duracion })),
     telefonos: estado.contacto.telefonos.filter((t) => telefonoValido(t.numero)),
     sucursal: estado.contacto.sucursal || null,
   };
@@ -1243,8 +1662,6 @@ function leerPaso(id) {
       implementos: $('#e-implementos').value.trim(),
       descripcion: $('#e-descripcion').value.trim(),
     });
-  } else if (id === 'fotos') {
-    estado.video = $('#e-video').value.trim();
   } else if (id === 'precio') {
     Object.assign(estado.precio, {
       monto: $('#p-monto').value,
@@ -1281,7 +1698,6 @@ function volcarEstadoAlFormulario() {
   $('#e-ciudad').value = e.ciudad;
   $('#e-implementos').value = e.implementos;
   $('#e-descripcion').value = e.descripcion;
-  $('#e-video').value = estado.video;
   // marca, provincia y condición se llenan por script: se asignan
   // después de que app.js haya poblado sus <option>.
   $('#e-marca').value = e.marca;
@@ -1323,6 +1739,7 @@ async function montarPublicador() {
 
   montarPasoEquipo();
   montarPasoFotos();
+  montarPasoVideos();
   montarPasoPrecio();
   montarPasoContacto();
   await montarPasoConfirmar();

@@ -14,6 +14,7 @@
 const db = require('./db');
 const correo = require('./correo');
 const fotos = require('./fotos');
+const videos = require('./videos');
 const chat = require('./chat');
 
 /* El cálculo del importe es el MISMO módulo que carga el navegador.
@@ -536,6 +537,45 @@ const subirFoto = conSesion(async (req, res, ctx) => {
     const completa = fotos.guardar(c.completa);
     const miniatura = c.miniatura ? fotos.guardar(c.miniatura) : completa;
     return responder(res, 201, { completa, miniatura });
+  } catch (e) {
+    return fallo(res, e.codigo || 500, e.message);
+  }
+});
+
+/* Dentro del manejador que crea un anuncio, la variable local con las
+   fotos del anuncio tapa al módulo `fotos`. La comprobación de rutas
+   vive aquí para poder usarla desde allí. */
+const esRutaDeFoto = (ruta) => !!fotos.archivoDe(ruta || '');
+
+/* ── Rutas: videos ──────────────────────────────────────────── */
+
+/* Sube un video ya recortado y reducido a 720p por el navegador, y
+   devuelve su ruta. El póster —el primer fotograma— viaja como una foto
+   normal y se guarda con las demás.
+ *
+ * El límite es más estrecho que el de las fotos: 12 subidas por hora
+ * frente a 120. Un video ocupa doce veces más, y a diferencia de las
+ * fotos —que se suben en tandas de veinte— aquí tres son ya el máximo
+ * que admite el mejor plan.
+ *
+ * NO se recodifica aquí. El VPS tiene 512 MB de RAM y un núcleo: pasarle
+ * ffmpeg a un video dejaría el sitio sin responder durante minutos. Lo
+ * que llega ya viene reducido desde el navegador. */
+const subirVideo = conSesion(async (req, res, ctx) => {
+  if (!db.permitir(`videos:${ctx.usuario.id}`, 12, 60)) {
+    return fallo(res, 429, 'Demasiados videos seguidos. Espere unos minutos.');
+  }
+
+  const c = await leerCuerpo(req);
+  try {
+    const url = videos.guardar(c.video);
+    // El póster es opcional: sin él, `<video>` enseña un rectángulo
+    // negro hasta que alguien pulsa, pero el video funciona igual.
+    let poster = null;
+    if (c.poster) {
+      try { poster = fotos.guardar(c.poster); } catch (_) { poster = null; }
+    }
+    return responder(res, 201, { url, poster, duracion: Number(c.duracion) || null });
   } catch (e) {
     return fallo(res, e.codigo || 500, e.message);
   }
@@ -1365,6 +1405,21 @@ const publicar = conSesion(async (req, res, ctx) => {
   const fotos = Array.isArray(c.fotos) ? c.fotos.slice(0, plan.fotos_maximas) : [];
   if (fotos.length < 3) return fallo(res, 400, 'Cargue al menos 3 fotografías');
 
+  /* Los videos se recortan al tope del plan igual que las fotos, y se
+     comprueba que cada ruta sea de las que sirve este servidor: sin
+     eso, quien manipule la petición podría incrustar en la ficha un
+     video alojado en cualquier otro sitio. */
+  const videosDelPlan = Array.isArray(c.videos)
+    ? c.videos
+      .filter((v) => v && videos.archivoDe(v.url))
+      .map((v) => ({
+        url: v.url,
+        poster: esRutaDeFoto(v.poster) ? v.poster : null,
+        duracion: Number(v.duracion) || null,
+      }))
+      .slice(0, plan.videos_maximos || 0)
+    : [];
+
   const telefonos = (Array.isArray(c.telefonos) ? c.telefonos : [])
     .filter((t) => String(t.numero || '').replace(/\D/g, '').length === 10)
     .slice(0, 5);
@@ -1412,6 +1467,7 @@ const publicar = conSesion(async (req, res, ctx) => {
     vence: membresia.fin,
     destacadoHasta: plan.destacado ? membresia.fin : null,
     fotos,
+    videos: videosDelPlan,
     telefonos: telefonos.map((t) => ({ numero: t.numero, tipo: t.tipo, nota: t.nota })),
   });
 
@@ -1470,8 +1526,13 @@ const eliminarAnuncio = conSesion((req, res, ctx, idAnuncio) => {
   /* Los archivos se borran DESPUÉS de que la fila se haya ido. Si se
      hiciera antes y la transacción fallara, el anuncio se quedaría
      publicado apuntando a fotos que ya no están. `borrar` no lanza si
-     el archivo falta. */
-  rutas.forEach((r) => { try { fotos.borrar(r); } catch (_) { /* ya no estaba */ } });
+     el archivo falta.
+
+     Los videos pesan doce veces más que una foto: dejárselos olvidados
+     en disco al borrar un anuncio llenaría el VPS sin que nadie lo
+     relacionara con nada. */
+  rutas.fotos.forEach((r) => { try { fotos.borrar(r); } catch (_) { /* ya no estaba */ } });
+  rutas.videos.forEach((r) => { try { videos.borrar(r); } catch (_) { /* ya no estaba */ } });
 
   return responder(res, 200, {
     ok: true,
@@ -1631,6 +1692,7 @@ const RUTAS = [
   ['POST', /^\/api\/membresias\/([\w-]+)\/ampliar$/, ampliarMembresia],
   ['POST', /^\/api\/eventos$/,           evento],
   ['POST', /^\/api\/fotos$/,             subirFoto],
+  ['POST', /^\/api\/videos$/,            subirVideo],
 
   // Flota propia de alquiler y transporte. La lectura es pública;
   // todo lo que la modifica exige sesión con es_admin.

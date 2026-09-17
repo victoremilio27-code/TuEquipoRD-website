@@ -106,6 +106,9 @@ function tarjetaNivel(n) {
 
   const rasgos = [
     `Hasta ${n.fotos_maximas} fotografías por equipo`,
+    n.videos_maximos
+      ? `${n.videos_maximos} ${n.videos_maximos === 1 ? 'video' : 'videos'} de 30 segundos por equipo`
+      : null,
     n.destacado ? 'Distintivo Destacado y posición preferente' : 'Ficha técnica completa con horas y condición',
     n.destacado ? 'Aparece en la portada' : 'Contacto directo por teléfono y WhatsApp',
     n.perfil_publico ? 'Página pública de su empresa en el directorio' : null,
@@ -134,7 +137,9 @@ function tarjetaNivel(n) {
 function pintarTablaComparativa() {
   const filas = [
     ['Fotografías por equipo', (n) => `${n.fotos_maximas}`],
-    ['Vídeo del equipo', (n) => (n.destacado ? 'Sí' : '—')],
+    // Antes esta fila decía «Sí» para todo plan destacado, cuando el
+    // video no existía en el sitio: prometía algo que no se entregaba.
+    ['Videos de 30 s por equipo', (n) => (n.videos_maximos ? `${n.videos_maximos}` : '—')],
     ['Distintivo Destacado', (n) => (n.destacado ? 'Sí' : '—')],
     ['Posición preferente en resultados', (n) => (n.destacado ? 'Sí' : '—')],
     ['Aparece en la portada', (n) => (n.destacado ? 'Sí' : '—')],
