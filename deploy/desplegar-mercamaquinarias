@@ -12,8 +12,9 @@
 # este montaje existe para evitar.
 set -euo pipefail
 
-REPO=/var/www/tuequipord
-DUENO=tuequipord
+REPO=/var/www/mercamaquinarias
+DUENO=mercamaquinarias
+SERVICIO=mercamaquinarias
 SALUD=http://127.0.0.1:8080/
 INTENTOS=15
 
@@ -49,7 +50,7 @@ echo "Actualizando de ${ANTES:0:7} a ${NUEVO:0:7}"
 # preferible que el despliegue falle a que se fusione a ciegas.
 comoDueno git merge --ff-only origin/main
 
-systemctl restart tuequipord
+systemctl restart "$SERVICIO"
 
 # Se espera a que levante en vez de dormir una cantidad fija: arrancar
 # tarda distinto segun lo que haya que migrar en la base.
@@ -63,7 +64,7 @@ done
 
 echo "ERROR: el sitio no respondio en ${INTENTOS}s. Volviendo a ${ANTES:0:7}" >&2
 comoDueno git reset --hard "$ANTES"
-systemctl restart tuequipord
+systemctl restart "$SERVICIO"
 
 for _ in $(seq 1 "$INTENTOS"); do
   sleep 1

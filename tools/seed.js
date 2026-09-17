@@ -20,14 +20,14 @@
  * contactan, cuentan métricas y caducan.
  *
  * En producción no se ejecuta nunca. Todo lo que crea lleva el correo
- * en @demo.tuequipord.do, y --vaciar lo borra por ahí sin tocar una
- * sola cuenta real.
+ * en @demo.mercamaquinarias.do, y --vaciar lo borra por ahí sin tocar
+ * una sola cuenta real.
  */
 
 const db = require('./db');
 const precios = require('../assets/precios.js');
 
-const DOMINIO = 'demo.tuequipord.do';
+const DOMINIO = 'demo.mercamaquinarias.do';
 const CLAVE = 'demostracion2026';
 
 /* ── Fotografías ────────────────────────────────────────────

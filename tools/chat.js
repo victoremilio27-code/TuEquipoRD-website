@@ -10,12 +10,12 @@
  *
  * LA CLAVE NUNCA LLEGA AL NAVEGADOR. Vive en ANTHROPIC_API_KEY, que
  * en desarrollo sale del .env (gitignored) y en producción de
- * /etc/tuequipord.env. La página habla con /api/chat, y solo este
+ * /etc/mercamaquinarias.env. La página habla con /api/chat, y solo este
  * archivo habla con Anthropic.
  *
  * Configuración:
  *   ANTHROPIC_API_KEY=sk-ant-…      (obligatoria)
- *   TUEQUIPO_CHAT_MODELO=…          (opcional; por defecto Sonnet 5)
+ *   MERCA_CHAT_MODELO=…          (opcional; por defecto Sonnet 5)
  */
 
 const https = require('https');
@@ -27,7 +27,7 @@ const CLAVE = () => process.env.ANTHROPIC_API_KEY || '';
 /* Sonnet 5: buena redacción y buen criterio para decir «no sé», a un
    tercio de lo que cuesta Opus. Para un FAQ con el contexto ya escrito
    en el prompt no hace falta más. */
-const MODELO = process.env.TUEQUIPO_CHAT_MODELO || 'claude-sonnet-5';
+const MODELO = process.env.MERCA_CHAT_MODELO || 'claude-sonnet-5';
 
 /* El pensamiento adaptativo viene encendido en Sonnet 5. Aquí se apaga
    a propósito: quien escribe en un widget de soporte está esperando
@@ -55,7 +55,7 @@ const LARGO_MAXIMO = 1000;
    Cambiarlo aquí y en assets/app.js (WHATSAPP). */
 const TELEFONO = '(809) 000-0000';
 const CORREO_GENERAL = 'hola@mercamaquinarias.com';
-const CORREO_COTIZAR = process.env.TUEQUIPO_REVISION || 'dealers@mercamaquinarias.com';
+const CORREO_COTIZAR = process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com';
 
 /* Los precios salen de la tabla `planes`, que es la misma fila que
    después se cobra. Escribirlos a mano aquí sería crear una cuarta

@@ -46,10 +46,26 @@ const CALIDAD_FOTO = 0.82;
 const ANCHO_MINIATURA = 900;
 const CALIDAD_MINIATURA = 0.78;
 
-/* NO se renombra con el cambio de marca. Quien tenga un anuncio a
-   medio escribir lo guardó bajo esta clave: cambiarla le borra el
-   borrador sin avisarle. El nombre viejo aquí no lo ve nadie. */
-const CLAVE_BORRADOR = 'tuequipord:borrador';
+const CLAVE_BORRADOR = 'mercamaquinarias:borrador';
+
+/* La clave de antes del cambio de nombre.
+ *
+ * Renombrar y ya está le habría borrado el anuncio a medio escribir a
+ * cualquiera que tuviese uno guardado, sin avisarle y sin manera de
+ * recuperarlo. Se rescata una vez y se tira la clave vieja.
+ *
+ * Esta línea sobra a partir de finales de 2026: para entonces nadie
+ * conserva un borrador de antes de la mudanza. */
+const CLAVE_BORRADOR_ANTERIOR = 'tuequipord:borrador';
+
+function rescatarBorradorAnterior() {
+  try {
+    const viejo = localStorage.getItem(CLAVE_BORRADOR_ANTERIOR);
+    if (!viejo) return;
+    if (!localStorage.getItem(CLAVE_BORRADOR)) localStorage.setItem(CLAVE_BORRADOR, viejo);
+    localStorage.removeItem(CLAVE_BORRADOR_ANTERIOR);
+  } catch (_) { /* almacenamiento no disponible: no hay nada que rescatar */ }
+}
 
 /* ── Estado ─────────────────────────────────────────────── */
 
@@ -100,6 +116,7 @@ function guardarBorrador() {
 }
 
 function leerBorrador() {
+  rescatarBorradorAnterior();
   try {
     const crudo = localStorage.getItem(CLAVE_BORRADOR);
     if (!crudo) return null;

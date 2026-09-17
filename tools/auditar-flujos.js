@@ -177,7 +177,7 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
 
   vigilar(p, 'admin');
   await p.goto(`${BASE}/cuenta.html`, { waitUntil: 'networkidle0' });
-  await escribir(p, '#ent-correo', 'caribe@demo.tuequipord.do');
+  await escribir(p, '#ent-correo', 'caribe@demo.mercamaquinarias.do');
   await escribir(p, '#ent-clave', 'demostracion2026');
   await p.click('#formEntrar button[type="submit"]');
   await esperar(1200);

@@ -1,6 +1,6 @@
 # Despliegue de MercaMaquinarias en un VPS
 
-Ubuntu 24.04. El dominio ya está puesto en todos los archivos: `mercamaquinarias.com` (antes `tuequipord.com`).
+Ubuntu 24.04. El dominio ya está puesto en todos los archivos: `mercamaquinarias.com`.
 
 El sitio corre como un proceso Node en el puerto 8080, escuchando solo
 en local. Nginx lo publica hacia fuera en los puertos 80 y 443 y se
@@ -25,31 +25,31 @@ apt install -y nodejs
 node --version   # debe decir v24.x
 
 # Usuario sin privilegios para el sitio
-adduser --system --group --home /var/www/tuequipord tuequipord
+adduser --system --group --home /var/www/mercamaquinarias mercamaquinarias
 
 # Base de datos y fotografías de los anuncios. Fuera del proyecto: así
 # un `git pull` no las toca y se respaldan aparte.
-mkdir -p /var/lib/tuequipord/fotos
-chown -R tuequipord:tuequipord /var/lib/tuequipord
+mkdir -p /var/lib/mercamaquinarias/fotos
+chown -R mercamaquinarias:mercamaquinarias /var/lib/mercamaquinarias
 ```
 
 ## 2. Código
 
 ```bash
-git clone https://github.com/victoremilio27-code/TuEquipoRD-website.git /var/www/tuequipord
-chown -R tuequipord:tuequipord /var/www/tuequipord
+git clone https://github.com/victoremilio27-code/mercamaquinarias-website.git /var/www/mercamaquinarias
+chown -R mercamaquinarias:mercamaquinarias /var/www/mercamaquinarias
 ```
 
 El repositorio es **público**, así que `git clone` no pide credenciales.
 Si algún día pasa a privado, hará falta una *deploy key* de solo lectura:
-genera una clave en el servidor con `ssh-keygen -t ed25519 -C tuequipord-vps`,
+genera una clave en el servidor con `ssh-keygen -t ed25519 -C mercamaquinarias-vps`,
 copia `~/.ssh/id_ed25519.pub` y añádelo en GitHub bajo
 **Settings → Deploy keys**. Luego clona por SSH:
-`git@github.com:victoremilio27-code/TuEquipoRD-website.git`.
+`git@github.com:victoremilio27-code/mercamaquinarias-website.git`.
 
 **Ese `chown` no es opcional.** Todo lo que toque este directorio después
 —incluido cualquier `git` que se ejecute a mano— tiene que ser como
-`tuequipord`, nunca como root: git escribe los objetos nuevos con el dueño
+`mercamaquinarias`, nunca como root: git escribe los objetos nuevos con el dueño
 de quien lo ejecuta, y un solo `git pull` hecho como root deja el
 repositorio inservible para el despliegue automático.
 
@@ -63,39 +63,39 @@ Puppeteer es solo para capturas en desarrollo.
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Crea `/etc/tuequipord.env` con ese valor:
+Crea `/etc/mercamaquinarias.env` con ese valor:
 
 ```
-TUEQUIPO_SECRETO=<el valor generado arriba>
+MERCA_SECRETO=<el valor generado arriba>
 
-TUEQUIPO_CORREO=brevo
+MERCA_CORREO=brevo
 BREVO_API_KEY=<la clave de Brevo>
-TUEQUIPO_REMITENTE=MercaMaquinarias <no-reply@mercamaquinarias.com>
-TUEQUIPO_REVISION=dealers@mercamaquinarias.com
-TUEQUIPO_SITIO=https://mercamaquinarias.com
+MERCA_REMITENTE=MercaMaquinarias <no-reply@mercamaquinarias.com>
+MERCA_REVISION=dealers@mercamaquinarias.com
+MERCA_SITIO=https://mercamaquinarias.com
 ```
 
 Ciérralo para que solo root lo lea:
 
 ```bash
-chmod 600 /etc/tuequipord.env
-chown root:root /etc/tuequipord.env
+chmod 600 /etc/mercamaquinarias.env
+chown root:root /etc/mercamaquinarias.env
 ```
 
-`TUEQUIPO_SECRETO` firma las sesiones. Si cambia, todo el mundo pierde
+`MERCA_SECRETO` firma las sesiones. Si cambia, todo el mundo pierde
 la sesión iniciada; si se filtra, cualquiera puede falsificar una. No
 lo pongas nunca en el repositorio.
 
 ## 4. Servicio
 
 ```bash
-cp /var/www/tuequipord/deploy/tuequipord.service /etc/systemd/system/
+cp /var/www/mercamaquinarias/deploy/mercamaquinarias.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now tuequipord
-systemctl status tuequipord
+systemctl enable --now mercamaquinarias
+systemctl status mercamaquinarias
 ```
 
-La base se crea sola en `/var/lib/tuequipord/tuequipord.db` a partir de
+La base se crea sola en `/var/lib/mercamaquinarias/mercamaquinarias.db` a partir de
 `db/schema.sql` la primera vez que arranca.
 
 Comprueba que responde en local antes de seguir:
@@ -111,8 +111,8 @@ alquiler y las camas de transporte—, que es inventario real y no
 demostración:
 
 ```bash
-sudo -u tuequipord TUEQUIPO_DB=/var/lib/tuequipord/tuequipord.db \
-  node /var/www/tuequipord/tools/seed.js --solo-flota
+sudo -u mercamaquinarias MERCA_DB=/var/lib/mercamaquinarias/mercamaquinarias.db \
+  node /var/www/mercamaquinarias/tools/seed.js --solo-flota
 ```
 
 **Nunca ejecutes `node tools/seed.js` sin `--solo-flota` en
@@ -126,13 +126,13 @@ Repetirlo no duplica nada: si la flota ya está, no la toca.
 Se crean desde el servidor, con el correo ya verificado:
 
 ```bash
-cd /var/www/tuequipord
+cd /var/www/mercamaquinarias
 
-sudo -u tuequipord node tools/admin.js crear principal@mercamaquinarias.com \
+sudo -u mercamaquinarias node tools/admin.js crear principal@mercamaquinarias.com \
   "Administración MercaMaquinarias" --admin --exenta --empresa "MercaMaquinarias"
 
-sudo -u tuequipord node tools/admin.js crear <tu-correo> "<Tu nombre>" --exenta
-sudo -u tuequipord node tools/admin.js crear <correo-socio> "<Nombre>" --exenta
+sudo -u mercamaquinarias node tools/admin.js crear <tu-correo> "<Tu nombre>" --exenta
+sudo -u mercamaquinarias node tools/admin.js crear <correo-socio> "<Nombre>" --exenta
 ```
 
 Cada comando imprime la contraseña generada **una sola vez**. Anótalas
@@ -143,15 +143,37 @@ pagar. Ninguna de las dos se puede conceder desde el sitio.
 
 Para ver quién tiene permisos internos: `node tools/admin.js listar`.
 
-## 5. Nginx
+## 5. Nginx (arranque, sin certificado todavía)
+
+`deploy/nginx.conf` es la configuración **definitiva** y da por hecho que
+el certificado existe. En una máquina recién montada no existe, así que
+primero va un bloque mínimo que sirva el sitio por HTTP puro. Es lo que
+certbot necesita para validar el dominio en el paso 7.
 
 ```bash
-cp /var/www/tuequipord/deploy/nginx.conf /etc/nginx/sites-available/tuequipord
-# El archivo ya trae mercamaquinarias.com; no hace falta sustituir nada
-ln -s /etc/nginx/sites-available/tuequipord /etc/nginx/sites-enabled/
+cat > /etc/nginx/sites-available/mercamaquinarias <<'FIN'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mercamaquinarias.com www.mercamaquinarias.com;
+    client_max_body_size 12M;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $host;
+    }
+}
+FIN
+
+ln -s /etc/nginx/sites-available/mercamaquinarias /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 ```
+
+**Sin redirigir a HTTPS todavía.** Redirigir antes de tener certificado
+deja el sitio inalcanzable: el navegador va a https, no hay certificado
+y no llega a ninguna parte.
 
 ## 6. DNS
 
@@ -176,7 +198,19 @@ certbot --nginx -d mercamaquinarias.com -d www.mercamaquinarias.com
 Certbot reescribe la configuración de nginx para servir por HTTPS y
 redirigir el HTTP. La renovación queda automática por temporizador.
 
-El servicio ya arranca con `TUEQUIPO_HTTPS=1`, que marca las cookies de
+Con el certificado ya puesto, se sustituye por la configuración buena,
+que además manda el `www` al dominio sin `www`:
+
+```bash
+cp /var/www/mercamaquinarias/deploy/nginx.conf /etc/nginx/sites-available/mercamaquinarias
+nginx -t && systemctl reload nginx
+```
+
+Si el sitio viene de otro dominio, `deploy/nginx-dominio-viejo.conf`
+lo redirige entero al nuevo con un 301. Es temporal y el propio archivo
+explica cómo quitarlo.
+
+El servicio ya arranca con `MERCA_HTTPS=1`, que marca las cookies de
 sesión como `Secure`. Eso **solo funciona una vez que el certificado
 está puesto**: si entras por HTTP puro con esa variable activa, el
 navegador descarta la cookie y no se puede iniciar sesión. Por eso este
@@ -210,11 +244,11 @@ una cuenta. Es el paso que más se olvida y el que más rápido se nota.
    Outlook lo mandan a spam, que a efectos prácticos es lo mismo que
    no enviarlo.
 3. Genera la clave en **SMTP & API → API Keys** y ponla en
-   `/etc/tuequipord.env` como `BREVO_API_KEY`.
+   `/etc/mercamaquinarias.env` como `BREVO_API_KEY`.
 4. Comprueba que sale de verdad:
 
    ```bash
-   sudo -u tuequipord TUEQUIPO_CORREO=brevo \
+   sudo -u mercamaquinarias MERCA_CORREO=brevo \
      node -e "require('./tools/correo').enviarBienvenida({para:'tucorreo@gmail.com',nombre:'Prueba'})"
    ```
 
@@ -227,19 +261,19 @@ registro del servicio lo anota.
 Caducar anuncios, avisar de vencimientos, purgar y respaldar la base:
 
 ```bash
-mkdir -p /var/backups/tuequipord
-chown tuequipord:tuequipord /var/backups/tuequipord
+mkdir -p /var/backups/mercamaquinarias
+chown mercamaquinarias:mercamaquinarias /var/backups/mercamaquinarias
 
-cp /var/www/tuequipord/deploy/tuequipord-tareas.* /etc/systemd/system/
+cp /var/www/mercamaquinarias/deploy/mercamaquinarias-tareas.* /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now tuequipord-tareas.timer
-systemctl list-timers tuequipord-tareas.timer
+systemctl enable --now mercamaquinarias-tareas.timer
+systemctl list-timers mercamaquinarias-tareas.timer
 ```
 
 Corre a las 5:00. Para ver qué haría sin hacer nada:
 
 ```bash
-sudo -u tuequipord node tools/tareas.js --seco
+sudo -u mercamaquinarias node tools/tareas.js --seco
 ```
 
 Cada tarea es idempotente: repetirla no manda dos veces el mismo aviso.
@@ -249,8 +283,8 @@ protege del fallo que más importa, que es perder la máquina. Con
 `rclone` a cualquier almacenamiento remoto:
 
 ```bash
-rclone sync /var/backups/tuequipord remoto:tuequipord-respaldos
-rclone sync /var/lib/tuequipord/fotos remoto:tuequipord-fotos
+rclone sync /var/backups/mercamaquinarias remoto:mercamaquinarias-respaldos
+rclone sync /var/lib/mercamaquinarias/fotos remoto:mercamaquinarias-fotos
 ```
 
 **Las fotos van en su propia línea a propósito.** La tarea de
@@ -272,7 +306,7 @@ Las migraciones de `tools/db.js` se aplican solas al arrancar.
 
 `/usr/local/bin/desplegar-mercamaquinarias`, como root:
 
-0. `chown -R tuequipord:tuequipord` sobre el repositorio. **No es decorativo:**
+0. `chown -R mercamaquinarias:mercamaquinarias` sobre el repositorio. **No es decorativo:**
    si alguien entra al servidor y hace `git pull` como root, git deja objetos
    nuevos con dueño root y el siguiente despliegue falla con *insufficient
    permission for adding an object*. Pasó exactamente eso la primera vez.
@@ -280,7 +314,7 @@ Las migraciones de `tools/db.js` se aplican solas al arrancar.
 2. `git merge --ff-only origin/main` — a propósito: si alguien hubiera
    hecho un commit a mano en el servidor, es preferible que el despliegue
    falle a que se fusione a ciegas.
-3. Reinicia `tuequipord` y espera hasta 15 s a que el sitio responda.
+3. Reinicia `mercamaquinarias` y espera hasta 15 s a que el sitio responda.
 4. **Si no responde, vuelve solo a la versión anterior** y la reinicia.
    Ojo: eso devuelve el código, no la base. Las migraciones son de ida;
    como solo añaden, una versión anterior sigue arrancando, pero una
@@ -294,16 +328,16 @@ Las migraciones de `tools/db.js` se aplican solas al arrancar.
   con la orden **forzada**: `command="sudo -n /usr/local/bin/desplegar-mercamaquinarias"`,
   sin pty ni reenvíos. Aunque el secreto se filtrara, esa llave no sirve
   para leer nada de la máquina — se comprobó pidiéndole
-  `cat /etc/tuequipord.env` y ejecutó el despliegue igualmente.
+  `cat /etc/mercamaquinarias.env` y ejecutó el despliegue igualmente.
 - Los secretos del repositorio son `VPS_HOST` y `VPS_SSH_KEY`. La llave
   privada no queda en ningún PC.
 
 ### A mano, si alguna vez hace falta
 
 ```bash
-cd /var/www/tuequipord
-sudo -u tuequipord git pull
-systemctl restart tuequipord
+cd /var/www/mercamaquinarias
+sudo -u mercamaquinarias git pull
+systemctl restart mercamaquinarias
 ```
 
 ## Copias de seguridad
@@ -313,12 +347,12 @@ regularidad; SQLite necesita `.backup` en vez de `cp` para no capturar
 una escritura a medias:
 
 ```bash
-sqlite3 /var/lib/tuequipord/tuequipord.db ".backup '/tmp/respaldo.db'"
+sqlite3 /var/lib/mercamaquinarias/mercamaquinarias.db ".backup '/tmp/respaldo.db'"
 ```
 
 ## Ver qué pasa
 
 ```bash
-journalctl -u tuequipord -f      # registro del sitio
+journalctl -u mercamaquinarias -f      # registro del sitio
 tail -f /var/log/nginx/error.log # registro de nginx
 ```

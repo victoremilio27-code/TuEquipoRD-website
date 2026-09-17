@@ -7,7 +7,7 @@
 # estuvo apagado a esa hora, en vez de saltarse el día.
 
 [Unit]
-Description=Mantenimiento diario de TuEquipoRD
+Description=Mantenimiento diario de MercaMaquinarias
 
 [Timer]
 OnCalendar=*-*-* 05:00:00

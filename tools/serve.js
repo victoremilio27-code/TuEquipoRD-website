@@ -5,7 +5,7 @@
  *   npm start                        # http://localhost:8080
  *   node tools/serve.js --port 3000
  *   node tools/serve.js --sin-api    # solo estáticos
- *   node tools/serve.js --root archive/v1-aterrizaje --port 8081
+ *   node tools/serve.js --root otra/carpeta --port 8081
  *
  * Con la API montada, /api/* lo atiende tools/api.js contra la base
  * SQLite de db/. El resto son archivos del proyecto.
@@ -83,7 +83,7 @@ function cabecerasDe(extra = {}) {
   // HSTS solo con HTTPS activo. Enviarlo por HTTP no hace nada, y
   // enviarlo antes de tener certificado deja el dominio inaccesible en
   // los navegadores que ya lo hayan recordado.
-  if (PRODUCCION && process.env.TUEQUIPO_HTTPS === '1') {
+  if (PRODUCCION && process.env.MERCA_HTTPS === '1') {
     h['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
   }
   return h;
@@ -124,7 +124,7 @@ const etagDe = (est) => `W/"${est.size.toString(36)}-${est.mtimeMs.toString(36)}
  * la raíz del proyecto y eso dejaba a la vista:
  *
  *   /.env              la clave de Brevo y el secreto de sesión
- *   /db/tuequipord.db  la base entera: correos, hashes, RNC
+ *   /db/mercamaquinarias.db  la base entera: correos, hashes, RNC
  *   /.git/config       el repositorio
  *   /tools/db.js       el código del servidor
  *

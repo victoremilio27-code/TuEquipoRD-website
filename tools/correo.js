@@ -12,7 +12,7 @@
  *   · 'brevo' — producción. Correo transaccional por la API HTTPS de
  *     Brevo. Ni la API ni las pantallas se enteran del cambio.
  *
- * Elegir con TUEQUIPO_CORREO=brevo y definir BREVO_API_KEY.
+ * Elegir con MERCA_CORREO=brevo y definir BREVO_API_KEY.
  */
 
 const fs = require('fs');
@@ -21,14 +21,14 @@ const path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const BANDEJA = path.join(RAIZ, '.tmp', 'correos');
 
-const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'MercaMaquinarias <no-reply@mercamaquinarias.com>';
-const TRANSPORTE = process.env.TUEQUIPO_CORREO || 'archivo';
+const REMITENTE = process.env.MERCA_REMITENTE || 'MercaMaquinarias <no-reply@mercamaquinarias.com>';
+const TRANSPORTE = process.env.MERCA_CORREO || 'archivo';
 
 // Buzón interno que recibe las solicitudes de dealer para revisar.
-const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@mercamaquinarias.com';
+const REVISION = process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com';
 
 // URL pública, para los enlaces que van dentro de los correos.
-const SITIO = process.env.TUEQUIPO_SITIO || 'https://mercamaquinarias.com';
+const SITIO = process.env.MERCA_SITIO || 'https://mercamaquinarias.com';
 
 /* Escapa lo que venga del usuario antes de meterlo en el HTML del
    correo: un nombre con "<script>" no debe llegar a la bandeja de
@@ -216,7 +216,7 @@ function porArchivo({ para, asunto, texto, html }) {
  * Sin `node:https` extra: viene con Node.
  *
  * Configuración:
- *   TUEQUIPO_CORREO=brevo
+ *   MERCA_CORREO=brevo
  *   BREVO_API_KEY=xkeysib-…
  *
  * El remitente debe estar verificado en Brevo y el dominio necesita
