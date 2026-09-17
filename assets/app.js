@@ -1200,40 +1200,61 @@ const ESPACIOS_PUB = {
   'movil-lista':    { letra: 'H', ancho: 336,  alto: 336, sel: null },
 };
 
-const CORREO_PUB = 'hola@tuequipord.com';
+/* El correo NO va escrito aquí: se lee del pie de la página.
+ *
+ * Escrito a mano, el día que el sitio pase a mercamaquinarias.com habría
+ * que acordarse de cambiarlo justo en este renglón, y el recuadro
+ * seguiría invitando a escribir a un buzón muerto. Leyéndolo del pie
+ * —que sí cambia con el dominio— el espacio publicitario dice siempre la
+ * dirección que de verdad se atiende. */
+function correoPublicidad() {
+  const enlace = document.querySelector('.pie a[href^="mailto:"]');
+  const correo = enlace && enlace.getAttribute('href').replace(/^mailto:/i, '').trim();
+  return correo || 'hola@tuequipord.com';
+}
 
-/* MODO MUESTRA — solo para enseñarle los espacios a un anunciante.
+/* LOS ESPACIOS VACÍOS SE VEN.
  *
- * Al público no se le enseñan recuadros vacíos: un sitio con marcos de
- * «espacio disponible» parece a medio hacer, y quien entra a comprar
- * una excavadora no viene a buscar dónde anunciarse. Esa decisión no
- * cambia. Lo que se añade es una vista aparte, que hay que pedir:
+ * Antes no: la idea era que un sitio con marcos de «espacio disponible»
+ * parece a medio hacer. Victor decidió lo contrario, y tiene su lógica
+ * —un hueco que dice «anúnciese aquí» es la única forma de que un
+ * anunciante sepa que puede comprarlo—, así que el recuadro se rediseña
+ * para ese trabajo: sin jerga y con el correo a un clic.
  *
- *   ?muestra=publicidad   la enciende (se recuerda al navegar)
- *   ?muestra=no           la apaga
+ * Se puede apagar sin desplegar nada, con `?muestra=no`.
  *
- * Se guarda en sessionStorage y no en localStorage a propósito: dura lo
- * que dure la pestaña. Nadie se queda con el sitio en modo muestra
- * porque un día abrió un enlace de una reunión. */
+ * MODO TARIFARIO (`?muestra=publicidad`) es otra cosa: añade la letra y
+ * la medida exacta de cada formato, que es lo que se le enseña a un
+ * anunciante con las fichas de venta delante. Al visitante normal esos
+ * datos no le dicen nada. */
 const CLAVE_MUESTRA = 'mm-muestra-pub';
+const CLAVE_APAGADO = 'mm-pub-apagada';
 
-const enMuestra = (() => {
-  let activo = false;
-  try {
-    const pedido = params().get('muestra');
-    if (pedido === 'publicidad') sessionStorage.setItem(CLAVE_MUESTRA, '1');
-    else if (pedido === 'no') sessionStorage.removeItem(CLAVE_MUESTRA);
-    activo = sessionStorage.getItem(CLAVE_MUESTRA) === '1';
-  } catch {
-    // Navegación privada con almacenamiento bloqueado: al menos que
-    // funcione en la página que trae el parámetro.
-    activo = params().get('muestra') === 'publicidad';
-  }
-  // Se marca en <html> al cargar el script, no al terminar el DOM, para
+const modoPublicidad = (() => {
+  let tarifario = false;
+  let apagado = false;
+
+  const leer = (clave) => { try { return sessionStorage.getItem(clave) === '1'; } catch { return false; } };
+  const fijar = (clave, v) => {
+    try { if (v) sessionStorage.setItem(clave, '1'); else sessionStorage.removeItem(clave); } catch { /* sin memoria */ }
+  };
+
+  const pedido = params().get('muestra');
+  if (pedido === 'publicidad') { fijar(CLAVE_MUESTRA, true); fijar(CLAVE_APAGADO, false); }
+  else if (pedido === 'no') { fijar(CLAVE_APAGADO, true); fijar(CLAVE_MUESTRA, false); }
+
+  tarifario = leer(CLAVE_MUESTRA) || pedido === 'publicidad';
+  apagado = leer(CLAVE_APAGADO) || pedido === 'no';
+
+  // Se marca en <html> al cargar el script y no al terminar el DOM, para
   // que el hueco de la barra ya esté reservado en el primer pintado.
-  if (activo) document.documentElement.classList.add('muestra-pub');
-  return () => activo;
+  if (tarifario) document.documentElement.classList.add('muestra-pub');
+
+  return { tarifario: () => tarifario, visibles: () => !apagado };
 })();
+
+const enTarifario = () => modoPublicidad.tarifario();
+const espaciosVisibles = () => modoPublicidad.visibles();
 
 /* Las campañas se piden una sola vez por página aunque las reclamen la
    portada, la ficha y las listas: cada petición cuenta impresiones, y
@@ -1247,17 +1268,37 @@ const campanasVigentes = () => {
   return PUB_PENDIENTE;
 };
 
-/* El recuadro vacío del modo muestra: la letra del tarifario, el
-   formato y a quién escribirle. Lleva la proporción exacta del formato
-   para que lo que se ve en pantalla sea lo que se compra. */
+/* El recuadro del espacio libre.
+ *
+ * Es un ENLACE, no una caja muerta. Si se le enseña a todo el mundo un
+ * hueco que dice «anúnciese aquí», lo menos que puede hacer es abrir el
+ * correo cuando alguien lo pulsa; si no, se queda en decoración y hay
+ * que copiar la dirección a mano.
+ *
+ * La letra y la medida solo salen en modo tarifario: al anunciante le
+ * sirven para cotejar con las fichas de venta, pero a quien vino a
+ * comprar una excavadora «B · 970 × 90 px» no le dice nada.
+ *
+ * La proporción es la exacta del formato en los dos casos: lo que se ve
+ * en pantalla es lo que se compra. */
 function muestraHTML(id) {
   const e = ESPACIOS_PUB[id];
-  return `<div class="pub-muestra" style="--pub-ancho: ${e.ancho}; --pub-alto: ${e.alto}">
-    <span class="pub-muestra__letra" aria-hidden="true">${e.letra}</span>
+  const correo = correoPublicidad();
+  const asunto = encodeURIComponent('Publicidad en MercaMaquinarias');
+  const detalle = enTarifario()
+    ? `<span class="pub-muestra__letra" aria-hidden="true">${e.letra}</span>`
+    : '';
+  const medida = enTarifario()
+    ? `<span class="pub-muestra__medida num">${e.ancho} &times; ${e.alto} px</span>`
+    : '';
+
+  return `<a class="pub-muestra" style="--pub-ancho: ${e.ancho}; --pub-alto: ${e.alto}"
+     href="mailto:${esc(correo)}?subject=${asunto}">
+    ${detalle}
     <span class="pub-muestra__nombre">Espacio publicitario</span>
-    <span class="pub-muestra__medida num">${e.ancho} &times; ${e.alto} px</span>
-    <span class="pub-muestra__pie">Anúnciese aquí · ${esc(CORREO_PUB)}</span>
-  </div>`;
+    ${medida}
+    <span class="pub-muestra__pie">Anúnciese aquí · ${esc(correo)}</span>
+  </a>`;
 }
 
 /* Un recuadro de muestra puede caer sobre el fondo oscuro del teléfono
@@ -1321,10 +1362,11 @@ function pintarEspacio(id, caja, lista) {
     return;
   }
 
-  // Sin campaña no se dibuja nada. El bloque comparte fila con otro
-  // panel, y su fila se encoge sola a una columna: ver
+  // Sin campaña se enseña el hueco libre, salvo que se haya apagado con
+  // `?muestra=no`. Cuando no se dibuja, el bloque comparte fila con otro
+  // panel y su fila se encoge sola a una columna: ver
   // `.fila--dos:has(> .pub[hidden])` en styles.css.
-  if (!enMuestra()) return;
+  if (!espaciosVisibles()) return;
 
   caja.innerHTML = muestraHTML(id);
   caja.classList.add('pub--muestra');
@@ -1332,18 +1374,19 @@ function pintarEspacio(id, caja, lista) {
   ajustarContraste(caja);
 }
 
-/* Barra de aviso del modo muestra. Va siempre, para que nadie confunda
-   esta vista con el sitio que ve el público. */
+/* Barra del modo tarifario. NO sale en el sitio público: allí los
+   espacios libres ya son parte de la página, y anunciarlos como «vista
+   de muestra» sería mentir sobre lo que se está viendo. */
 function montarBarraMuestra() {
-  if (!enMuestra() || $('.muestra-barra')) return;
+  if (!enTarifario() || $('.muestra-barra')) return;
 
   const salir = new URLSearchParams(location.search);
   salir.set('muestra', 'no');
 
   const barra = document.createElement('div');
   barra.className = 'muestra-barra';
-  barra.innerHTML = `<span class="muestra-barra__texto">Vista de muestra de espacios publicitarios</span>
-    <a class="muestra-barra__salir" href="${esc(location.pathname)}?${esc(salir.toString())}">Salir de la muestra</a>`;
+  barra.innerHTML = `<span class="muestra-barra__texto">Vista con las medidas del tarifario</span>
+    <a class="muestra-barra__salir" href="${esc(location.pathname)}?${esc(salir.toString())}">Salir</a>`;
   document.body.prepend(barra);
 
   /* El alto se mide, no se fija: según el ancho el rótulo cabe en una
@@ -1363,7 +1406,7 @@ async function montarPubEnLista(lista) {
   if (!lista) return;
   const campanas = await campanasVigentes();
   const suyas = campanas['movil-lista'] || [];
-  if (!suyas.length && !enMuestra()) return;
+  if (!suyas.length && !espaciosVisibles()) return;
 
   const avisos = $$(':scope > li.aviso', lista);
   if (avisos.length < 3) return;          // con menos de tres no hay dónde intercalar

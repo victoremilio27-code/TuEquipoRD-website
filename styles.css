@@ -2992,15 +2992,22 @@ main { position: relative; }
   .pub--bloque.pub--muestra { display: none; }
 }
 
-/* ── Modo muestra de espacios publicitarios ─────────────────
-   Nada de esto se le enseña al visitante. Solo aparece con
-   `?muestra=publicidad`, para sentarse con un anunciante y enseñarle
-   dónde y de qué tamaño quedaría su banner. Ver assets/app.js. */
+/* ── Espacio publicitario libre ─────────────────────────────
+   El hueco que todavía no se ha vendido. Se enseña al visitante: es la
+   única forma de que un anunciante sepa que puede comprarlo. Con
+   `?muestra=publicidad` añade la letra y la medida del tarifario, que
+   son para enseñárselas a un anunciante. Ver assets/app.js. */
 
 /* El rótulo «Publicidad» sobra encima de un recuadro que ya dice
-   «Espacio publicitario»: repetiría la misma palabra dos veces. */
+   «Espacio publicitario»: repetiría la misma palabra dos veces. Y sería
+   falso: todavía no hay nada pagado ahí. */
 .pub--muestra::before { content: none; }
 
+/* El selector va con `.pub >` a propósito. El recuadro es un <a>, así
+   que la regla `.pub > a` de más arriba —borde gris, fondo neutro, la
+   que enmarca los banners de verdad— le ganaba en especificidad y lo
+   dejaba sin su borde ámbar. */
+.pub > .pub-muestra,
 .pub-muestra {
   /* Toma el ámbar del tema cuando exista (rama de interfaz clara) y,
      mientras tanto, el de la guía de marca. Así el recuadro no habrá
@@ -3031,6 +3038,24 @@ main { position: relative; }
      clara (--azul). Con un azul fijo, «Espacio publicitario» quedaba
      azul marino sobre fondo casi negro, ilegible en el teléfono. */
   color: var(--app-text, var(--azul));
+
+  /* Es un enlace: abre el correo. Sin subrayado porque el recuadro
+     entero ya se lee como algo pulsable. */
+  text-decoration: none;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+
+/* Que se note que se puede pulsar. Con `hover: none` —el teléfono— no se
+   aplica: allí un estado de hover se queda pegado tras el toque. */
+@media (hover: hover) {
+  .pub > .pub-muestra:hover {
+    background: rgba(242, 169, 0, .16);
+    border-style: solid;
+  }
+}
+.pub > .pub-muestra:focus-visible {
+  outline: 2px solid var(--pub-acento);
+  outline-offset: 3px;
 }
 
 /* Y cuando el recuadro cae sobre una superficie clara aunque el tema
@@ -3055,6 +3080,16 @@ main { position: relative; }
 .pub-muestra__medida { font-size: 12px; color: var(--app-muted, var(--gris-acero)); }
 .pub-muestra__pie    { font-size: 10.5px; color: var(--app-muted, var(--gris-acero)); line-height: 1.45; }
 
+/* En el sitio público el recuadro solo tiene dos renglones —no salen ni
+   la letra ni la medida del tarifario— y el que invita a anunciarse deja
+   de ser un pie de nota: es la razón de existir de la caja. Se le da
+   tamaño y el ámbar de marca. */
+.pub-muestra:not(:has(.pub-muestra__letra)) .pub-muestra__pie {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ambar-hondo);
+}
+
 /* 90 px de alto no dan para cuatro renglones apilados: en el banner de
    catálogo el contenido se pone en fila. */
 .pub--catalogo .pub-muestra {
@@ -3063,10 +3098,15 @@ main { position: relative; }
   gap: 4px 12px;
 }
 
-/* El riel mide 160 px de ancho: ahí el correo no cabe en una línea y
-   tampoco hace falta, porque al lado está el mismo dato en el resto de
-   los recuadros. */
-.pub--lateral .pub-muestra__pie { display: none; }
+/* El riel mide 160 px de ancho, así que el correo no cabe en una línea.
+   Antes se ocultaba; ahora no puede: es la invitación a anunciarse y sin
+   ella el riel es un rectángulo mudo. Se deja partir —hay 600 px de
+   alto de sobra— y se permite cortar la dirección por donde haga falta,
+   que si no se desborda del recuadro. */
+.pub--lateral .pub-muestra__pie {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 
 /* El recuadro del riel acompaña la lectura igual que lo haría el banner
    vendido, que es `sticky` por la regla de más arriba. */
