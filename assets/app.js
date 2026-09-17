@@ -350,10 +350,11 @@ function montarMosaicoCategorias() {
       elevacion: 'brand_assets/generated/categoria-cargadores-v2.webp',
       generadores: 'brand_assets/generated/categoria-generadores-v2.webp',
     };
+    // Fotos de estudio en todos los tamaños: el escritorio usa ya la
+    // misma estética que el móvil.
     const esMovil = matchMedia('(max-width: 700px)').matches;
-    const fotoVisible = esMovil
-      ? (fotosEditoriales[c.id] || (foto && foto.foto) || 'brand_assets/generated/categoria-cargadores-v2.webp')
-      : (foto && foto.foto);
+    const fotoVisible = fotosEditoriales[c.id] || (foto && foto.foto)
+      || 'brand_assets/generated/categoria-cargadores-v2.webp';
 
     return `<li>
       <a class="mosaico__pieza${hay ? '' : ' mosaico__pieza--vacia'}" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
@@ -458,6 +459,8 @@ async function montarRecientes() {
       ? 'No pudimos cargar el catálogo. Actualice la página en un momento.'
       : 'Sea el primero en publicar. Su equipo aparecerá aquí y en los resultados de búsqueda.'}
       ${caido ? '' : '<a href="publicar.html">Publicar un equipo</a>'}</li>`;
+
+  montarPubEnLista(cont);
 
   /* El rótulo se escribe en SU span, no en el `.panel__meta` entero.
      Ahí dentro viven ahora las flechas del carrusel, y reemplazar el
@@ -744,6 +747,7 @@ async function montarResultados() {
     if (vacio) vacio.hidden = true;
     if (mando) mando.disabled = false;
     cont.innerHTML = r.anuncios.map(avisoHTML).join('');
+    montarPubEnLista(cont);
     return;
   }
 
@@ -948,6 +952,12 @@ async function montarDetalle() {
 
         ${e.verificado ? `<p class="nota-verificado"><span class="pastilla pastilla--verde">${icono('i-check')} Anunciante verificado</span> Identidad y titularidad del equipo comprobadas por MercaMaquinarias.</p>` : ''}
 
+        <!-- Espacio D del tarifario. Va entre los datos del equipo y el
+             contacto del vendedor: en el teléfono la columna se apila y
+             queda justo donde el comprador acaba de leer el precio y
+             todavía no ha llamado. Sin campaña no se dibuja. -->
+        <aside class="pub pub--ficha" id="pubFicha" aria-label="Publicidad" hidden></aside>
+
         ${contactosHTML(e)}
 
         <p class="detalle__dealer">${e.dealerSlug
@@ -963,6 +973,10 @@ async function montarDetalle() {
           <a href="contacto.html?equipo=${encodeURIComponent(e.id)}&amp;motivo=reporte">Reportar este anuncio</a>.</p>
       </aside>
     </div>`;
+
+  // El recuadro de la ficha existe recién ahora: montarPublicidad() ya
+  // había pasado cuando este panel todavía estaba vacío.
+  campanasVigentes().then((c) => pintarEspacio('ficha', $('#pubFicha'), c.ficha));
 
   // Métricas de la ficha: una vista al abrirla y un clic cada vez que
   // alguien va a llamar o a escribir. Se anota justo donde ocurre, que
@@ -1167,52 +1181,258 @@ function montarHeroeFoto(portada) {
 
 /* ── Publicidad ─────────────────────────────────────────── */
 
-/* Rellena los cuatro espacios de la portada con lo que haya vigente.
+/* Los ocho formatos del tarifario que se le enseña al anunciante. La
+   letra y la medida son las de las fichas de venta: si allí cambian,
+   cambian aquí, porque es lo que el cliente vio antes de firmar.
+
+   `sel` es el recuadro fijo de la página. `movil-lista` no tiene: se
+   intercala entre los anuncios ya pintados, así que lo crea el propio
+   JavaScript cuando la lista existe. */
+const ESPACIOS_PUB = {
+  superior:         { letra: 'A', ancho: 1216, alto: 160, sel: '#pubSuperior' },
+  catalogo:         { letra: 'B', ancho: 970,  alto: 90,  sel: '#pubCatalogo' },
+  bloque:           { letra: 'C', ancho: 600,  alto: 500, sel: '#pubBloque' },
+  ficha:            { letra: 'D', ancho: 300,  alto: 250, sel: '#pubFicha' },
+  'lateral-izq':    { letra: 'E', ancho: 160,  alto: 600, sel: '#pubIzq' },
+  'lateral-der':    { letra: 'E', ancho: 160,  alto: 600, sel: '#pubDer' },
+  'movil-superior': { letra: 'F', ancho: 320,  alto: 180, sel: '#pubMovilSuperior' },
+  'movil-cuadro':   { letra: 'G', ancho: 336,  alto: 336, sel: '#pubMovilCuadro' },
+  'movil-lista':    { letra: 'H', ancho: 336,  alto: 336, sel: null },
+};
+
+/* El correo NO va escrito aquí: se lee del pie de la página.
  *
- * Un espacio sin campaña se queda con `hidden` y no ocupa nada. Un
- * recuadro que diga «espacio disponible» hace que el sitio parezca a
- * medio terminar, y quien entra a comprar una excavadora no viene a
- * buscar dónde anunciarse.
+ * Escrito a mano, el día que el sitio pase a mercamaquinarias.com habría
+ * que acordarse de cambiarlo justo en este renglón, y el recuadro
+ * seguiría invitando a escribir a un buzón muerto. Leyéndolo del pie
+ * —que sí cambia con el dominio— el espacio publicitario dice siempre la
+ * dirección que de verdad se atiende. */
+function correoPublicidad() {
+  const enlace = document.querySelector('.pie a[href^="mailto:"]');
+  const correo = enlace && enlace.getAttribute('href').replace(/^mailto:/i, '').trim();
+  return correo || 'hola@tuequipord.com';
+}
+
+/* LOS ESPACIOS VACÍOS SE VEN.
  *
- * El enlace pasa por /api/publicidad/:id/ir para contar el clic. Sigue
- * siendo un enlace de verdad: se abre en pestaña nueva, se copia y
- * funciona sin JavaScript.
+ * Antes no: la idea era que un sitio con marcos de «espacio disponible»
+ * parece a medio hacer. Victor decidió lo contrario, y tiene su lógica
+ * —un hueco que dice «anúnciese aquí» es la única forma de que un
+ * anunciante sepa que puede comprarlo—, así que el recuadro se rediseña
+ * para ese trabajo: sin jerga y con el correo a un clic.
  *
- * `rel="sponsored"` porque es publicidad pagada: decírselo a Google es
- * lo correcto y evita que el enlace se lea como una recomendación
- * editorial del sitio. */
-async function montarPublicidad() {
-  const espacios = {
-    superior: $('#pubSuperior'),
-    'lateral-izq': $('#pubIzq'),
-    'lateral-der': $('#pubDer'),
-    bloque: $('#pubBloque'),
+ * Se puede apagar sin desplegar nada, con `?muestra=no`.
+ *
+ * MODO TARIFARIO (`?muestra=publicidad`) es otra cosa: añade la letra y
+ * la medida exacta de cada formato, que es lo que se le enseña a un
+ * anunciante con las fichas de venta delante. Al visitante normal esos
+ * datos no le dicen nada. */
+const CLAVE_MUESTRA = 'mm-muestra-pub';
+const CLAVE_APAGADO = 'mm-pub-apagada';
+
+const modoPublicidad = (() => {
+  let tarifario = false;
+  let apagado = false;
+
+  const leer = (clave) => { try { return sessionStorage.getItem(clave) === '1'; } catch { return false; } };
+  const fijar = (clave, v) => {
+    try { if (v) sessionStorage.setItem(clave, '1'); else sessionStorage.removeItem(clave); } catch { /* sin memoria */ }
   };
-  if (!espacios.superior && !espacios['lateral-izq'] && !espacios.bloque) return;
 
-  const datos = await api('/publicidad', { silencioso: true });
-  if (!datos) return;
+  const pedido = params().get('muestra');
+  if (pedido === 'publicidad') { fijar(CLAVE_MUESTRA, true); fijar(CLAVE_APAGADO, false); }
+  else if (pedido === 'no') { fijar(CLAVE_APAGADO, true); fijar(CLAVE_MUESTRA, false); }
 
-  Object.entries(espacios).forEach(([espacio, caja]) => {
-    if (!caja) return;
-    const lista = datos.publicidad[espacio] || [];
-    // Sin campaña no se dibuja nada. El bloque comparte fila con otro
-    // panel, y su fila se encoge sola a una columna: ver
-    // `.fila--dos:has(> .pub[hidden])` en styles.css.
-    if (!lista.length) return;
+  tarifario = leer(CLAVE_MUESTRA) || pedido === 'publicidad';
+  apagado = leer(CLAVE_APAGADO) || pedido === 'no';
 
+  // Se marca en <html> al cargar el script y no al terminar el DOM, para
+  // que el hueco de la barra ya esté reservado en el primer pintado.
+  if (tarifario) document.documentElement.classList.add('muestra-pub');
+
+  return { tarifario: () => tarifario, visibles: () => !apagado };
+})();
+
+const enTarifario = () => modoPublicidad.tarifario();
+const espaciosVisibles = () => modoPublicidad.visibles();
+
+/* Las campañas se piden una sola vez por página aunque las reclamen la
+   portada, la ficha y las listas: cada petición cuenta impresiones, y
+   pedirlas tres veces inflaría los números que se le facturan al
+   anunciante. */
+let PUB_PENDIENTE = null;
+const campanasVigentes = () => {
+  PUB_PENDIENTE ||= api('/publicidad', { silencioso: true })
+    .then((d) => (d && d.publicidad) || {})
+    .catch(() => ({}));
+  return PUB_PENDIENTE;
+};
+
+/* El recuadro del espacio libre.
+ *
+ * Es un ENLACE, no una caja muerta. Si se le enseña a todo el mundo un
+ * hueco que dice «anúnciese aquí», lo menos que puede hacer es abrir el
+ * correo cuando alguien lo pulsa; si no, se queda en decoración y hay
+ * que copiar la dirección a mano.
+ *
+ * La letra y la medida solo salen en modo tarifario: al anunciante le
+ * sirven para cotejar con las fichas de venta, pero a quien vino a
+ * comprar una excavadora «B · 970 × 90 px» no le dice nada.
+ *
+ * La proporción es la exacta del formato en los dos casos: lo que se ve
+ * en pantalla es lo que se compra. */
+function muestraHTML(id) {
+  const e = ESPACIOS_PUB[id];
+  const correo = correoPublicidad();
+  const asunto = encodeURIComponent('Publicidad en MercaMaquinarias');
+  const detalle = enTarifario()
+    ? `<span class="pub-muestra__letra" aria-hidden="true">${e.letra}</span>`
+    : '';
+  const medida = enTarifario()
+    ? `<span class="pub-muestra__medida num">${e.ancho} &times; ${e.alto} px</span>`
+    : '';
+
+  return `<a class="pub-muestra" style="--pub-ancho: ${e.ancho}; --pub-alto: ${e.alto}"
+     href="mailto:${esc(correo)}?subject=${asunto}">
+    ${detalle}
+    <span class="pub-muestra__nombre">Espacio publicitario</span>
+    ${medida}
+    <span class="pub-muestra__pie">Anúnciese aquí · ${esc(correo)}</span>
+  </a>`;
+}
+
+/* Un recuadro de muestra puede caer sobre el fondo oscuro del teléfono
+   o sobre un panel blanco —la ficha del equipo sigue siendo clara en
+   móvil—, así que el color del texto no se puede fijar de antemano:
+   con el token del tema a secas, «Espacio publicitario» salía hueso
+   sobre blanco en la ficha, con 1.09 de contraste.
+
+   Se mira el fondo que de verdad hay detrás y se elige. Medirlo en vez
+   de escribir una excepción para la ficha significa que esto seguirá
+   valiendo cuando el resto del sitio cambie de tema. */
+function ajustarContraste(caja) {
+  const muestra = $('.pub-muestra', caja);
+  if (!muestra) return;
+
+  let nodo = caja;
+  let fondo = 'rgba(0, 0, 0, 0)';
+  while (nodo && /rgba\(0, 0, 0, 0\)|transparent/.test(fondo)) {
+    fondo = getComputedStyle(nodo).backgroundColor;
+    nodo = nodo.parentElement;
+  }
+
+  const canales = (fondo.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+  if (canales.length < 3) return;
+
+  const lineal = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const luz = 0.2126 * lineal(canales[0]) + 0.7152 * lineal(canales[1]) + 0.0722 * lineal(canales[2]);
+  muestra.classList.toggle('pub-muestra--claro', luz > 0.4);
+}
+
+/* Pinta un espacio. Hay tres desenlaces y solo tres:
+     con campaña      → el anuncio, en cualquier caso;
+     sin campaña      → nada, y el hueco no existe;
+     sin campaña pero en modo muestra → el recuadro de muestra.
+
+   El enlace pasa por /api/publicidad/:id/ir para contar el clic. Sigue
+   siendo un enlace de verdad: se abre en pestaña nueva, se copia y
+   funciona sin JavaScript.
+
+   `rel="sponsored"` porque es publicidad pagada: decírselo a Google es
+   lo correcto y evita que el enlace se lea como una recomendación
+   editorial del sitio. */
+function pintarEspacio(id, caja, lista) {
+  if (!caja) return;
+  const campanas = lista || [];
+
+  if (campanas.length) {
     // Con varias campañas en el mismo espacio se muestra una al azar:
     // así todas reciben impresiones sin necesidad de un rotador.
-    const p = lista[Math.floor(Math.random() * lista.length)];
-
+    const p = campanas[Math.floor(Math.random() * campanas.length)];
     const img = `<img src="${esc(p.imagen)}" alt="${esc(p.alt)}" loading="lazy" decoding="async">`;
     caja.innerHTML = p.enlace
       ? `<a class="pub__enlace" href="/api/publicidad/${esc(p.id)}/ir"
              target="_blank" rel="sponsored noopener">${img}</a>`
       : img;
-
+    caja.classList.remove('pub--muestra');
     caja.hidden = false;
-  });
+    return;
+  }
+
+  // Sin campaña se enseña el hueco libre, salvo que se haya apagado con
+  // `?muestra=no`. Cuando no se dibuja, el bloque comparte fila con otro
+  // panel y su fila se encoge sola a una columna: ver
+  // `.fila--dos:has(> .pub[hidden])` en styles.css.
+  if (!espaciosVisibles()) return;
+
+  caja.innerHTML = muestraHTML(id);
+  caja.classList.add('pub--muestra');
+  caja.hidden = false;
+  ajustarContraste(caja);
+}
+
+/* Barra del modo tarifario. NO sale en el sitio público: allí los
+   espacios libres ya son parte de la página, y anunciarlos como «vista
+   de muestra» sería mentir sobre lo que se está viendo. */
+function montarBarraMuestra() {
+  if (!enTarifario() || $('.muestra-barra')) return;
+
+  const salir = new URLSearchParams(location.search);
+  salir.set('muestra', 'no');
+
+  const barra = document.createElement('div');
+  barra.className = 'muestra-barra';
+  barra.innerHTML = `<span class="muestra-barra__texto">Vista con las medidas del tarifario</span>
+    <a class="muestra-barra__salir" href="${esc(location.pathname)}?${esc(salir.toString())}">Salir</a>`;
+  document.body.prepend(barra);
+
+  /* El alto se mide, no se fija: según el ancho el rótulo cabe en una
+     línea o en dos, y la cabecera —que es `sticky top: 0`— tiene que
+     quedar justo debajo en ambos casos. */
+  const medir = () => document.documentElement.style.setProperty(
+    '--muestra-alto', `${Math.ceil(barra.getBoundingClientRect().height)}px`);
+  medir();
+  if ('ResizeObserver' in window) new ResizeObserver(medir).observe(barra);
+}
+
+/* Intercala el cuadro móvil (H) tras el tercer anuncio de una lista.
+   Tras el tercero y no al principio: en el teléfono la lista es lo que
+   se vino a ver, y un anuncio antes del primer equipo es el que se
+   salta con el dedo sin leerlo. */
+async function montarPubEnLista(lista) {
+  if (!lista) return;
+  const campanas = await campanasVigentes();
+  const suyas = campanas['movil-lista'] || [];
+  if (!suyas.length && !espaciosVisibles()) return;
+
+  const avisos = $$(':scope > li.aviso', lista);
+  if (avisos.length < 3) return;          // con menos de tres no hay dónde intercalar
+
+  const li = document.createElement('li');
+  li.className = 'pub pub--movil-lista';
+  li.setAttribute('aria-label', 'Publicidad');
+  li.hidden = true;
+  avisos[2].after(li);
+  pintarEspacio('movil-lista', li, suyas);
+}
+
+/* Rellena los espacios fijos de la página. La ficha y las listas se
+   pintan aparte, cuando su contenido existe. */
+async function montarPublicidad() {
+  montarBarraMuestra();
+
+  const fijos = Object.entries(ESPACIOS_PUB)
+    .filter(([, e]) => e.sel)
+    .map(([id, e]) => [id, $(e.sel)])
+    .filter(([, caja]) => caja);
+
+  if (fijos.length) {
+    const campanas = await campanasVigentes();
+    fijos.forEach(([id, caja]) => pintarEspacio(id, caja, campanas[id]));
+  }
 
   /* Los rieles arrancan justo debajo del héroe. Se mide en vez de
      fijarlo: el alto del héroe cambia con el ancho de la ventana, con
@@ -1329,13 +1549,43 @@ const finPromo = () => (NIVELES_SITIO.find((p) => p.en_promo) || {}).promo_hasta
 /* Rótulos de la promoción de lanzamiento. Si no hay promoción viva, el
    aviso entero se retira en vez de quedarse anunciando algo que ya no
    rige. */
+/* Días que faltan para una fecha AAAA-MM-DD, contando días de
+   calendario y no horas: a las 11 de la noche del día 29 faltaba «0
+   días» para el 30 porque quedaban menos de 24 horas.
+
+   Se compara en UTC contra la medianoche local de hoy para que el
+   resultado no cambie con la zona horaria del visitante. */
+function diasHasta(iso) {
+  const [a, m, d] = String(iso).split('-').map(Number);
+  if (!a || !m || !d) return null;
+  const hoy = new Date();
+  return Math.round(
+    (Date.UTC(a, m - 1, d) - Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))
+    / 86400000);
+}
+
 function montarPromo() {
   const fin = finPromo();
+
   $$('[data-promo-hasta]').forEach((el) => {
-    const aviso = el.closest('.realce') || el;
+    // El bloque entero, no solo la fecha: un anuncio de oferta al que
+    // se le quita la fecha sigue anunciando una oferta.
+    const aviso = el.closest('[data-promo-aviso]') || el.closest('.realce') || el;
     if (!fin) { aviso.hidden = true; return; }
     aviso.hidden = false;
     el.textContent = fechaLarga(fin);
+  });
+
+  /* Cuánto queda. Es lo que convierte «hay una oferta» en «conviene
+     hacerlo esta semana», y sale de la misma fecha que se cobra, así
+     que no puede desmentir a la caja. */
+  const quedan = fin === null ? null : diasHasta(fin);
+  $$('[data-promo-quedan]').forEach((el) => {
+    if (quedan === null || quedan < 0) { el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = quedan === 0 ? 'Último día'
+      : quedan === 1 ? 'Queda 1 día'
+      : `Quedan ${quedan} días`;
   });
 }
 
@@ -1897,6 +2147,11 @@ async function montarSaludoUsuario() {
 }
 
 /* ── Arranque ───────────────────────────────────────────── */
+
+/* Transporte está en pausa: quien llegue por un enlace viejo va a la
+   portada. Para reactivarlo, borrar esta línea y el bloque
+   «Transporte: servicio pausado» de styles.css. */
+if (/\/transporte\.html$/i.test(location.pathname)) location.replace('index.html');
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Primero lo que no depende del catálogo, para que la página sea

@@ -402,11 +402,33 @@ function avisarPub(mensaje, bien = false) {
   aviso.textContent = mensaje || '';
 }
 
+/* Las letras son las del tarifario que se le enseña al anunciante: así
+   lo que se vende y lo que se administra se llaman igual. */
 const NOMBRE_ESPACIO = {
-  superior: 'Horizontal',
-  'lateral-izq': 'Lateral izquierdo',
-  'lateral-der': 'Lateral derecho',
-  bloque: 'Bloque de portada',
+  superior: 'A · Horizontal',
+  catalogo: 'B · Catálogo',
+  bloque: 'C · Bloque de portada',
+  ficha: 'D · Ficha de equipo',
+  'lateral-izq': 'E · Lateral izquierdo',
+  'lateral-der': 'E · Lateral derecho',
+  'movil-superior': 'F · Superior móvil',
+  'movil-cuadro': 'G · Cuadro de portada',
+  'movil-lista': 'H · Cuadro en listas',
+};
+
+/* Ancho al que se guarda la imagen de cada formato: el doble del que se
+   ve, para que no salga borrosa en pantallas de mucha densidad. Subir
+   un 1216×160 a 480 px lo dejaba ilegible. */
+const ANCHO_SUBIDA = {
+  superior: 1600,
+  catalogo: 1280,
+  bloque: 1200,
+  ficha: 600,
+  'lateral-izq': 480,
+  'lateral-der': 480,
+  'movil-superior': 640,
+  'movil-cuadro': 672,
+  'movil-lista': 672,
 };
 
 /* Una campaña puede estar encendida y aun así no verse: por eso el
@@ -493,8 +515,7 @@ function montarPub() {
     const estado = $('#pubEstadoImagen');
     estado.textContent = 'Subiendo…';
     try {
-      // El horizontal se ve a 1216 px; los laterales, a 160.
-      const ancho = $('#pub-espacio').value === 'superior' ? 1600 : 480;
+      const ancho = ANCHO_SUBIDA[$('#pub-espacio').value] || 480;
       IMAGEN_PUB = await reducirYSubir(archivo, ancho);
       estado.textContent = 'Imagen lista.';
     } catch (e) {

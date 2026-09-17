@@ -36,16 +36,22 @@ chown -R tuequipord:tuequipord /var/lib/tuequipord
 ## 2. Código
 
 ```bash
-git clone https://github.com/victoremilio27-code/MercaMaquinarias-website.git /var/www/tuequipord
+git clone https://github.com/victoremilio27-code/TuEquipoRD-website.git /var/www/tuequipord
 chown -R tuequipord:tuequipord /var/www/tuequipord
 ```
 
-El repositorio es privado, así que `git clone` pedirá credenciales. Lo
-más limpio es una *deploy key*: genera una clave en el servidor con
-`ssh-keygen -t ed25519 -C tuequipord-vps`, copia el contenido de
-`~/.ssh/id_ed25519.pub` y añádelo en GitHub bajo
-**Settings → Deploy keys** del repositorio. Luego clona por SSH:
-`git@github.com:victoremilio27-code/MercaMaquinarias-website.git`.
+El repositorio es **público**, así que `git clone` no pide credenciales.
+Si algún día pasa a privado, hará falta una *deploy key* de solo lectura:
+genera una clave en el servidor con `ssh-keygen -t ed25519 -C tuequipord-vps`,
+copia `~/.ssh/id_ed25519.pub` y añádelo en GitHub bajo
+**Settings → Deploy keys**. Luego clona por SSH:
+`git@github.com:victoremilio27-code/TuEquipoRD-website.git`.
+
+**Ese `chown` no es opcional.** Todo lo que toque este directorio después
+—incluido cualquier `git` que se ejecute a mano— tiene que ser como
+`tuequipord`, nunca como root: git escribe los objetos nuevos con el dueño
+de quien lo ejecuta, y un solo `git pull` hecho como root deja el
+repositorio inservible para el despliegue automático.
 
 No hace falta `npm install`: el servidor y la API no usan dependencias.
 Puppeteer es solo para capturas en desarrollo.
@@ -255,13 +261,50 @@ ya no existe.
 
 ## Actualizar el sitio
 
+**No hace falta entrar al servidor.** Al fusionar un Pull Request en `main`,
+GitHub Actions despliega solo: ver `.github/workflows/desplegar.yml`. El
+resultado se mira en la pestaña **Actions** del repositorio, o con
+`gh run list --workflow=desplegar.yml`.
+
+Las migraciones de `tools/db.js` se aplican solas al arrancar.
+
+### Qué hace el despliegue
+
+`/usr/local/bin/desplegar-mercamaquinarias`, como root:
+
+0. `chown -R tuequipord:tuequipord` sobre el repositorio. **No es decorativo:**
+   si alguien entra al servidor y hace `git pull` como root, git deja objetos
+   nuevos con dueño root y el siguiente despliegue falla con *insufficient
+   permission for adding an object*. Pasó exactamente eso la primera vez.
+1. `git fetch` y, si no hay nada nuevo, termina sin tocar el servicio.
+2. `git merge --ff-only origin/main` — a propósito: si alguien hubiera
+   hecho un commit a mano en el servidor, es preferible que el despliegue
+   falle a que se fusione a ciegas.
+3. Reinicia `tuequipord` y espera hasta 15 s a que el sitio responda.
+4. **Si no responde, vuelve solo a la versión anterior** y la reinicia.
+   Ojo: eso devuelve el código, no la base. Las migraciones son de ida;
+   como solo añaden, una versión anterior sigue arrancando, pero una
+   migración que borrara o renombrara algo rompería esa suposición.
+
+### Cómo está montado el acceso
+
+- Usuario `deploy`, sin contraseña, y una regla en `/etc/sudoers.d/deploy`
+  que le deja ejecutar ese script y nada más.
+- La llave de GitHub Actions vive en `/home/deploy/.ssh/authorized_keys`
+  con la orden **forzada**: `command="sudo -n /usr/local/bin/desplegar-mercamaquinarias"`,
+  sin pty ni reenvíos. Aunque el secreto se filtrara, esa llave no sirve
+  para leer nada de la máquina — se comprobó pidiéndole
+  `cat /etc/tuequipord.env` y ejecutó el despliegue igualmente.
+- Los secretos del repositorio son `VPS_HOST` y `VPS_SSH_KEY`. La llave
+  privada no queda en ningún PC.
+
+### A mano, si alguna vez hace falta
+
 ```bash
 cd /var/www/tuequipord
 sudo -u tuequipord git pull
 systemctl restart tuequipord
 ```
-
-Las migraciones de `tools/db.js` se aplican solas al arrancar.
 
 ## Copias de seguridad
 

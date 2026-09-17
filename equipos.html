@@ -25,6 +25,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script src="assets/tema.js"></script>
 </head>
 <body>
 
@@ -168,6 +169,12 @@
         </label>
       </div>
 
+      <!-- B · 970×90, escritorio. Encima de los resultados y debajo de
+           la barra de filtros: se ve al llegar sin empujar el catálogo.
+           Sin campaña no se dibuja; el recuadro vacío solo aparece en
+           modo muestra (`?muestra=publicidad`). -->
+      <aside class="pub pub--catalogo" id="pubCatalogo" aria-label="Publicidad" hidden></aside>
+
       <ul class="rejilla rejilla--panel" id="resultados" aria-busy="true"></ul>
 
       <nav class="paginacion" id="paginacion" aria-label="Páginas de resultados"></nav>
@@ -190,7 +197,7 @@
   <div class="envoltura pie__inner">
     <div class="pie__col">
       <img class="pie__logo" src="brand_assets/svg/mercamaquinarias-horizontal-oscuro.svg" alt="MercaMaquinarias">
-      <p class="pie__legal">© 2026 MercaMaquinarias XZT · XZT Inversiones. Todos los derechos reservados.</p>
+      <p class="pie__legal">© 2026 MercaMaquinarias · Inversiones XZT, S.R.L. Todos los derechos reservados.</p>
       <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
       <ul class="pie__lista">
         <li><a href="legal.html">Condiciones de uso y privacidad</a></li>

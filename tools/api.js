@@ -750,7 +750,23 @@ function verTaxonomia(req, res) {
 
 /* ── Rutas: publicidad ──────────────────────────────────── */
 
-const ESPACIOS = ['superior', 'lateral-izq', 'lateral-der', 'bloque'];
+/* Los ocho formatos del tarifario, en el orden de las fichas de venta
+   (A a la H). Los cuatro primeros nombres son los de siempre y no se
+   renombran: hay campañas guardadas con ese valor en la base.
+
+   A superior         1216×160  portada, bajo el héroe      escritorio
+   B catalogo          970× 90  equipos.html, sobre la lista escritorio
+   C bloque            600×500  portada, fila de «vende»     escritorio
+   D ficha             300×250  equipo.html, columna lateral ambas
+   E lateral-izq/der   160×600  rieles de la portada         escritorio
+   F movil-superior    320×180  portada, bajo el buscador    móvil
+   G movil-cuadro      336×336  portada, entre bloques       móvil
+   H movil-lista       336×336  intercalado en las listas    móvil */
+const ESPACIOS = [
+  'superior', 'catalogo', 'bloque', 'ficha',
+  'lateral-izq', 'lateral-der',
+  'movil-superior', 'movil-cuadro', 'movil-lista',
+];
 
 /* Lo que ve el visitante, agrupado por espacio. La impresión se cuenta
    aquí y no en el navegador: un contador que depende de que el cliente

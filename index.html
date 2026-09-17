@@ -25,6 +25,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script src="assets/tema.js"></script>
 </head>
 <body>
 
@@ -188,22 +189,31 @@
 </section>
 
 <!-- ==== PUBLICIDAD ====
-     Tres espacios que administra el equipo desde /admin.html. Los
-     rellena app.js con lo que devuelva /api/publicidad.
+     Los espacios que administra el equipo desde /admin.html. Los
+     rellena app.js con lo que devuelva /api/publicidad. Las letras son
+     las del tarifario que se le enseña al anunciante.
 
      SI NO HAY CAMPAÑA, EL HUECO NO EXISTE. Nada de recuadros con
      «espacio disponible»: un sitio con marcos vacíos parece a medio
      hacer, y quien llega a comprar una excavadora no está buscando
      dónde anunciarse.
 
-     Los laterales solo aparecen a partir de 1500 px, donde de verdad
+     La única excepción es el MODO MUESTRA (`?muestra=publicidad`), que
+     hay que pedir a propósito y sirve para enseñarle a un anunciante
+     dónde quedaría su banner. El visitante normal no lo ve nunca.
+
+     Los laterales solo aparecen a partir de 1600 px, donde de verdad
      sobra margen. Por debajo de eso no se muestran: robarle ancho al
      catálogo para meter un banner es cambiar ventas por impresiones. -->
 <aside class="pub pub--lateral pub--izq" id="pubIzq" aria-label="Publicidad" hidden></aside>
 <aside class="pub pub--lateral pub--der" id="pubDer" aria-label="Publicidad" hidden></aside>
 
 <div class="envoltura">
+  <!-- A · 1216×160, escritorio. -->
   <aside class="pub pub--superior" id="pubSuperior" aria-label="Publicidad" hidden></aside>
+  <!-- F · 320×180, solo teléfono: justo debajo del buscador del héroe,
+       que es donde termina de leer quien llega desde el celular. -->
+  <aside class="pub pub--movil-superior" id="pubMovilSuperior" aria-label="Publicidad" hidden></aside>
 </div>
 
 <div class="envoltura">
@@ -276,6 +286,10 @@
     <ul class="mosaico" id="mosaicoCategorias" data-top="7"></ul>
   </section>
 
+  <!-- G · 336×336, solo teléfono: entre las categorías y los
+       destacados, en la costura natural entre dos bloques. -->
+  <aside class="pub pub--movil-cuadro" id="pubMovilCuadro" aria-label="Publicidad" hidden></aside>
+
   <!-- ==== DESTACADOS EN CARRUSEL ====
        Antes era una columna vertical de ocho renglones dentro de un
        panel estrecho. En horizontal caben los mismos ocho ocupando un
@@ -323,10 +337,31 @@
       <h2 class="panel__titulo" id="t-vende"><em>Publicación</em> de equipos</h2>
       <p class="panel__texto">Publique su maquinaria ante contratistas, constructoras y administradores de flota. No se paga por anuncio: se contratan <b>cupos</b>, y un cupo libre se reutiliza sin volver a pagar.</p>
 
-      <p class="realce">
-        <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
-        <span>Los cupos del nivel <b>Estándar</b> no se cobran hasta <b data-promo-hasta>fecha por definir</b></span>
-      </p>
+      <!-- Oferta de lanzamiento. Va como anuncio y no como nota al pie:
+           es la razón por la que a alguien le compensa publicar hoy en
+           vez de dentro de tres meses, y escondida en un renglón gris
+           no la leía nadie.
+
+           La fecha y los días que quedan los escribe app.js desde
+           /api/planes: son los mismos que se aplican al cobrar. Si la
+           promoción termina, montarPromo() retira el bloque entero en
+           vez de dejarlo anunciando algo que ya no rige.
+
+           Se dice «sin costo» y no «RD$0» a propósito: es la misma
+           regla que sigue el asistente. Un precio de cero escrito con
+           cifras se lee como un error de la página. -->
+      <aside class="oferta" data-promo-aviso aria-label="Oferta de lanzamiento" hidden>
+        <p class="oferta__sello">
+          <svg class="ico" aria-hidden="true"><use href="#i-etiqueta"/></svg>
+          Oferta de lanzamiento
+        </p>
+        <p class="oferta__titulo">Publique <em>sin costo</em></p>
+        <p class="oferta__texto">Los cupos del nivel <b>Estándar</b> no se cobran. Su equipo sale en el catálogo, en la portada y en las búsquedas igual que los demás.</p>
+        <p class="oferta__plazo">
+          <span>Hasta el <b data-promo-hasta>fecha por definir</b></span>
+          <b class="oferta__quedan" data-promo-quedan hidden></b>
+        </p>
+      </aside>
 
       <ul class="servicio__puntos">
         <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg> Uno de cada cinco cupos no se cobra</li>
@@ -443,7 +478,7 @@
   <div class="envoltura pie__inner">
     <div class="pie__col">
       <img class="pie__logo" src="brand_assets/svg/mercamaquinarias-horizontal-oscuro.svg" alt="MercaMaquinarias">
-      <p class="pie__legal">© 2026 MercaMaquinarias XZT · XZT Inversiones. Todos los derechos reservados.</p>
+      <p class="pie__legal">© 2026 MercaMaquinarias · Inversiones XZT, S.R.L. Todos los derechos reservados.</p>
       <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
       <ul class="pie__lista">
         <li><a href="legal.html">Condiciones de uso y privacidad</a></li>

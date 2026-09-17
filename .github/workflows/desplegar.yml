@@ -1,0 +1,42 @@
+# Despliegue automatico a produccion.
+#
+# Cada vez que algo entra en `main` —que, con main protegida, significa
+# cada vez que se fusiona un Pull Request— GitHub entra al droplet y
+# actualiza el sitio. Nadie tiene que abrir una terminal ni escribir una
+# contrasena.
+#
+# Lo que corre en el servidor es /usr/local/bin/desplegar-mercamaquinarias,
+# y es lo UNICO que puede correr: la llave de despliegue lleva la orden
+# forzada en authorized_keys, asi que aunque se filtrara este secreto no
+# serviria para leer nada de la maquina. El script, ademas, comprueba que
+# el sitio responda y vuelve solo a la version anterior si no lo hace.
+
+name: Desplegar
+
+on:
+  push:
+    branches: [main]
+  # Para poder relanzar un despliegue a mano desde la pestana Actions
+  # sin tener que inventarse un commit.
+  workflow_dispatch:
+
+# Dos despliegues a la vez sobre la misma maquina se pisarian. No se
+# cancela el que ya esta corriendo: a mitad de un `git merge` y un
+# reinicio del servicio es el peor momento para cortar.
+concurrency: produccion
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    # Si algo se queda colgado, que falle en vez de consumir minutos.
+    timeout-minutes: 5
+    steps:
+      - name: Actualizar el droplet y reiniciar el sitio
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # La orden va igualmente forzada del lado del servidor; se
+          # escribe aqui para que se lea lo que se pretende hacer.
+          script: sudo -n /usr/local/bin/desplegar-mercamaquinarias
