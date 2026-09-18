@@ -6,8 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node tools/serve.js --port 8080",
-    "shot": "node tools/screenshot.js --url http://localhost:8080/",
-    "shot:fold": "node tools/screenshot.js --url http://localhost:8080/ --width 1440 --clip",
+    "shot": "node tools/screenshot.js --url http://127.0.0.1:8080/",
+    "shot:fold": "node tools/screenshot.js --url http://127.0.0.1:8080/ --width 1440 --clip",
     "check": "node tools/check-links.js",
     "check:encoding": "node tools/fix-encoding.js --check",
     "check:motion": "node tools/check-motion.js",

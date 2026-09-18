@@ -12,8 +12,11 @@ Group=mercamaquinarias
 WorkingDirectory=/var/www/mercamaquinarias
 
 # El servidor escucha solo en local; nginx publica hacia fuera.
+# MERCA_HOST va escrito aunque sea el valor por defecto: esta línea es
+# la que hace cierta la frase de arriba, y conviene que se vea.
 Environment=NODE_ENV=production
 Environment=PORT=8080
+Environment=MERCA_HOST=127.0.0.1
 Environment=MERCA_HTTPS=1
 Environment=MERCA_DB=/var/lib/mercamaquinarias/mercamaquinarias.db
 Environment=MERCA_FOTOS=/var/lib/mercamaquinarias/fotos

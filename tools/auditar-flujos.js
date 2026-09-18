@@ -6,7 +6,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 
-const BASE = 'http://localhost:8080';
+const BASE = 'http://127.0.0.1:8080';
 const CLAVE = 'Retroexcavadora77RD';
 const BUZON = '.tmp/correos';
 
