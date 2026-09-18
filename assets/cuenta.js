@@ -228,12 +228,25 @@ function montarCuenta() {
       if (!el('new-provincia').value) return mostrarAviso('Elija la provincia de la oficina principal.');
     }
 
+    /* Sin aceptar, no se crea la cuenta. El servidor lo comprueba
+       también —una casilla marcada en el navegador no prueba nada— pero
+       decirlo aquí evita mandar el formulario entero para que vuelva
+       rechazado. */
+    if (!el('new-acepta').checked) {
+      el('new-acepta').focus();
+      return mostrarAviso('Debe aceptar los términos y condiciones y la política de privacidad.');
+    }
+
     const cuerpo = {
       correo: el('new-correo').value.trim(),
       clave,
       nombre: el('new-nombre').value.trim(),
       telefono: el('new-telefono').value.trim(),
       tipo: dealer ? 'dealer' : 'particular',
+      /* Qué versión se acepta, no un simple «sí». Lo que se guarda es
+         el par documento+versión, y tiene que salir de la misma lista
+         que lee el servidor. */
+      acepta: OBLIGATORIOS.reduce((m, d) => { m[d.id] = d.version; return m; }, {}),
     };
 
     // Los datos de empresa solo viajan si son de una empresa. Mandarlos

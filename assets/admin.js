@@ -761,6 +761,77 @@ async function montarHeroe() {
       aviso('Quitada. La portada vuelve a rotar.', true);
     } catch (e) { aviso(e.message); }
   });
+
+  montarLegales();
+}
+
+/* ── Aceptaciones legales ─────────────────────────────────── */
+
+/* Quién aceptó qué y cuándo.
+ *
+ * Se enseña la VERSIÓN y la FECHA, no un «sí»: la pregunta que esta
+ * tabla tiene que poder responder es «demuestre que esta persona
+ * aceptó este texto», y para eso hace falta saber qué texto regía ese
+ * día. Con un booleano no se responde nada.
+ *
+ * La IP se guarda pero NO se pinta por defecto: es dato personal y en
+ * una lista de doscientas filas no aporta nada. Está en la respuesta de
+ * la API para quien la necesite. */
+let DOC_LEGAL = null;
+
+function pintarLegales(datos) {
+  const cuerpo = $('#listaLegales');
+  const lista = datos.aceptaciones || [];
+
+  $('#legalesVacio').hidden = lista.length > 0;
+  cuerpo.innerHTML = lista.map((a) => {
+    const doc = (datos.documentos || []).find((d) => d.id === a.documento);
+    const cuando = new Date(a.aceptado_en);
+    const vigente = doc && doc.version === a.version;
+    return `<tr>
+      <td class="num">${cuando.toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' })}
+        <span class="tabla-legales__hora">${cuando.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}</span></td>
+      <td>${esc(a.nombre || '')}${a.empresa ? `<span class="tabla-legales__sub">${esc(a.empresa)}</span>` : ''}
+        <span class="tabla-legales__sub">${esc(a.correo)}</span></td>
+      <td>${esc((doc && doc.nombre) || a.documento)}</td>
+      <td class="num">${esc(a.version)}${vigente ? '' : ' <span class="pastilla pastilla--ambar">anterior</span>'}</td>
+      <td class="num">${esc(a.ip || '—')}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function cargarLegales() {
+  const datos = await api(`/admin/legales${DOC_LEGAL ? `?documento=${encodeURIComponent(DOC_LEGAL)}` : ''}`,
+    { silencioso: true });
+  if (!datos) return null;
+  pintarLegales(datos);
+  return datos;
+}
+
+async function montarLegales() {
+  if (!$('#listaLegales')) return;
+
+  const datos = await cargarLegales();
+  if (!datos) return;
+
+  /* Los filtros se pintan desde la lista que manda el servidor y no
+     escritos aquí: si mañana hay un documento más, aparece solo. */
+  const filtros = $('#filtrosLegales');
+  filtros.innerHTML = [{ id: '', nombre: 'Todos' }, ...(datos.documentos || [])]
+    .map((d, i) => `<button type="button" class="btn btn--chico ${i === 0 ? 'btn--ambar' : 'btn--linea'}"
+      data-doc="${esc(d.id)}" role="tab" aria-selected="${i === 0}">${esc(d.nombre)}</button>`).join('');
+
+  filtros.addEventListener('click', (ev) => {
+    const boton = ev.target.closest('button[data-doc]');
+    if (!boton) return;
+    DOC_LEGAL = boton.dataset.doc || null;
+    [...filtros.children].forEach((b) => {
+      b.setAttribute('aria-selected', String(b === boton));
+      b.classList.toggle('btn--ambar', b === boton);
+      b.classList.toggle('btn--linea', b !== boton);
+    });
+    cargarLegales();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', montarAdmin);

@@ -91,6 +91,27 @@
       <p class="revision__vacio" id="colaVacia" hidden></p>
     </section>
 
+    <!-- Quién aceptó qué condiciones y cuándo.
+         Es la respuesta a «demuestre que esta persona aceptó esto», así
+         que enseña la versión y la fecha, no un sí. -->
+    <section class="panel" aria-labelledby="t-legales">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-legales"><em>Aceptaciones</em> legales</h2>
+      </div>
+
+      <div class="revision__filtros" id="filtrosLegales" role="tablist" aria-label="Documento"></div>
+
+      <div class="tabla-envoltura">
+        <table class="tabla-legales">
+          <thead>
+            <tr><th>Cuándo</th><th>Quién</th><th>Documento</th><th>Versión</th><th>Desde</th></tr>
+          </thead>
+          <tbody id="listaLegales"></tbody>
+        </table>
+      </div>
+      <p class="revision__vacio" id="legalesVacio" hidden>Todavía nadie ha aceptado nada.</p>
+    </section>
+
     <!-- Flota propia: los equipos que alquila MercaMaquinarias y las camas
          con las que transporta. Antes vivían escritos en el código. -->
     <section class="panel" aria-labelledby="t-flota">
@@ -286,6 +307,7 @@
 <script src="assets/taxonomia.js"></script>
 <script src="assets/precios.js"></script>
 <script src="assets/data.js"></script>
+<script src="assets/legales.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/admin.js"></script>
 </body>

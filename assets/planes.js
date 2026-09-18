@@ -204,6 +204,19 @@ function pintarPedido() {
   $('#btnContratar').textContent = EXENTA_PLAN
     ? 'Activar sin costo'
     : `Contratar por ${pesos(ped.total)}`;
+
+  /* Qué se acepta al pulsar, junto al botón que lo acepta.
+     Escondido en el pie no serviría: la advertencia tiene que estar
+     donde se toma la decisión. */
+  const boton = $('#btnContratar');
+  if (boton && !document.querySelector('.pedido__legal')) {
+    const aviso = document.createElement('p');
+    aviso.className = 'pedido__legal';
+    aviso.innerHTML = 'Al confirmar el pago acepta las '
+      + '<a href="legal.html#contratacion" target="_blank" rel="noopener">Condiciones de contratación y pagos</a>, '
+      + 'incluida la política de reembolso.';
+    boton.insertAdjacentElement('afterend', aviso);
+  }
 }
 
 /* La regla del uno gratis por cada cinco, contada sobre lo que acaba
@@ -317,6 +330,8 @@ async function montarPlanes() {
   if (!$('#nivelesLista')) return;
 
   await cargarSesion();
+  montarAvisoLegal('pagar');
+
   const catalogo = await api('/planes', { silencioso: true });
   NIVELES_PLAN = (catalogo && catalogo.planes) || [];
 

@@ -471,6 +471,37 @@ const MIGRACIONES = [
     "UPDATE planes SET videos_maximos = 2 WHERE id = 'destacado'",
     "UPDATE planes SET videos_maximos = 3 WHERE id = 'premium'",
   ]],
+
+  /* Quién aceptó qué condiciones y cuándo.
+
+     UNA FILA POR DOCUMENTO Y VERSIÓN, y no un campo «acepto» en la
+     cuenta. Un booleano no sirve para nada el día que haya que
+     demostrar qué texto aceptó alguien: las condiciones cambian, y lo
+     que importa es exactamente qué versión estaba vigente cuando esa
+     persona pulsó.
+
+     Se guardan la IP y el navegador porque una aceptación sin rastro
+     de dónde vino es difícil de sostener frente a un «yo nunca acepté
+     eso». No se usan para nada más.
+
+     La clave es (usuario, documento, versión): aceptar dos veces la
+     misma versión no crea dos filas, y aceptar una versión nueva no
+     borra la anterior. El historial completo se conserva, que es todo
+     el sentido de la tabla. */
+  ['2026-09-aceptaciones-legales', [
+    `CREATE TABLE IF NOT EXISTS aceptaciones_legales (
+       id          TEXT PRIMARY KEY,
+       usuario_id  TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+       documento   TEXT NOT NULL,
+       version     TEXT NOT NULL,
+       aceptado_en TEXT NOT NULL,
+       ip          TEXT,
+       user_agent  TEXT,
+       UNIQUE (usuario_id, documento, version)
+     )`,
+    'CREATE INDEX IF NOT EXISTS ix_aceptaciones_usuario ON aceptaciones_legales (usuario_id)',
+    'CREATE INDEX IF NOT EXISTS ix_aceptaciones_doc ON aceptaciones_legales (documento, version)',
+  ]],
 ];
 
 function migrar() {
@@ -2124,7 +2155,58 @@ const cambiarClave = (idUsuario, clave) => {
     .run(hash, sal, idUsuario);
 };
 
+/* ── Aceptaciones legales ───────────────────────────────── */
+
+/* Anota que alguien aceptó un documento en su versión vigente.
+ *
+ * `INSERT OR IGNORE`: aceptar dos veces la misma versión —recargar la
+ * página, pulsar dos veces— no debe crear dos filas ni reventar por la
+ * clave única. La primera vez es la que cuenta, y es la que queda. */
+function registrarAceptacion({ usuarioId, documento, version, ip, userAgent }) {
+  abrir().prepare(`
+    INSERT OR IGNORE INTO aceptaciones_legales
+      (id, usuario_id, documento, version, aceptado_en, ip, user_agent)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id(), usuarioId, documento, version, ahora(),
+      ip || null, (userAgent || '').slice(0, 300) || null);
+}
+
+/* Lo último que aceptó alguien de cada documento, como
+   { documento: version }. Es lo que compara assets/legales.js para
+   saber qué le falta. */
+function aceptacionesDe(usuarioId) {
+  const filas = abrir().prepare(`
+    SELECT documento, version, MAX(aceptado_en) AS aceptado_en
+      FROM aceptaciones_legales
+     WHERE usuario_id = ?
+     GROUP BY documento`).all(usuarioId);
+
+  const mapa = {};
+  for (const f of filas) mapa[f.documento] = f.version;
+  return mapa;
+}
+
+/* El historial completo, para la vista de administración. Por usuario
+   y por fecha: quien la consulta busca «quién aceptó esto» o «qué
+   aceptó esta persona», y las dos preguntas se leen de esta lista. */
+function historialAceptaciones({ documento, limite = 200 } = {}) {
+  const d = abrir();
+  const donde = documento ? 'WHERE a.documento = ?' : '';
+  const args = documento ? [documento, limite] : [limite];
+  return d.prepare(`
+    SELECT a.documento, a.version, a.aceptado_en, a.ip,
+           u.correo, u.nombre, o.nombre AS empresa
+      FROM aceptaciones_legales a
+      JOIN usuarios u ON u.id = a.usuario_id
+      LEFT JOIN miembros m ON m.usuario_id = u.id
+      LEFT JOIN organizaciones o ON o.id = m.organizacion_id
+      ${donde}
+     ORDER BY a.aceptado_en DESC
+     LIMIT ?`).all(...args);
+}
+
 module.exports = {
+  registrarAceptacion, aceptacionesDe, historialAceptaciones,
   abrir, id, ahora, hoy, sumarDias, sumarMeses, aSlug, huella, purgar,
   cifrarClave, claveCorrecta, cambiarClave,
   usuarioPorCorreo, usuarioPorId, crearCuenta, organizacionDe, sucursalPrincipal,

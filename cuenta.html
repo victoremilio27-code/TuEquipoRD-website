@@ -226,8 +226,24 @@
           </p>
         </div>
 
+        <!-- Aceptación de las condiciones.
+             Casilla de verdad y SIN MARCAR: antes había una frase que
+             decía «al crear la cuenta acepta…», y eso no es una
+             aceptación, es un aviso. Quien la lee no hace nada, y no
+             queda constancia de qué versión aceptó ni cuándo.
+             Los enlaces abren en pestaña nueva a propósito: mandar a
+             alguien a leer las condiciones perdiendo lo que lleva
+             escrito del formulario es la forma segura de que no las
+             lea. -->
+        <label class="acepta" for="new-acepta">
+          <input type="checkbox" id="new-acepta">
+          <span>He leído y acepto los
+            <a href="legal.html#terminos" target="_blank" rel="noopener">Términos y condiciones de uso</a>
+            y la
+            <a href="legal.html#privacidad" target="_blank" rel="noopener">Política de privacidad</a>.</span>
+        </label>
+
         <button class="btn btn--ambar btn--bloque btn--grande" type="submit" id="btnCrear">Crear cuenta</button>
-        <p class="acceso__legal">Al crear la cuenta acepta las <a href="legal.html">condiciones de uso</a> y la política de privacidad.</p>
       </form>
 
       <!-- Código de 6 dígitos: verificación de correo o acceso -->
@@ -302,7 +318,9 @@
       <img class="pie__logo" src="brand_assets/svg/mercamaquinarias-horizontal-oscuro.svg" alt="MercaMaquinarias">
       <p class="pie__legal">© 2026 MercaMaquinarias · Inversiones XZT, S.R.L. Todos los derechos reservados.</p>
       <ul class="pie__lista">
-        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html">Centro legal</a></li>
+        <li><a href="legal.html#terminos">Términos y condiciones de uso</a></li>
+        <li><a href="legal.html#privacidad">Política de privacidad</a></li>
         <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
         <li><a href="contacto.html">Contacto</a></li>
       </ul>
@@ -331,6 +349,10 @@
 <script src="assets/taxonomia.js"></script>
 <script src="assets/precios.js"></script>
 <script src="assets/data.js"></script>
+<!-- Las versiones de los documentos legales. El mismo archivo que
+     importa el servidor: la versión que se acepta y la que se guarda
+     tienen que ser la misma. -->
+<script src="assets/legales.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/cuenta.js"></script>
 <script src="assets/chat.js" defer></script>

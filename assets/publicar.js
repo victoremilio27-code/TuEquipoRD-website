@@ -1748,6 +1748,11 @@ async function montarPublicador() {
   // el otro.
   await cargarSesion();
 
+  /* Si hay condiciones nuevas sin aceptar, se avisa arriba. No bloquea
+     el asistente: quien esté a medio escribir un anuncio puede seguir.
+     Lo que no va a poder es publicarlo, y eso lo impide el servidor. */
+  montarAvisoLegal('publicar');
+
   const guardado = leerBorrador();
   if (guardado) {
     estado = guardado;
