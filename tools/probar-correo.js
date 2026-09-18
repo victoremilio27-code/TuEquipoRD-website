@@ -30,6 +30,7 @@ const transporte = process.env.MERCA_CORREO || 'archivo';
 console.log('\n── Configuración ──');
 console.log(`  Transporte:  ${transporte}`);
 console.log(`  Remitente:   ${process.env.MERCA_REMITENTE || '(sin definir, se usa el de por defecto)'}`);
+console.log(`  Responder a: ${correo.RESPUESTAS}`);
 console.log(`  Revisión:    ${correo.REVISION}`);
 console.log(`  Sitio:       ${correo.SITIO}`);
 console.log(`  BREVO_API_KEY: ${process.env.BREVO_API_KEY ? 'definida' : 'SIN DEFINIR'}`);

@@ -54,7 +54,10 @@ const LARGO_MAXIMO = 1000;
 /* PENDIENTE: sigue siendo el número de relleno de todo el sitio.
    Cambiarlo aquí y en assets/app.js (WHATSAPP). */
 const TELEFONO = '(809) 000-0000';
-const CORREO_GENERAL = 'hola@mercamaquinarias.com';
+/* Lo que el asistente da cuando no sabe responder. ayuda@ es el buzón
+   de soporte; hola@ es el general del sitio y está en el pie de todas
+   las páginas, así que quien quiera ese ya lo tiene a la vista. */
+const CORREO_GENERAL = 'ayuda@mercamaquinarias.com';
 const CORREO_COTIZAR = process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com';
 
 /* Los precios salen de la tabla `planes`, que es la misma fila que
