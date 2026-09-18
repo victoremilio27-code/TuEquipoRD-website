@@ -73,16 +73,25 @@ const SOPORTE = BUZONES.soporte;
  *
  * Quien recibe un correo automático tiene derecho a saber de qué
  * empresa viene, no solo de qué marca. La razón social y el RNC van en
- * el pie de TODOS los mensajes.
+ * el pie de TODOS los mensajes, y con esos dos datos cualquiera puede
+ * comprobar la empresa en el registro mercantil.
  *
- * El domicilio es el que consta en el Registro Mercantil. Si la oficina
- * operativa acaba siendo otra, van las dos con etiquetas distintas: el
- * domicilio social no se cambia por mudarse de local. */
+ * EL DOMICILIO NO SE PUBLICA. No hay oficina: el domicilio registrado
+ * es una vivienda particular, y ponerlo en el pie de cada correo
+ * automático la expone sin que nadie lo necesite para nada. La razón
+ * social, el RNC y un correo de contacto identifican a la empresa de
+ * sobra.
+ *
+ * Se guarda aquí porque en una FACTURA sí es obligatorio: un
+ * comprobante fiscal tiene que llevar el domicilio del emisor. Ese es
+ * el único sitio donde debe aparecer, y es el domicilio social que
+ * consta en el Registro Mercantil, no una dirección operativa. */
 const EMPRESA = {
   marca: 'MercaMaquinarias',
   razonSocial: process.env.MERCA_RAZON_SOCIAL || 'Inversiones XZT, S.R.L.',
   rnc: process.env.MERCA_RNC || '1-31-27975-9',
-  direccion: process.env.MERCA_DIRECCION
+  // Solo para documentos fiscales. NO usar en correos ni en el sitio.
+  domicilioFiscal: process.env.MERCA_DOMICILIO_FISCAL
     || 'C/ Ramón Santana No. 4, Gazcue, Distrito Nacional, República Dominicana',
 };
 
@@ -191,7 +200,7 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
       </p>
       <p style="margin:0;font-family:${TIPO};font-size:12px;line-height:1.65;color:#8FA3B3">
         ${esc(EMPRESA.razonSocial)} · RNC ${esc(EMPRESA.rnc)}<br>
-        ${esc(EMPRESA.direccion)}<br>
+        República Dominicana<br>
         <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">mercamaquinarias.com</a>
         ${responderA ? ` · <a href="mailto:${esc(responderA)}" style="color:${AMBAR};text-decoration:none">${esc(responderA)}</a>` : ''}
       </p>
@@ -930,7 +939,7 @@ module.exports = {
   enviarAnuncioPublicado, enviarAnuncioPorVencer, enviarAnuncioVencido,
   enviarComprobante, enviarContactoRecibido, enviarBienvenida,
   avisarInternamente,
-  BANDEJA, SITIO, BUZONES, EMPRESA,
+  BANDEJA, SITIO, BUZONES, EMPRESA, avisarInternamente,
   // Nombres sueltos que ya usaba otro código. BUZONES es lo que hay que
   // usar a partir de ahora.
   REVISION, RESPUESTAS, SOPORTE,
