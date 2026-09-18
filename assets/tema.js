@@ -7,6 +7,7 @@
 (function () {
   var CLAVE = 'mm-tema';
   var raiz = document.documentElement;
+  var transicion;
 
   function leer() {
     try { return localStorage.getItem(CLAVE); } catch (e) { return null; }
@@ -56,6 +57,17 @@
       var menu = document.getElementById('navToggle');
       cab.insertBefore(b, menu || null);
       b.addEventListener('click', function () {
+        clearTimeout(transicion);
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          raiz.classList.add('tema-cambiando');
+          // Register the color transitions before changing their target values.
+          void window.getComputedStyle(document.body).backgroundColor;
+          transicion = setTimeout(function () {
+            raiz.classList.remove('tema-cambiando');
+          }, 500);
+        } else {
+          raiz.classList.remove('tema-cambiando');
+        }
         var t = raiz.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         guardar(t);
         aplicar(t);
