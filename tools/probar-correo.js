@@ -41,7 +41,10 @@ for (const [area, direccion] of Object.entries(correo.BUZONES)) {
 
 console.log('\n── Empresa ──');
 console.log(`  ${correo.EMPRESA.razonSocial} · RNC ${correo.EMPRESA.rnc}`);
-console.log(`  ${correo.EMPRESA.direccion}\n`);
+// El domicilio NO va en los correos. Se enseña aquí para poder
+// comprobar que está bien puesto de cara a las facturas, que es el
+// único documento donde aparece.
+console.log(`  domicilio fiscal (solo facturas): ${correo.EMPRESA.domicilioFiscal}\n`);
 
 if (transporte === 'archivo') {
   console.log('  Aviso: el transporte es "archivo". Los correos se escriben en');
