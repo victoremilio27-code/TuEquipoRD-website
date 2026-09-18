@@ -29,12 +29,19 @@ const transporte = process.env.MERCA_CORREO || 'archivo';
 
 console.log('\n── Configuración ──');
 console.log(`  Transporte:  ${transporte}`);
-console.log(`  Remitente:   ${process.env.MERCA_REMITENTE || '(sin definir, se usa el de por defecto)'}`);
-console.log(`  Responder a: ${correo.RESPUESTAS}`);
-console.log(`  Revisión:    ${correo.REVISION}`);
+console.log(`  Remitente:   ${process.env.MERCA_REMITENTE || '(el de por defecto)'}`);
 console.log(`  Sitio:       ${correo.SITIO}`);
 console.log(`  BREVO_API_KEY: ${process.env.BREVO_API_KEY ? 'definida' : 'SIN DEFINIR'}`);
-console.log(`  Destino:     ${destino}\n`);
+console.log(`  Destino:     ${destino}`);
+
+console.log('\n── Buzones ──');
+for (const [area, direccion] of Object.entries(correo.BUZONES)) {
+  console.log(`  ${area.padEnd(12)} ${direccion}`);
+}
+
+console.log('\n── Empresa ──');
+console.log(`  ${correo.EMPRESA.razonSocial} · RNC ${correo.EMPRESA.rnc}`);
+console.log(`  ${correo.EMPRESA.direccion}\n`);
 
 if (transporte === 'archivo') {
   console.log('  Aviso: el transporte es "archivo". Los correos se escriben en');
@@ -78,6 +85,28 @@ const MUESTRAS = [
   ['cuenta de dealer aprobada', () => correo.enviarResolucionDealer({
     para: destino, nombre: 'Prueba', empresa: 'Equipos de Prueba SRL',
     aprobada: true, slug: 'equipos-de-prueba',
+  })],
+  ['cuenta de dealer rechazada', () => correo.enviarResolucionDealer({
+    para: destino, nombre: 'Prueba', empresa: 'Equipos de Prueba SRL',
+    aprobada: false, motivo: 'El RNC no aparece en el registro mercantil.',
+  })],
+  ['aviso de cambio de contraseña', () => correo.enviarAvisoCambioClave({
+    para: destino, nombre: 'Prueba',
+  })],
+  /* Estas dos mandan DOS mensajes: uno al cliente y otro al buzón del
+     área. Con el transporte de archivo se ven los dos en la bandeja. */
+  ['cotización de alquiler (cliente + ventas@)', () => correo.enviarSolicitudServicio({
+    servicio: 'alquiler', nombre: 'Prueba', telefono: '8095551234', correo: destino,
+    empresa: 'Constructora de Prueba', referencia: 'MM-PRUEBA-001',
+    detalle: { Equipo: 'Retroexcavadora', Días: '5', Zona: 'Santo Domingo' },
+  })],
+  ['solicitud de dealer (a dealers@)', () => correo.enviarSolicitudDealer({
+    id: 'PRUEBA-001', razon_social: 'Equipos de Prueba SRL', nombre_comercial: 'Equipos Prueba',
+    rnc: '131909090', anios_operando: 8, direccion: 'Av. Principal 45', municipio: 'Herrera',
+    provincia: 'Santo Domingo', telefono: '8095551234', encargado: 'Prueba Pérez',
+    cargo: 'Gerente', solicitante: 'Prueba Pérez', correo_solicitante: destino,
+    equipos_inventario: 24, equipos_publicar: 12, tipos_equipo: 'excavadoras, cargadores',
+    origen: 'Instagram', comentario: 'Mensaje de prueba.',
   })],
 ];
 
