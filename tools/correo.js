@@ -21,30 +21,70 @@ const path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const BANDEJA = path.join(RAIZ, '.tmp', 'correos');
 
+/* ── Buzones ────────────────────────────────────────────────
+ *
+ * TODAS las direcciones del sitio viven aquí. Antes estaban escritas a
+ * mano en tres archivos distintos, y cuando el dominio cambió hubo que
+ * ir a buscarlas una por una; alguna se quedó apuntando a un buzón
+ * muerto hasta que alguien se quejó.
+ *
+ * EL REMITENTE ES SIEMPRE no-reply@. Tiene que ser una dirección del
+ * dominio autenticado en Brevo o el correo acaba en spam, y no hay
+ * nadie leyendo ahí. A dónde va la respuesta lo decide cada mensaje con
+ * su `responderA`: quien recibe una cotización responde a ventas@, y
+ * quien recibe una factura a facturacion@. Es la diferencia entre que
+ * la respuesta llegue a quien puede atenderla y que caiga en el montón.
+ *
+ * Cada buzón se puede cambiar por entorno sin tocar código, que es lo
+ * que hace falta el día que alguien atienda ventas de verdad y quiera
+ * su correo aparte. */
 const REMITENTE = process.env.MERCA_REMITENTE || 'MercaMaquinarias <no-reply@mercamaquinarias.com>';
 const TRANSPORTE = process.env.MERCA_CORREO || 'archivo';
 
-// Buzón interno que recibe las solicitudes de dealer para revisar.
-const REVISION = process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com';
+const BUZONES = {
+  // Contacto general. Es el que va en el pie del sitio y el que recoge
+  // las respuestas de lo que no encaja en ningún área concreta.
+  general: process.env.MERCA_GENERAL || 'hola@mercamaquinarias.com',
+  // Quien tiene un problema, no una pregunta: el asistente y los avisos
+  // de seguridad mandan aquí.
+  soporte: process.env.MERCA_SOPORTE || 'ayuda@mercamaquinarias.com',
+  // Cotizaciones de alquiler e importación.
+  ventas: process.env.MERCA_VENTAS || 'ventas@mercamaquinarias.com',
+  // Solicitudes de alta de dealer, que un administrador revisa a mano.
+  revision: process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com',
+  // Publicaciones, vencimientos y cupos.
+  anuncios: process.env.MERCA_ANUNCIOS || 'anuncios@mercamaquinarias.com',
+  // Cobros, comprobantes y facturas.
+  facturacion: process.env.MERCA_FACTURACION || 'facturacion@mercamaquinarias.com',
+  // Espacios publicitarios.
+  publicidad: process.env.MERCA_PUBLICIDAD || 'publicidad@mercamaquinarias.com',
+  // Avisos legales y ejercicio de derechos sobre datos personales.
+  legal: process.env.MERCA_LEGAL || 'legal@mercamaquinarias.com',
+};
 
-/* A dónde va la respuesta si el destinatario le da a «Responder».
- *
- * El remitente es no-reply@ y ahí no hay nadie leyendo. Sin esta
- * cabecera, quien conteste —y contesta gente, por muy «no-reply» que
- * diga— escribe a un buzón que nadie mira. Se le manda a hola@, que sí
- * se atiende.
- *
- * Va aparte del remitente a propósito: el remitente tiene que ser una
- * dirección del dominio autenticado en Brevo para que el correo no
- * acabe en spam, y esta no tiene por qué serlo. */
-const RESPUESTAS = process.env.MERCA_RESPUESTAS || 'hola@mercamaquinarias.com';
+/* Nombres viejos, que siguen exportándose porque hay código que los
+   usa. `REVISION` es el que más: lo lee tools/chat.js y lo consulta
+   probar-correo.js. */
+const REVISION = BUZONES.revision;
+const RESPUESTAS = BUZONES.general;
+const SOPORTE = BUZONES.soporte;
 
-/* Soporte. Es a donde se manda a quien tiene un problema, no una
-   pregunta: por ejemplo, a quien le acaban de cambiar la contraseña y
-   no fue él. Va aparte del buzón general a propósito, para que el día
-   que haya alguien atendiendo soporte no haya que buscar estos avisos
-   entre el correo de siempre. */
-const SOPORTE = process.env.MERCA_SOPORTE || 'ayuda@mercamaquinarias.com';
+/* ── Identidad de la empresa ────────────────────────────────
+ *
+ * Quien recibe un correo automático tiene derecho a saber de qué
+ * empresa viene, no solo de qué marca. La razón social y el RNC van en
+ * el pie de TODOS los mensajes.
+ *
+ * El domicilio es el que consta en el Registro Mercantil. Si la oficina
+ * operativa acaba siendo otra, van las dos con etiquetas distintas: el
+ * domicilio social no se cambia por mudarse de local. */
+const EMPRESA = {
+  marca: 'MercaMaquinarias',
+  razonSocial: process.env.MERCA_RAZON_SOCIAL || 'Inversiones XZT, S.R.L.',
+  rnc: process.env.MERCA_RNC || '1-31-27975-9',
+  direccion: process.env.MERCA_DIRECCION
+    || 'C/ Ramón Santana No. 4, Gazcue, Distrito Nacional, República Dominicana',
+};
 
 // URL pública, para los enlaces que van dentro de los correos.
 const SITIO = process.env.MERCA_SITIO || 'https://mercamaquinarias.com';
@@ -111,7 +151,8 @@ const filas = (pares) => `
   </table>`;
 
 /* Armazón completo: banner, cuerpo y pie. */
-function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accion }) {
+function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accion,
+  responderA = BUZONES.general }) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -143,11 +184,21 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
       ${nota ? `<p style="margin:22px 0 0;padding-top:16px;border-top:1px solid ${LINEA};font-family:${TIPO};font-size:12.5px;line-height:1.6;color:${GRIS_CLARO}">${nota}</p>` : ''}
     </td></tr>
 
-    <!-- Pie -->
+    <!-- Pie: la firma corporativa, igual en todos los mensajes -->
     <tr><td bgcolor="${AZUL}" style="padding:20px 26px">
-      <p style="margin:0;font-family:${TIPO};font-size:12px;line-height:1.6;color:#8FA3B3">
-        MercaMaquinarias · República Dominicana<br>
+      <p style="margin:0 0 8px;font-family:${TIPO};font-size:12.5px;line-height:1.6;color:#FFFFFF;font-weight:600">
+        ${esc(EMPRESA.marca)}
+      </p>
+      <p style="margin:0;font-family:${TIPO};font-size:12px;line-height:1.65;color:#8FA3B3">
+        ${esc(EMPRESA.razonSocial)} · RNC ${esc(EMPRESA.rnc)}<br>
+        ${esc(EMPRESA.direccion)}<br>
         <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">mercamaquinarias.com</a>
+        ${responderA ? ` · <a href="mailto:${esc(responderA)}" style="color:${AMBAR};text-decoration:none">${esc(responderA)}</a>` : ''}
+      </p>
+      <p style="margin:14px 0 0;padding-top:12px;border-top:1px solid rgba(143,163,179,.3);font-family:${TIPO};font-size:11px;line-height:1.55;color:#6E8496">
+        Mensaje automático dirigido a su destinatario. Si lo ha recibido
+        por error, bórrelo y avísenos. No responda a esta dirección:
+        las respuestas se atienden en el correo indicado arriba.
       </p>
     </td></tr>
 
@@ -208,13 +259,24 @@ function plantillaCodigo({ codigo, tipo, nombre, minutos }) {
 
 /* ── Transportes ────────────────────────────────────────── */
 
-function porArchivo({ para, asunto, texto, html }) {
+/* Cuenta de mensajes de esta ejecución. Va en el nombre del archivo.
+ *
+ * El nombre era solo la marca de tiempo y el destinatario, y dos
+ * correos al mismo destinatario dentro del mismo milisegundo se
+ * pisaban: el segundo borraba al primero sin decir nada. Pasa de
+ * verdad, y justo donde peor sienta —al mandar el comprobante al
+ * cliente y la copia a facturación, que salen seguidos—: la prueba
+ * decía «12 de 12 entregados» y en la bandeja había diez. */
+let secuencia = 0;
+
+function porArchivo({ para, asunto, texto, html, responderA = BUZONES.general }) {
   fs.mkdirSync(BANDEJA, { recursive: true });
   const sello = new Date().toISOString().replace(/[:.]/g, '-');
-  const base = path.join(BANDEJA, `${sello}-${para.replace(/[^\w.@-]/g, '_')}`);
+  const n = String(++secuencia).padStart(3, '0');
+  const base = path.join(BANDEJA, `${sello}-${n}-${para.replace(/[^\w.@-]/g, '_')}`);
   const archivo = `${base}.txt`;
   fs.writeFileSync(archivo,
-    `Para: ${para}\nDe: ${REMITENTE}\nResponder a: ${RESPUESTAS}\nAsunto: ${asunto}\n\n${texto}\n`, 'utf8');
+    `Para: ${para}\nDe: ${REMITENTE}\nResponder a: ${responderA}\nAsunto: ${asunto}\n\n${texto}\n`, 'utf8');
 
   // La versión HTML se guarda aparte para poder abrirla en el navegador
   // y ver cómo va a llegar, sin gastar un envío real.
@@ -251,14 +313,14 @@ function partirRemitente(cadena) {
   return m ? { name: m[1] || undefined, email: m[2] } : { email: String(cadena).trim() };
 }
 
-function porBrevo({ para, asunto, texto, html }) {
+function porBrevo({ para, asunto, texto, html, responderA = BUZONES.general }) {
   const clave = process.env.BREVO_API_KEY;
   if (!clave) throw new Error('Falta BREVO_API_KEY');
 
   const cuerpo = JSON.stringify({
     sender: partirRemitente(REMITENTE),
     to: [{ email: para }],
-    replyTo: partirRemitente(RESPUESTAS),
+    replyTo: partirRemitente(responderA),
     subject: asunto,
     textContent: texto,
     ...(html ? { htmlContent: html } : {}),
@@ -327,8 +389,39 @@ function enviar(mensaje) {
   }
 }
 
+/* Copia al buzón del área, como MENSAJE APARTE.
+ *
+ * Nunca como CC ni BCC del mensaje al cliente. Tres razones, y las tres
+ * han mordido a alguien alguna vez:
+ *
+ *   · Un CC enseña al cliente una dirección interna y, si hay varios
+ *     destinatarios, los correos de unos a otros.
+ *   · Si el correo del cliente rebota, un proveedor puede dar el envío
+ *     entero por fallido y la copia interna se pierde con él. Justo la
+ *     que avisa de que hay trabajo pendiente.
+ *   · El mensaje interno quiere decir otra cosa: al cliente se le
+ *     confirma, al área se le avisa de que tiene algo que atender.
+ *
+ * No se espera al resultado: quien llama ya está mandando su correo y
+ * esto es accesorio. Los fallos se anotan en el registro. */
+function avisarInternamente({ buzon, asunto, texto, html }) {
+  const destino = BUZONES[buzon] || BUZONES.general;
+  const r = enviar({ para: destino, asunto, texto, html, responderA: destino });
+  if (r && typeof r.then === 'function') {
+    r.then((x) => {
+      if (!x || !x.entregado) console.error(`correo: la copia interna a ${destino} no salió`);
+    });
+  }
+  return r;
+}
+
 const enviarCodigo = ({ para, codigo, tipo, nombre, minutos }) =>
-  enviar({ para, ...plantillaCodigo({ codigo, tipo, nombre, minutos }) });
+  enviar({
+    para,
+    // Un código que no llega es un problema, no una consulta comercial.
+    responderA: BUZONES.soporte,
+    ...plantillaCodigo({ codigo, tipo, nombre, minutos }),
+  });
 
 /* Aviso de que la contraseña cambió. No lleva código ni enlace: su
    único fin es que el dueño se entere si el cambio no fue suyo. */
@@ -344,9 +437,11 @@ function enviarAvisoCambioClave({ para, nombre }) {
       `Si no fue usted, escriba de inmediato a ${SOPORTE}.`, '',
       'MercaMaquinarias',
     ].join('\n'),
+    responderA: BUZONES.soporte,
     html: envoltura({
       titulo: 'Su contraseña cambió',
       saludo,
+      responderA: BUZONES.soporte,
       parrafos: [
         'La contraseña de su cuenta acaba de cambiar y se cerraron todas las sesiones abiertas.',
         'Si fue usted, no hay nada que hacer.',
@@ -401,12 +496,18 @@ function enviarSolicitudServicio(s) {
     `Referencia ${s.referencia}`,
   ].filter((l) => l !== null).join('\n');
 
-  enviar({
-    para: REVISION,
+  /* Una cotización es trabajo de ventas; un «contacto general» todavía
+     no se sabe de quién es. El área decide a qué buzón va la copia y a
+     dónde contesta el cliente si responde. */
+  const area = s.servicio === 'contacto' ? 'general' : 'ventas';
+
+  avisarInternamente({
+    buzon: area,
     asunto: `Solicitud de ${servicio} · ${s.nombre} · ${s.referencia}`,
     texto: cuerpo,
     html: envoltura({
       titulo: `Solicitud de ${servicio}`,
+      responderA: BUZONES[area],
       parrafos: [
         `<b style="color:${AZUL}">${esc(s.nombre)}</b> pide una cotización.`,
         `Teléfono: <b>${esc(s.telefono)}</b>${s.correo ? ` · Correo: ${esc(s.correo)}` : ''}`,
@@ -426,6 +527,7 @@ function enviarSolicitudServicio(s) {
 
   return enviar({
     para: s.correo,
+    responderA: BUZONES[area],
     asunto: `Recibimos su solicitud · ${s.referencia}`,
     texto: [
       `Hola ${s.nombre},`,
@@ -437,6 +539,7 @@ function enviarSolicitudServicio(s) {
     ].join('\n'),
     html: envoltura({
       titulo: 'Recibimos su solicitud',
+      responderA: BUZONES[area],
       parrafos: [
         `Hola ${esc(s.nombre)}, ya tenemos su solicitud de ${esc(servicio)}.`,
         'Le respondemos con precio y disponibilidad, normalmente el mismo día hábil.',
@@ -482,11 +585,13 @@ function enviarSolicitudDealer(s) {
   ].filter((l) => l !== null).join('\n');
 
   return enviar({
-    para: REVISION,
+    para: BUZONES.revision,
+    responderA: BUZONES.revision,
     asunto: `Solicitud de dealer · ${s.razon_social}`,
     texto: cuerpo,
     html: envoltura({
       titulo: 'Solicitud de dealer',
+      responderA: BUZONES.revision,
       parrafos: [`<b style="color:${AZUL}">${esc(s.razon_social)}</b> pide cuenta de empresa.`],
       extra: tarjeta(filas([
         ['Razón social', s.razon_social],
@@ -541,6 +646,8 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
 
   return enviar({
     para,
+    // Quien pregunta por su alta de dealer escribe a quien la revisa.
+    responderA: BUZONES.revision,
     asunto: aprobada
       ? `Su cuenta de dealer quedó aprobada · MercaMaquinarias`
       : `Sobre su solicitud de cuenta de dealer · MercaMaquinarias`,
@@ -549,6 +656,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       ? envoltura({
         titulo: 'Su cuenta de dealer quedó aprobada',
         saludo,
+        responderA: BUZONES.revision,
         parrafos: [
           `Revisamos los datos de <b style="color:${AZUL}">${esc(empresa)}</b> y su cuenta de empresa está aprobada.`,
           'Ya puede publicar equipos. Su página de empresa aparecerá en el directorio en cuanto contrate un plan que la incluya.',
@@ -561,6 +669,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       : envoltura({
         titulo: 'Sobre su solicitud',
         saludo,
+        responderA: BUZONES.revision,
         parrafos: [
           `Revisamos la solicitud de <b style="color:${AZUL}">${esc(empresa)}</b> y por ahora no podemos aprobarla.`,
         ],
@@ -585,6 +694,7 @@ const fecha = (iso) => (iso
    compartirla. */
 const enviarAnuncioPublicado = ({ para, nombre, equipo, idAnuncio, vence, plan }) => enviar({
   para,
+  responderA: BUZONES.anuncios,
   asunto: `Su ${equipo} ya está publicado · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
@@ -617,6 +727,7 @@ const enviarAnuncioPublicado = ({ para, nombre, equipo, idAnuncio, vence, plan }
    eso se encarga quien llama, anotándolo en la base. */
 const enviarAnuncioPorVencer = ({ para, nombre, equipo, idAnuncio, vence, dias }) => enviar({
   para,
+  responderA: BUZONES.anuncios,
   asunto: `Su ${equipo} vence en ${dias} ${dias === 1 ? 'día' : 'días'} · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
@@ -642,6 +753,7 @@ const enviarAnuncioPorVencer = ({ para, nombre, equipo, idAnuncio, vence, dias }
 
 const enviarAnuncioVencido = ({ para, nombre, equipo, idAnuncio }) => enviar({
   para,
+  responderA: BUZONES.anuncios,
   asunto: `Su ${equipo} dejó de publicarse · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
@@ -662,26 +774,66 @@ const enviarAnuncioVencido = ({ para, nombre, equipo, idAnuncio }) => enviar({
 });
 
 /* Comprobante del cobro. No sustituye a la factura fiscal; sirve para
-   que el anunciante tenga por escrito qué contrató y por cuánto. */
-const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referencia, fin }) => enviar({
-  para,
-  asunto: `Comprobante de su plan ${plan} · MercaMaquinarias`,
-  texto: [
-    nombre ? `Hola, ${nombre}:` : 'Hola:', '',
-    `Confirmamos la contratación del plan ${plan}.`, '',
-    `Subtotal:   RD$${Number(subtotal).toLocaleString('en-US')}`,
-    `ITBIS 18%:  RD$${Number(itbis).toLocaleString('en-US')}`,
-    `Total:      RD$${Number(total).toLocaleString('en-US')}`,
-    `Referencia: ${referencia}`,
-    fin ? `Vigente hasta el ${fecha(fin)}.` : null,
-    '',
-    `Su historial de pagos está en ${SITIO}/panel.html`, '',
-    'MercaMaquinarias',
-  ].filter((l) => l !== null).join('\n'),
-  html: envoltura({
-    titulo: 'Comprobante de su plan',
-    saludo: nombre ? `Hola, ${nombre}:` : 'Hola:',
-    parrafos: [`Confirmamos la contratación del plan <b style="color:${AZUL}">${esc(plan)}</b>.`],
+   que el anunciante tenga por escrito qué contrató y por cuánto.
+
+   Va con copia a facturación, como mensaje aparte: cada cobro tiene que
+   quedar registrado en el buzón del área aunque el correo del cliente
+   rebote. */
+const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referencia, fin }) => {
+  const dinero = (n) => `RD$${Number(n).toLocaleString('en-US')}`;
+
+  avisarInternamente({
+    buzon: 'facturacion',
+    asunto: `Cobro ${referencia} · ${plan} · ${dinero(total)}`,
+    texto: [
+      'Pago confirmado.',
+      '',
+      `Cliente:    ${nombre || '(sin nombre)'} <${para}>`,
+      `Plan:       ${plan}`,
+      `Subtotal:   ${dinero(subtotal)}`,
+      `ITBIS 18%:  ${dinero(itbis)}`,
+      `Total:      ${dinero(total)}`,
+      `Referencia: ${referencia}`,
+      fin ? `Vigente hasta el ${fecha(fin)}.` : null,
+    ].filter((l) => l !== null).join('\n'),
+    html: envoltura({
+      titulo: 'Pago confirmado',
+      responderA: BUZONES.facturacion,
+      parrafos: [`<b style="color:${AZUL}">${esc(nombre || para)}</b> contrató el plan ${esc(plan)}.`],
+      extra: tarjeta(filas([
+        ['Cliente', nombre],
+        ['Correo', para],
+        ['Plan', plan],
+        ['Subtotal', dinero(subtotal)],
+        ['ITBIS 18%', dinero(itbis)],
+        ['Total', dinero(total)],
+        ['Referencia', referencia],
+        ['Vigente hasta', fin ? fecha(fin) : null],
+      ])),
+    }),
+  });
+
+  return enviar({
+    para,
+    responderA: BUZONES.facturacion,
+    asunto: `Comprobante de su plan ${plan} · MercaMaquinarias`,
+    texto: [
+      nombre ? `Hola, ${nombre}:` : 'Hola:', '',
+      `Confirmamos la contratación del plan ${plan}.`, '',
+      `Subtotal:   ${dinero(subtotal)}`,
+      `ITBIS 18%:  ${dinero(itbis)}`,
+      `Total:      ${dinero(total)}`,
+      `Referencia: ${referencia}`,
+      fin ? `Vigente hasta el ${fecha(fin)}.` : null,
+      '',
+      `Su historial de pagos está en ${SITIO}/panel.html`, '',
+      'MercaMaquinarias',
+    ].filter((l) => l !== null).join('\n'),
+    html: envoltura({
+      titulo: 'Comprobante de su plan',
+      saludo: nombre ? `Hola, ${nombre}:` : 'Hola:',
+      responderA: BUZONES.facturacion,
+      parrafos: [`Confirmamos la contratación del plan <b style="color:${AZUL}">${esc(plan)}</b>.`],
     extra: tarjeta(`
       ${filas([
     ['Subtotal', `RD$${Number(subtotal).toLocaleString('en-US')}`],
@@ -697,16 +849,18 @@ const enviarComprobante = ({ para, nombre, plan, subtotal, itbis, total, referen
     ['Referencia', referencia],
     ['Vigente hasta', fin ? fecha(fin) : null],
   ])}`),
-    accion: { texto: 'Ver mi historial de pagos', url: `${SITIO}/panel.html` },
-    nota: 'Este comprobante confirma lo contratado y su importe. No sustituye a la factura fiscal.',
-  }),
-});
+      accion: { texto: 'Ver mi historial de pagos', url: `${SITIO}/panel.html` },
+      nota: 'Este comprobante confirma lo contratado y su importe. No sustituye a la factura fiscal.',
+    }),
+  });
+};
 
 /* Aviso al vendedor de que alguien pidió su contacto. Es la señal de
    que el anuncio está funcionando, y la razón principal por la que
    alguien renueva. */
 const enviarContactoRecibido = ({ para, nombre, equipo, idAnuncio, via }) => enviar({
   para,
+  responderA: BUZONES.anuncios,
   asunto: `Alguien pidió su contacto por el ${equipo} · MercaMaquinarias`,
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
@@ -735,6 +889,7 @@ const enviarContactoRecibido = ({ para, nombre, equipo, idAnuncio, via }) => env
    en vez de limitarse a celebrar el registro. */
 const enviarBienvenida = ({ para, nombre, esDealer }) => enviar({
   para,
+  responderA: BUZONES.general,
   asunto: 'Su cuenta de MercaMaquinarias está lista',
   texto: [
     nombre ? `Hola, ${nombre}:` : 'Hola:', '',
@@ -774,5 +929,9 @@ module.exports = {
   enviarSolicitudDealer, enviarResolucionDealer, enviarSolicitudServicio,
   enviarAnuncioPublicado, enviarAnuncioPorVencer, enviarAnuncioVencido,
   enviarComprobante, enviarContactoRecibido, enviarBienvenida,
-  BANDEJA, REVISION, SITIO, RESPUESTAS, SOPORTE,
+  avisarInternamente,
+  BANDEJA, SITIO, BUZONES, EMPRESA,
+  // Nombres sueltos que ya usaba otro código. BUZONES es lo que hay que
+  // usar a partir de ahora.
+  REVISION, RESPUESTAS, SOPORTE,
 };

@@ -54,11 +54,22 @@ const LARGO_MAXIMO = 1000;
 /* PENDIENTE: sigue siendo el número de relleno de todo el sitio.
    Cambiarlo aquí y en assets/app.js (WHATSAPP). */
 const TELEFONO = '(809) 000-0000';
-/* Lo que el asistente da cuando no sabe responder. ayuda@ es el buzón
-   de soporte; hola@ es el general del sitio y está en el pie de todas
-   las páginas, así que quien quiera ese ya lo tiene a la vista. */
-const CORREO_GENERAL = 'ayuda@mercamaquinarias.com';
-const CORREO_COTIZAR = process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com';
+/* Los buzones salen de correo.js, que es donde viven todos.
+ *
+ * Aquí estaban escritos a mano, y al mudar el dominio uno se quedó
+ * apuntando al viejo: el asistente daba una dirección muerta a quien le
+ * preguntaba cómo contactar, que es el peor momento posible para
+ * hacerlo.
+ *
+ * SOPORTE y no general: quien llega a preguntarle al asistente y no
+ * encuentra respuesta necesita que le atiendan, y hola@ está en el pie
+ * de todas las páginas, así que ya lo tiene a la vista.
+ * VENTAS para cotizar, que es de lo que se trata cuando alguien
+ * pregunta por un alquiler o una importación. */
+const { BUZONES } = require('./correo');
+
+const CORREO_GENERAL = BUZONES.soporte;
+const CORREO_COTIZAR = BUZONES.ventas;
 
 /* Los precios salen de la tabla `planes`, que es la misma fila que
    después se cobra. Escribirlos a mano aquí sería crear una cuarta
