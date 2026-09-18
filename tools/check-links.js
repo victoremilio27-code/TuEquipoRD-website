@@ -3,7 +3,7 @@
  * todo enlace interno apunta a algo que existe, que no hay errores de
  * consola y que los contenedores dinámicos quedaron con contenido.
  *
- * Uso: node tools/check-links.js [--base http://localhost:8080]
+ * Uso: node tools/check-links.js [--base http://127.0.0.1:8080]
  */
 
 const fs = require('fs');
@@ -36,7 +36,7 @@ const ESPERADO = {
 
 function leerBase(argv) {
   const i = argv.indexOf('--base');
-  return i >= 0 ? argv[i + 1] : 'http://localhost:8080';
+  return i >= 0 ? argv[i + 1] : 'http://127.0.0.1:8080';
 }
 
 async function main() {

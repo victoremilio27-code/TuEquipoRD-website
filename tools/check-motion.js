@@ -6,7 +6,7 @@
  * está moviendo. Así que se consulta el estilo calculado y se observa
  * si el DOM cambia solo.
  *
- * Uso: node tools/check-motion.js [--base http://localhost:8080]
+ * Uso: node tools/check-motion.js [--base http://127.0.0.1:8080]
  */
 
 const puppeteer = require('puppeteer');
@@ -20,7 +20,7 @@ const ANIMADOS = [
 
 function leerBase(argv) {
   const i = argv.indexOf('--base');
-  return i >= 0 ? argv[i + 1] : 'http://localhost:8080';
+  return i >= 0 ? argv[i + 1] : 'http://127.0.0.1:8080';
 }
 
 /* Estilo calculado de un selector, con y sin movimiento reducido. */
