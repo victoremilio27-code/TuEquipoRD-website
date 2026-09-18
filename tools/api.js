@@ -23,6 +23,12 @@ const chat = require('./chat');
    página anunciara un plan sin costo mientras el servidor cobraba. */
 const precios = require('../assets/precios.js');
 
+/* Las versiones de los documentos legales, también compartidas con el
+   navegador. La casilla del formulario y la comprobación de aquí tienen
+   que hablar de la misma versión, o se pediría aceptar una cosa y se
+   guardaría constancia de otra. */
+const legales = require('../assets/legales.js');
+
 const { ITBIS } = precios;
 const COOKIE = 'te_sesion';
 const COOKIE_EQUIPO = 'te_equipo';
@@ -53,7 +59,11 @@ function responder(res, codigo, cuerpo, cabeceras = {}) {
   res.end(datos);
 }
 
-const fallo = (res, codigo, texto) => responder(res, codigo, { error: texto });
+/* `extra` sirve para que el sitio pueda hacer algo con el error además
+   de enseñarlo: por ejemplo, saber QUÉ documentos faltan por aceptar y
+   ofrecer aceptarlos ahí mismo en vez de dejar al usuario buscando. */
+const fallo = (res, codigo, texto, extra) =>
+  responder(res, codigo, { error: texto, ...(extra || {}) });
 
 function leerCuerpo(req) {
   return new Promise((resolver, rechazar) => {
@@ -246,6 +256,22 @@ async function registro(req, res) {
     };
   }
 
+  /* La aceptación de las condiciones se comprueba AQUÍ, no solo en el
+     navegador. Una casilla marcada en el formulario no prueba nada:
+     quien llame a esta ruta directamente se la salta, y entonces el
+     sitio tendría cuentas sin constancia de haber aceptado nada, que es
+     justo lo que la tabla existe para evitar.
+
+     Se exige la versión vigente de cada documento obligatorio. Mandar
+     una versión antigua no vale: sería constancia de haber aceptado un
+     texto que ya no es el que rige. */
+  const aceptado = (c.acepta && typeof c.acepta === 'object') ? c.acepta : {};
+  const faltan = legales.OBLIGATORIOS.filter((d) => aceptado[d.id] !== d.version);
+  if (faltan.length) {
+    return fallo(res, 400,
+      `Debe aceptar ${faltan.map((d) => d.nombre).join(' y ')} para crear la cuenta`);
+  }
+
   if (db.usuarioPorCorreo(c.correo)) return fallo(res, 409, 'Ya existe una cuenta con ese correo');
 
   let idUsuario;
@@ -269,6 +295,19 @@ async function registro(req, res) {
       return fallo(res, 409, 'Ese RNC ya está registrado por otra cuenta');
     }
     throw e;
+  }
+
+  /* Se anota la aceptación en cuanto la cuenta existe, antes de nada
+     más: si algo fallara después, es preferible una cuenta con la
+     constancia guardada que una cuenta sin ella. */
+  for (const d of legales.OBLIGATORIOS) {
+    db.registrarAceptacion({
+      usuarioId: idUsuario,
+      documento: d.id,
+      version: d.version,
+      ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   // El expediente completo va al equipo que revisa. Se manda aquí y no
@@ -469,8 +508,57 @@ function sesionPublica(idUsuario) {
     // se ofrece el equipo, así que viajan con la sesión.
     sucursales: org ? db.sucursalesDe(org.id) : [],
     verificado: !!u.correo_verificado,
+
+    /* Qué condiciones tiene aceptadas y cuáles le faltan.
+     *
+     * Viaja con la sesión para que el sitio pueda avisar en cuanto
+     * alguien entra, sin una petición aparte. `faltan` es lo que el
+     * servidor va a exigir de todos modos al publicar o al pagar: el
+     * aviso no es la regla, solo la manera de que nadie llegue al
+     * final de un formulario para que entonces se le diga que no. */
+    legales: (() => {
+      const aceptado = db.aceptacionesDe(u.id);
+      return {
+        aceptado,
+        faltan: {
+          publicar: legales.faltanPorAceptar(aceptado, legales.PARA_PUBLICAR),
+          pagar: legales.faltanPorAceptar(aceptado, legales.PARA_PAGAR),
+        },
+      };
+    })(),
   };
 }
+
+/* Aceptar documentos desde el sitio, ya con sesión abierta.
+ *
+ * Hace falta para dos cosas: quien tenía cuenta antes de que existieran
+ * estas condiciones, y quien las aceptó en una versión anterior a la
+ * vigente. En los dos casos se le pide aceptar antes de publicar o
+ * pagar, y esta ruta es por donde pasa esa aceptación.
+ *
+ * Solo se admite la versión VIGENTE. Aceptar una versión antigua sería
+ * constancia de haber aceptado un texto que ya no rige, que es peor que
+ * no tener constancia: parece que la hay. */
+const aceptarLegales = conSesion(async (req, res, ctx) => {
+  const c = await leerCuerpo(req);
+  const pedidos = Array.isArray(c.documentos) ? c.documentos : [];
+  if (!pedidos.length) return fallo(res, 400, 'No se indicó qué documento se acepta');
+
+  const desconocidos = pedidos.filter((id) => !legales.documento(id));
+  if (desconocidos.length) return fallo(res, 400, 'Documento desconocido');
+
+  for (const id of pedidos) {
+    db.registrarAceptacion({
+      usuarioId: ctx.usuario.id,
+      documento: id,
+      version: legales.versionDe(id),
+      ip: origen(req),
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  return responder(res, 200, sesionPublica(ctx.usuario.id));
+});
 
 const verSesion = (req, res, ctx) =>
   ctx ? responder(res, 200, sesionPublica(ctx.usuario.id)) : responder(res, 200, { usuario: null });
@@ -1024,6 +1112,23 @@ const listarSolicitudes = conAdmin((req, res, ctx, consulta) => {
   });
 });
 
+/* Quién aceptó qué condiciones y cuándo.
+ *
+ * Es la respuesta a «demuestre que esta persona aceptó esto», y por eso
+ * entrega también la versión y la fecha, no solo un sí. Lleva la IP,
+ * que es dato personal, así que exige sesión de administrador como el
+ * expediente de dealer. */
+const verAceptaciones = conAdmin((req, res, ctx, consulta) => {
+  const doc = consulta?.get('documento');
+  return responder(res, 200, {
+    documentos: legales.DOCUMENTOS.map((d) => ({
+      id: d.id, nombre: d.nombre, version: d.version, vigenteDesde: d.vigenteDesde,
+    })),
+    documento: legales.documento(doc) ? doc : null,
+    aceptaciones: db.historialAceptaciones({ documento: legales.documento(doc) ? doc : null }),
+  });
+});
+
 /* Expediente completo, con el RNC. Es la única ruta que lo entrega, y
    exige sesión de administrador. */
 const verSolicitud = conAdmin((req, res, ctx, idSolicitud) => {
@@ -1201,6 +1306,8 @@ const misPlanes = conSesion((req, res, ctx) => {
 });
 
 const comprarMembresia = conSesion(async (req, res, ctx) => {
+  if (exigirAceptacion(res, ctx.usuario.id, legales.PARA_PAGAR)) return undefined;
+
   const c = await leerCuerpo(req);
   const org = ctx.organizacion;
 
@@ -1321,7 +1428,25 @@ const taxonomia = require('../assets/taxonomia.js');
    POST /api/membresias, y publicar solo la ocupa. Esa separación es
    la que permite mover después un equipo de un nivel a otro: el cupo
    es de la organización, no del anuncio. */
+/* Nadie publica ni paga sin tener aceptadas las condiciones vigentes.
+ *
+ * Va en el servidor y no solo en la pantalla: el aviso del sitio evita
+ * que alguien llegue al final de un formulario para que entonces se le
+ * diga que no, pero lo que impide de verdad publicar sin aceptar es
+ * esto. Devuelve 409 y no 403 porque no es una cuestión de permisos:
+ * es un paso que falta y que quien lo recibe puede completar. */
+function exigirAceptacion(res, idUsuario, ids) {
+  const faltan = legales.faltanPorAceptar(db.aceptacionesDe(idUsuario), ids);
+  if (!faltan.length) return false;
+
+  const nombres = faltan.map((id) => legales.documento(id).nombre);
+  fallo(res, 409, `Debe aceptar ${nombres.join(' y ')} antes de continuar`, { faltan });
+  return true;
+}
+
 const publicar = conSesion(async (req, res, ctx) => {
+  if (exigirAceptacion(res, ctx.usuario.id, legales.PARA_PUBLICAR)) return undefined;
+
   const c = await leerCuerpo(req);
   const org = ctx.organizacion;
 
@@ -1668,6 +1793,7 @@ const RUTAS = [
   ['POST', /^\/api\/cuenta\/restablecer$/,  restablecer],
   ['POST', /^\/api\/cuenta\/salir$/,        salir],
   ['GET',  /^\/api\/sesion$/,               verSesion],
+  ['POST', /^\/api\/legales\/aceptar$/,     aceptarLegales],
   ['POST', /^\/api\/dealer\/registro$/,     registrarDealer],
   ['GET',  /^\/api\/sucursales$/,           listarSucursales],
   ['POST', /^\/api\/sucursales$/,           crearSucursal],
@@ -1726,6 +1852,7 @@ const RUTAS = [
   ['DELETE', /^\/api\/admin\/flota\/item\/([\w-]+)$/,   eliminarFlota],
 
   // Revisión de solicitudes. Todas exigen sesión con es_admin.
+  ['GET',  /^\/api\/admin\/legales$/,                   verAceptaciones],
   ['GET',  /^\/api\/admin\/solicitudes$/,               listarSolicitudes],
   ['GET',  /^\/api\/admin\/solicitudes\/([\w-]+)$/,     verSolicitud],
   ['POST', /^\/api\/admin\/solicitudes\/([\w-]+)$/,     resolverSolicitud],

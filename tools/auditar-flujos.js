@@ -19,6 +19,25 @@ const BUZON = '.tmp/correos';
    a tocar la base por debajo, que es justo lo que esta auditoría evita
    para que el recorrido sea el de una persona de verdad. */
 const SELLO = Date.now().toString().slice(-6);
+
+/* El limitador de altas, a cero antes de empezar.
+   Esta auditoría crea tres cuentas seguidas desde la misma conexión y
+   el servidor corta a la tercera, con razón: así se frena a quien crea
+   cuentas en masa. Una persona real nunca lo toca; una auditoría que se
+   corre diez veces en una tarde, sí. Sin esto la pasada mide el
+   limitador en vez de los flujos. */
+function limpiarLimitador() {
+  const { DatabaseSync } = require('node:sqlite');
+  const ruta = process.env.MERCA_DB
+    || require('path').resolve(__dirname, '..', 'db', 'mercamaquinarias.db');
+  try {
+    const d = new DatabaseSync(ruta);
+    d.exec('DELETE FROM intentos');
+    d.close();
+  } catch (e) {
+    console.log(`  (no se pudo limpiar el limitador: ${e.message})`);
+  }
+}
 const CORREO_PARTICULAR = `vendedor-${SELLO}@auditoria.do`;
 const CORREO_DEALER = `dealer-${SELLO}@auditoria.do`;
 const CORREO_ADMIN = `admin-${SELLO}@auditoria.do`;
@@ -105,6 +124,12 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
     await p.select('#new-provincia', extra.provincia || 'Santo Domingo');
   }
 
+  /* La casilla de las condiciones. Se marca pulsándola, no poniéndole
+     `checked` por código: lo que se audita es el formulario que usa una
+     persona, y una casilla que solo se puede marcar desde la consola no
+     serviría de nada. */
+  await p.click('#new-acepta');
+
   await p.click('#btnCrear');
   await esperar(1200);
 
@@ -120,6 +145,7 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
 }
 
 (async () => {
+  limpiarLimitador();
   const nav = await puppeteer.launch({ headless: 'new' });
   const p = await nav.newPage();
   await p.setViewport({ width: 1440, height: 950 });
@@ -249,20 +275,28 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
   console.log(`  ve la cola de revisión: ${verCola ? 'sí ✓' : 'NO ⚠'}`);
   if (!verCola) anota('admin', 'flujo', 'el administrador no ve la cola');
 
-  const nSol = await p.$$eval('.sol', (n) => n.length).catch(() => 0);
+  /* Acotado a #listaSolicitudes. La clase `.sol` la usan DOS listas de
+     esta página: la cola de revisión y la flota propia. Sin acotar, se
+     contaban los equipos de alquiler como si fueran solicitudes: con la
+     cola vacía decía «6 pendientes» y luego reventaba buscando un botón
+     de expediente que no existe en un equipo de la flota. */
+  const enCola = '#listaSolicitudes .sol';
+  const nSol = await p.$$eval(enCola, (n) => n.length).catch(() => 0);
   console.log(`  solicitudes pendientes: ${nSol}`);
 
-  if (nSol) {
-    await p.click('button[data-accion="ver"]');
+  if (!nSol) {
+    anota('admin', 'flujo', 'la cola está vacía: el alta de dealer de esta pasada no llegó');
+  } else {
+    await p.click(`${enCola} button[data-accion="ver"]`);
     await esperar(800);
-    const exp = await p.$eval('.sol__detalle', (el) => el.innerText).catch(() => '');
+    const exp = await p.$eval(`${enCola} .sol__detalle`, (el) => el.innerText).catch(() => '');
     const veRnc = exp.includes(RNC_DEALER);
     console.log(`  expediente muestra RNC: ${veRnc ? 'sí ✓' : 'NO ⚠'}`);
     if (!veRnc) anota('admin', 'flujo', 'el expediente no muestra el RNC');
 
-    await p.click('button[data-accion="aprobar"]');
+    await p.click(`${enCola} button[data-accion="aprobar"]`);
     await esperar(1500);
-    const restantes = await p.$$eval('.sol', (n) => n.length).catch(() => 0);
+    const restantes = await p.$$eval(enCola, (n) => n.length).catch(() => 0);
     console.log(`  tras aprobar: ${nSol} → ${restantes} pendientes`);
     if (restantes >= nSol) anota('admin', 'flujo', 'aprobar no saca la solicitud de la cola');
   }

@@ -350,7 +350,13 @@
 
       <div class="panel">
         <h2 class="panel__titulo"><em>Sello</em> de anunciante verificado</h2>
-        <p class="panel__texto">El sello no se contrata ni se incluye en ningún plan. Se otorga tras comprobar identidad y titularidad, y se retira ante una reclamación sin resolver.</p>
+        <!-- Aquí se le habla a quien VA a pedir el sello, así que la
+             lista de abajo es lo que se le pedirá. Lo que no puede
+             decirse es que se comprueba la titularidad de cada equipo:
+             se revisan los documentos que el anunciante aporta, que no
+             es lo mismo. La diferencia importa para quien compra
+             fiándose del sello. Ver legal.html#anuncios. -->
+        <p class="panel__texto">El sello no se contrata ni se incluye en ningún plan. Se otorga tras revisar la documentación que usted aporte, y se retira ante una reclamación sin resolver.</p>
         <ul class="lista-punteada lista-punteada--pasos">
           <li>Cédula para personas físicas o RNC para empresas.</li>
           <li>Factura, matrícula o certificado de importación del equipo.</li>
@@ -376,7 +382,9 @@
       <p class="pie__legal">© 2026 MercaMaquinarias · Inversiones XZT, S.R.L. Todos los derechos reservados.</p>
       <p class="pie__texto">El uso de este sitio implica la aceptación de nuestra política de privacidad y los términos y condiciones de uso.</p>
       <ul class="pie__lista">
-        <li><a href="legal.html">Condiciones de uso y privacidad</a></li>
+        <li><a href="legal.html">Centro legal</a></li>
+        <li><a href="legal.html#terminos">Términos y condiciones de uso</a></li>
+        <li><a href="legal.html#privacidad">Política de privacidad</a></li>
         <li><a href="legal.html#anuncios">Política de publicación de anuncios</a></li>
         <li><a href="contacto.html">Contacto</a></li>
       </ul>
@@ -416,6 +424,7 @@
 <script src="assets/taxonomia.js"></script>
 <script src="assets/precios.js"></script>
 <script src="assets/data.js"></script>
+<script src="assets/legales.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/publicar.js"></script>
 <script src="assets/chat.js" defer></script>

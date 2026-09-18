@@ -58,8 +58,75 @@ async function cargarSesion() {
     // el equipo, sin una segunda llamada.
     sucursales: (datos && datos.sucursales) || [],
     verificado: !!(datos && datos.verificado),
+    // Qué condiciones tiene aceptadas y cuáles le faltan para publicar
+    // o para pagar. Lo decide el servidor; aquí solo se enseña.
+    legales: (datos && datos.legales) || { aceptado: {}, faltan: { publicar: [], pagar: [] } },
   };
   return SESION;
+}
+
+/* Qué documentos le faltan por aceptar para hacer algo. */
+const faltanLegales = (para) => ((SESION.legales && SESION.legales.faltan) || {})[para] || [];
+
+/* Aviso de condiciones nuevas, para quien ya tenía cuenta.
+ *
+ * Se enseña SOBRE el contenido, no en su lugar: quien entra a ver sus
+ * anuncios sigue viéndolos. Lo que no puede es publicar ni pagar, y eso
+ * lo impide el servidor pase lo que pase con esta pantalla.
+ *
+ * `para` es 'publicar' o 'pagar' según lo que se haga en esta página.
+ */
+async function montarAvisoLegal(para) {
+  if (!haySesion()) return;
+  const faltan = faltanLegales(para);
+  if (!faltan.length) return;
+
+  const donde = document.querySelector('#contenido .envoltura');
+  if (!donde || donde.querySelector('.aviso-legal')) return;
+
+  /* Escape propio y no el de app.js: sesion.js se carga ANTES, y
+     depender de un global que todavía no existe es como se rompe algo
+     el día que alguien cambie el orden de los <script>. */
+  const limpio = (s) => String(s).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const nombres = faltan.map((id) => {
+    const d = typeof documento === 'function' ? documento(id) : null;
+    const nombre = (d && d.nombre) || id;
+    return `<a href="legal.html#${limpio(id)}" target="_blank" rel="noopener">${limpio(nombre)}</a>`;
+  });
+
+  const caja = document.createElement('section');
+  caja.className = 'aviso-legal';
+  caja.setAttribute('role', 'status');
+  caja.innerHTML = `
+    <p class="aviso-legal__titulo">Hay condiciones nuevas</p>
+    <p class="aviso-legal__texto">Para ${para === 'pagar' ? 'contratar un plan' : 'publicar un equipo'}
+      hace falta aceptar ${nombres.join(' y ')}.</p>
+    <div class="aviso-legal__acciones">
+      <button type="button" class="btn btn--ambar" id="btnAceptarLegal">Aceptar y continuar</button>
+    </div>`;
+  donde.prepend(caja);
+
+  caja.querySelector('#btnAceptarLegal').addEventListener('click', async (ev) => {
+    const boton = ev.currentTarget;
+    boton.disabled = true;
+    boton.textContent = 'Guardando…';
+    try {
+      const nueva = await api('/legales/aceptar', { metodo: 'POST', cuerpo: { documentos: faltan } });
+      if (nueva) {
+        SESION.legales = nueva.legales || SESION.legales;
+        caja.remove();
+        return;
+      }
+      throw new Error('sin respuesta');
+    } catch (_) {
+      boton.disabled = false;
+      boton.textContent = 'Aceptar y continuar';
+      caja.querySelector('.aviso-legal__texto').textContent =
+        'No se pudo guardar la aceptación. Inténtelo de nuevo.';
+    }
+  });
 }
 
 const haySesion = () => !!(SESION.usuario);
