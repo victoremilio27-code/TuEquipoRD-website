@@ -14,6 +14,8 @@ WorkingDirectory=/var/www/mercamaquinarias
 Environment=NODE_ENV=production
 Environment=MERCA_DB=/var/lib/mercamaquinarias/mercamaquinarias.db
 Environment=MERCA_RESPALDOS=/var/backups/mercamaquinarias
+# El reintento de envío de comprobantes necesita leer los PDF.
+Environment=MERCA_FACTURAS=/var/lib/mercamaquinarias/facturas
 EnvironmentFile=/etc/mercamaquinarias.env
 
 ExecStart=/usr/bin/node tools/tareas.js

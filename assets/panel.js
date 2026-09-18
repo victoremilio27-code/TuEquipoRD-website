@@ -671,6 +671,11 @@ async function montarPanel() {
   EXENTA = !!datos.exenta;
   $('#panelContenido').hidden = false;
 
+  /* Sin esperarlo: los comprobantes son una sección más del panel y no
+     tienen por qué retrasar lo que el anunciante viene a ver, que son
+     sus anuncios. */
+  montarFacturas();
+
   const org = SESION.organizacion || {};
   $('#panelTitulo').innerHTML = `<em>${esc((org.nombre || SESION.usuario.nombre).split(/[\s,]+/)[0])}</em> ${esc((org.nombre || '').replace(/^\S+\s*/, ''))}`;
   // Atajo a la cola de revisión para quien la atiende. El permiso lo
@@ -951,6 +956,42 @@ async function montarPanel() {
     await api('/cuenta/salir', { metodo: 'POST', silencioso: true });
     location.href = 'index.html';
   });
+}
+
+/* ── Comprobantes ───────────────────────────────────────── */
+
+/* Los comprobantes del cliente, con su PDF.
+ *
+ * La sección se esconde si no hay ninguno: quien nunca ha pagado no
+ * necesita ver una tabla vacía explicándole que está vacía.
+ *
+ * Un comprobante anulado NO desaparece de la lista. Se marca. Quien
+ * pagó y le devolvieron tiene derecho a ver las dos cosas, y una
+ * factura que se esfuma del historial es exactamente lo que hace
+ * desconfiar de un cobro. */
+async function montarFacturas() {
+  const cuerpo = $('#listaFacturas');
+  if (!cuerpo || !haySesion()) return;
+
+  const datos = await api('/facturas', { silencioso: true });
+  const lista = (datos && datos.facturas) || [];
+  if (!lista.length) return;
+
+  $('#panelFacturas').hidden = false;
+  cuerpo.innerHTML = lista.map((f) => {
+    const cuando = new Date(f.fecha);
+    return `<tr>
+      <td class="num">${cuando.toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+      <td class="num">${esc(f.numero)}
+        ${f.ncf ? `<span class="tabla-legales__sub">NCF ${esc(f.ncf)}</span>` : ''}
+        ${f.anulada ? '<span class="pastilla pastilla--ambar">anulada</span>' : ''}</td>
+      <td>${esc(f.concepto || '')}</td>
+      <td class="num">RD$${Number(f.total).toLocaleString('en-US')}</td>
+      <td>${f.hayPdf
+    ? `<a class="btn btn--linea btn--chico" href="/api/facturas/${esc(f.id)}.pdf" target="_blank" rel="noopener">PDF</a>`
+    : ''}</td>
+    </tr>`;
+  }).join('');
 }
 
 document.addEventListener('DOMContentLoaded', montarPanel);

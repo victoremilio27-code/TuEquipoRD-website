@@ -28,6 +28,7 @@ const precios = require('../assets/precios.js');
    que hablar de la misma versión, o se pediría aceptar una cosa y se
    guardaría constancia de otra. */
 const legales = require('../assets/legales.js');
+const facturas = require('./facturas');
 
 const { ITBIS } = precios;
 const COOKIE = 'te_sesion';
@@ -1112,6 +1113,122 @@ const listarSolicitudes = conAdmin((req, res, ctx, consulta) => {
   });
 });
 
+/* ── Comprobantes ───────────────────────────────────────── */
+
+/* Lo que ve el cliente: sus propios comprobantes. */
+const misFacturas = conSesion((req, res, ctx) => {
+  if (!ctx.organizacion) return responder(res, 200, { facturas: [] });
+  return responder(res, 200, {
+    facturas: db.facturasDe(ctx.organizacion.id).map((f) => ({
+      id: f.id, numero: f.numero, tipo: f.tipo, ncf: f.ncf, fecha: f.fecha,
+      concepto: f.concepto, subtotal: f.subtotal, itbis: f.itbis, total: f.total,
+      anulada: !!f.anulado_por, hayPdf: !!f.ruta_pdf,
+    })),
+  });
+});
+
+/* Descarga del PDF.
+ *
+ * Se comprueba que el comprobante sea de quien lo pide —o que quien lo
+ * pide sea administrador— antes de leer nada del disco. Un comprobante
+ * lleva el RNC y la dirección de una empresa: no es un archivo público
+ * aunque su nombre sea adivinable. */
+const descargarFactura = conSesion((req, res, ctx, idFactura) => {
+  const f = db.facturaPorId(idFactura);
+  if (!f) return fallo(res, 404, 'Ese comprobante no existe');
+
+  const esSuyo = ctx.organizacion && f.organizacion_id === ctx.organizacion.id;
+  if (!esSuyo && !ctx.usuario.esAdmin) return fallo(res, 404, 'Ese comprobante no existe');
+
+  const bytes = f.ruta_pdf && facturas.leerPdf(f.ruta_pdf);
+  if (!bytes) return fallo(res, 404, 'El archivo del comprobante no está disponible');
+
+  res.writeHead(200, {
+    'Content-Type': 'application/pdf',
+    'Content-Length': bytes.length,
+    'Content-Disposition': `inline; filename="${f.numero}.pdf"`,
+    // Privado y sin caché: lleva el RNC y la dirección de una empresa.
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  return res.end(bytes);
+});
+
+/* Administración: el listado, con filtro por mes. */
+const listarFacturas = conAdmin((req, res, ctx, consulta) => {
+  const mes = /^\d{4}-\d{2}$/.test(consulta?.get('mes') || '') ? consulta.get('mes') : null;
+  return responder(res, 200, {
+    mes,
+    secuencias: db.secuenciasNcf(),
+    bajas: facturas.secuenciasBajas().map((s) => ({ tipo: s.tipo, quedan: s.quedan })),
+    facturas: db.facturas({ mes }),
+  });
+});
+
+/* Exportación para el contador. Se entrega como CSV y no como JSON
+   porque quien lo abre lo abre en una hoja de cálculo. */
+const exportarFacturas = conAdmin((req, res, ctx, consulta) => {
+  const mes = /^\d{4}-\d{2}$/.test(consulta?.get('mes') || '') ? consulta.get('mes') : null;
+  const filas = db.facturas({ mes, limite: 5000 });
+
+  /* Separador de PUNTO Y COMA, no coma: Excel en configuración regional
+     española abre con coma como separador decimal y un CSV de comas le
+     deja todo en una columna. */
+  const escapar = (v) => {
+    const s = String(v == null ? '' : v);
+    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lineas = [
+    ['Fecha', 'Numero', 'Tipo', 'NCF', 'Cliente', 'RNC', 'Subtotal', 'ITBIS', 'Total', 'Moneda', 'Anulada']
+      .join(';'),
+    ...filas.map((f) => [
+      String(f.fecha).slice(0, 10), f.numero, f.tipo, f.ncf || '',
+      f.razon_social || 'Consumidor final', f.rnc || '',
+      f.subtotal, f.itbis, f.total, f.moneda, f.anulado_por ? 'si' : 'no',
+    ].map(escapar).join(';')),
+  ];
+
+  /* BOM al principio: sin él, Excel abre el archivo como ANSI y los
+     acentos de las razones sociales salen rotos. */
+  const cuerpo = Buffer.from(`﻿${lineas.join('\r\n')}\r\n`, 'utf8');
+  res.writeHead(200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Length': cuerpo.length,
+    'Content-Disposition': `attachment; filename="comprobantes-${mes || 'todos'}.csv"`,
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  return res.end(cuerpo);
+});
+
+/* Reenviar a mano un comprobante que no salió. */
+const reenviarFactura = conAdmin(async (req, res, ctx, idFactura) => {
+  const f = db.facturaPorId(idFactura);
+  if (!f) return fallo(res, 404, 'Ese comprobante no existe');
+
+  const dueno = f.organizacion_id && db.propietarioDe(f.organizacion_id);
+  await facturas.enviar(f, { correoCliente: dueno && dueno.correo });
+  return responder(res, 200, { factura: db.facturaPorId(idFactura) });
+});
+
+/* Nota de crédito. Es lo único que anula un comprobante: el original
+   nunca se borra ni se reescribe. */
+const anularFactura = conAdmin(async (req, res, ctx, idFactura) => {
+  const c = await leerCuerpo(req);
+  const f = db.facturaPorId(idFactura);
+  if (!f) return fallo(res, 404, 'Ese comprobante no existe');
+  if (f.tipo === 'nota_credito') return fallo(res, 400, 'Una nota de crédito no se anula');
+  if (f.anulado_por) return fallo(res, 409, 'Ese comprobante ya está anulado');
+
+  const nota = facturas.emitirNotaCredito(f, { motivo: texto(c.motivo, 200) });
+  if (f.pago_id) db.marcarPagoDevuelto(f.pago_id);
+
+  const dueno = f.organizacion_id && db.propietarioDe(f.organizacion_id);
+  facturas.enviar(nota, { correoCliente: dueno && dueno.correo });
+
+  return responder(res, 201, { nota, original: db.facturaPorId(idFactura) });
+});
+
 /* Quién aceptó qué condiciones y cuándo.
  *
  * Es la respuesta a «demuestre que esta persona aceptó esto», y por eso
@@ -1328,22 +1445,62 @@ const comprarMembresia = conSesion(async (req, res, ctx) => {
       procesador: 'demo',
     };
 
-  const membresia = db.comprarCupos({ idOrg: org.id, idPlan: plan.id, cupo, dias, cobro });
-
-  if (cobro.total > 0) {
-    correo.enviarComprobante({
-      para: ctx.usuario.correo,
-      nombre: ctx.usuario.nombre,
-      plan: `${plan.nombre} · ${cupo} ${cupo === 1 ? 'cupo' : 'cupos'}`,
-      subtotal: cobro.subtotal,
-      itbis: cobro.itbis,
-      total: cobro.total,
-      referencia: cobro.referencia,
-      fin: membresia.fin,
-    });
+  /* Datos fiscales, si los pidió.
+   *
+   * Se validan ANTES de cobrar: descubrir que el RNC está mal después
+   * de haber cobrado obliga a emitir una nota de crédito por un error
+   * de tecleo. El RNC se comprueba con la misma función que el alta de
+   * dealer, que es la que sabe cuántos dígitos tiene. */
+  let cliente = { razonSocial: ctx.usuario.nombre };
+  if (c.conRnc) {
+    const rnc = rncValido(c.rnc);
+    if (!rnc) return fallo(res, 400, 'El RNC tiene 9 dígitos');
+    if (!texto(c.razonSocial, 160)) return fallo(res, 400, 'Escriba la razón social para la factura');
+    if (!texto(c.direccionFiscal, 200) || String(c.direccionFiscal).trim().length < 8) {
+      return fallo(res, 400, 'Escriba la dirección fiscal para la factura');
+    }
+    cliente = {
+      razonSocial: texto(c.razonSocial, 160),
+      rnc,
+      direccion: texto(c.direccionFiscal, 200),
+    };
   }
 
-  return responder(res, 201, { membresia, cobro, sesion: sesionPublica(ctx.usuario.id) });
+  const membresia = db.comprarCupos({ idOrg: org.id, idPlan: plan.id, cupo, dias, cobro });
+
+  /* El comprobante se emite SIEMPRE que haya cobro, lo pida el cliente
+     o no. Una cuenta exenta no paga nada, así que no hay nada que
+     comprobar: por eso queda fuera. */
+  let comprobante = null;
+  if (cobro.total > 0) {
+    const pago = db.pagoPorReferencia(cobro.referencia);
+    if (pago) {
+      try {
+        comprobante = facturas.emitirPorPago(pago, {
+          concepto: `${plan.nombre} · ${cupo} ${cupo === 1 ? 'cupo' : 'cupos'} · ${dias} días`,
+          cliente,
+        });
+        /* El envío va aparte y sin esperarlo: emitir y notificar fallan
+           por motivos distintos, y una caída del proveedor de correo no
+           puede dejar sin comprobante un pago que ya entró. Lo que no
+           salga lo reintenta la tarea diaria. */
+        facturas.enviar(comprobante, { correoCliente: ctx.usuario.correo });
+      } catch (e) {
+        // Que no se pueda emitir NO revierte el cobro: el pago existe y
+        // el comprobante se puede emitir después desde administración.
+        console.error(`facturas: no se pudo emitir el comprobante del pago ${pago.id} · ${e.message}`);
+      }
+    }
+  }
+
+  return responder(res, 201, {
+    membresia,
+    cobro,
+    comprobante: comprobante && {
+      numero: comprobante.numero, tipo: comprobante.tipo, ncf: comprobante.ncf,
+    },
+    sesion: sesionPublica(ctx.usuario.id),
+  });
 });
 
 const ampliarMembresia = conSesion(async (req, res, ctx, idSusc) => {
@@ -1794,6 +1951,8 @@ const RUTAS = [
   ['POST', /^\/api\/cuenta\/salir$/,        salir],
   ['GET',  /^\/api\/sesion$/,               verSesion],
   ['POST', /^\/api\/legales\/aceptar$/,     aceptarLegales],
+  ['GET',  /^\/api\/facturas$/,             misFacturas],
+  ['GET',  /^\/api\/facturas\/([\w-]+)\.pdf$/, descargarFactura],
   ['POST', /^\/api\/dealer\/registro$/,     registrarDealer],
   ['GET',  /^\/api\/sucursales$/,           listarSucursales],
   ['POST', /^\/api\/sucursales$/,           crearSucursal],
@@ -1853,6 +2012,10 @@ const RUTAS = [
 
   // Revisión de solicitudes. Todas exigen sesión con es_admin.
   ['GET',  /^\/api\/admin\/legales$/,                   verAceptaciones],
+  ['GET',  /^\/api\/admin\/facturas$/,                  listarFacturas],
+  ['GET',  /^\/api\/admin\/facturas\.csv$/,             exportarFacturas],
+  ['POST', /^\/api\/admin\/facturas\/([\w-]+)\/reenviar$/, reenviarFactura],
+  ['POST', /^\/api\/admin\/facturas\/([\w-]+)\/anular$/,   anularFactura],
   ['GET',  /^\/api\/admin\/solicitudes$/,               listarSolicitudes],
   ['GET',  /^\/api\/admin\/solicitudes\/([\w-]+)$/,     verSolicitud],
   ['POST', /^\/api\/admin\/solicitudes\/([\w-]+)$/,     resolverSolicitud],
