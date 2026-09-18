@@ -1230,19 +1230,45 @@ const ESPACIOS_PUB = {
 
 /* Quien pregunta por un espacio publicitario escribe a publicidad@.
  *
- * El buzón va escrito, pero el DOMINIO no: se saca del correo del pie
- * de la página. Escrito entero a mano, el día que el sitio cambiara de
- * dominio habría que acordarse de este renglón, y el recuadro seguiría
- * invitando a escribir a una dirección muerta. Ya pasó una vez —la
- * mudanza de dominio— y este renglón fue de los pocos que no hubo que
- * tocar; conviene que siga siendo así. */
+ * El buzón va escrito, pero el DOMINIO no: se deduce. Escrito entero a
+ * mano, el día que el sitio cambiara de dominio habría que acordarse de
+ * este renglón, y el recuadro seguiría invitando a escribir a una
+ * dirección muerta. Ya pasó una vez —la mudanza de dominio— y este
+ * renglón fue de los pocos que no hubo que tocar.
+ *
+ * SE MIRA EN TRES SITIOS, en este orden:
+ *
+ *   1. El correo del pie. Es el más fiable cuando está.
+ *
+ *   2. El dominio del propio sitio. Hace falta porque Cloudflare
+ *      reescribe los `mailto:` —los cambia por /cdn-cgi/l/email-protection
+ *      y un <span> que descifra su script, para que los robots de spam
+ *      no cosechen direcciones—. Mientras eso no se ha ejecutado, en el
+ *      pie NO HAY ningún enlace que empiece por mailto:, y el paso 1 se
+ *      queda sin nada. En producción pasa siempre.
+ *
+ *   3. Y si el dominio no sirve —en desarrollo es 127.0.0.1— el de
+ *      siempre. Un `publicidad@127.0.0.1` en la pantalla de alguien
+ *      sería peor que no enseñar nada. */
 const BUZON_PUBLICIDAD = 'publicidad';
 
-function correoPublicidad() {
+function dominioDelPie() {
   const enlace = document.querySelector('.pie a[href^="mailto:"]');
   const correo = enlace && enlace.getAttribute('href').replace(/^mailto:/i, '').trim();
-  const dominio = (correo && correo.split('@')[1]) || 'mercamaquinarias.com';
-  return `${BUZON_PUBLICIDAD}@${dominio}`;
+  return correo && correo.includes('@') ? correo.split('@')[1] : null;
+}
+
+/* El nombre se puede pasar: `location.hostname` no se deja sustituir
+   en una prueba, y esta regla merece comprobarse con varios. */
+function dominioDelSitio(nombre) {
+  const h = nombre === undefined ? (location.hostname || '') : String(nombre || '');
+  // Un nombre con punto y que no sea una IP ni «localhost».
+  if (!h.includes('.') || /^[\d.]+$/.test(h)) return null;
+  return h.replace(/^www\./, '');
+}
+
+function correoPublicidad() {
+  return `${BUZON_PUBLICIDAD}@${dominioDelPie() || dominioDelSitio() || 'mercamaquinarias.com'}`;
 }
 
 /* LOS ESPACIOS VACÍOS SE VEN.
