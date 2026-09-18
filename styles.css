@@ -1154,7 +1154,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
 
 /* ── Tarjetas de categoría ──────────────────────────────── */
 
-.categorias-todas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); }
+.categorias-todas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
 
 .cat-tarjeta {
   display: block;
@@ -1172,7 +1172,7 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   background: var(--gris-neutro);
   color: var(--gris-acero);
   overflow: hidden;
@@ -1191,10 +1191,10 @@ select:focus, .calc__campo input:focus { outline: none; border-color: var(--amba
   background: var(--ambar);
   color: var(--azul);
 }
-.cat-tarjeta__cuerpo { padding: 12px 14px 14px; }
-.cat-tarjeta__nombre { display: block; font-family: var(--display); font-weight: 700; font-size: 15px; }
-.cat-tarjeta__meta { display: block; margin-top: 2px; font-size: 11.5px; color: var(--gris-acero); }
-.cat-tarjeta--vacia { opacity: .62; }
+.cat-tarjeta__cuerpo { display: grid; grid-template-rows: minmax(42px, auto) auto; gap: 6px; padding: 16px; text-align: left; }
+.cat-tarjeta__nombre { display: block; min-width: 0; font-family: var(--display); font-weight: 700; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.cat-tarjeta__meta { display: block; font-size: 12px; line-height: 1.5; color: var(--gris-acero); }
+.cat-tarjeta--vacia .cat-tarjeta__meta { color: var(--gris-acero); }
 
 /* ── Financiadoras ──────────────────────────────────────── */
 

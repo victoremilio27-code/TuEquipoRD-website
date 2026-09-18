@@ -1043,6 +1043,24 @@ async function montarDetalle() {
 function montarCategoriasPagina() {
   const cont = $('#categoriasTodas');
   if (!cont) return;
+  const imagenes = {
+    camiones: '01-camiones-y-cabezotes.webp',
+    autobuses: '02-autobuses-y-minibuses.webp',
+    bulldozers: '03-bulldozers-y-topadoras.webp',
+    cargadores: '04-cargadores.webp',
+    compactadoras: '05-compactadoras.webp',
+    excavadoras: '06-excavadoras.webp',
+    generadores: '07-generadores-y-compresores.webp',
+    gruas: '08-gruas.webp',
+    agricola: '09-maquinaria-agricola.webp',
+    montacargas: '10-montacargas.webp',
+    motoniveladoras: '11-motoniveladoras.webp',
+    pavimentacion: '12-pavimentacion-y-asfalto.webp',
+    perforacion: '13-perforacion-y-pilotaje.webp',
+    elevacion: '14-plataformas-de-elevacion.webp',
+    remolques: '15-remolques-y-patanas.webp',
+    retroexcavadoras: '16-retroexcavadoras.webp',
+  };
 
   // El número se cuenta, no se escribe: la página decía 'las ocho'
   // cuando la taxonomía ya tenía dieciséis.
@@ -1051,22 +1069,13 @@ function montarCategoriasPagina() {
   cont.innerHTML = conteoCategorias().map((c) => {
     const hay = c.total > 0;
 
-    /* La miniatura es un equipo publicado de esta misma categoría, y
-       se elige entre varios en cada carga: así rota por el inventario
-       en vez de quedarse siempre con la misma máquina. Antes todas las
-       categorías enseñaban el mismo hexágono gris.
-
-       El texto alternativo nombra la máquina concreta, no la
-       categoría: quien no ve la imagen se entera de qué hay dentro. */
-    const fotos = FOTOS_CATEGORIA[c.id] || [];
-    const foto = fotos.length ? alAzar(fotos) : null;
+    const imagen = imagenes[c.id];
 
     return `<li><a class="cat-tarjeta${hay ? '' : ' cat-tarjeta--vacia'}" href="equipos.html?categoria=${encodeURIComponent(c.id)}">
       <span class="cat-tarjeta__foto">
-        ${foto
-          ? `<img src="${esc(foto.foto)}" alt="${esc(foto.titulo)}, publicado en ${esc(c.nombre)}" loading="lazy" decoding="async">`
+        ${imagen
+          ? `<img src="brand_assets/categorias/${esc(imagen)}" alt="${esc(c.nombre)}" width="1280" height="720" loading="lazy" decoding="async">`
           : icono('i-hex-doble', 'fantasma')}
-        <span class="cat-tarjeta__ico">${icono(c.icono)}</span>
       </span>
       <span class="cat-tarjeta__cuerpo">
         <span class="cat-tarjeta__nombre">${esc(c.nombre)}</span>
