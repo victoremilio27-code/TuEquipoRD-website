@@ -5,8 +5,8 @@
  * estas funciones y nunca escribe una consulta: si mañana se cambia
  * SQLite por PostgreSQL, se reescribe este archivo y nada más.
  *
- * El archivo de base de datos se crea solo en db/tuequipord.db la
- * primera vez que arranca el servidor.
+ * El archivo de base de datos se crea solo en db/mercamaquinarias.db
+ * la primera vez que arranca el servidor.
  */
 
 const { DatabaseSync } = require('node:sqlite');
@@ -17,7 +17,7 @@ const path = require('path');
 
 const RAIZ = path.resolve(__dirname, '..');
 const CARPETA = path.join(RAIZ, 'db');
-const ARCHIVO = process.env.TUEQUIPO_DB || path.join(CARPETA, 'tuequipord.db');
+const ARCHIVO = process.env.MERCA_DB || path.join(CARPETA, 'mercamaquinarias.db');
 
 let db;
 
@@ -40,7 +40,7 @@ function abrir() {
 /* Fin de la promoción de lanzamiento del nivel Estándar. Cuando la
    fecha pase, los planes vuelven solos a su tarifa sin tocar código:
    el importe se calcula contra ella en cada cobro. */
-const PROMO_LANZAMIENTO = process.env.TUEQUIPO_PROMO_HASTA || '2026-11-30';
+const PROMO_LANZAMIENTO = process.env.MERCA_PROMO_HASTA || '2026-11-30';
 
 const MIGRACIONES = [
   ['2026-08-sucursales-contacto', [
@@ -410,11 +410,45 @@ const MIGRACIONES = [
        WHERE nivel = 'estandar' AND precio_promocional IS NOT NULL`,
   ]],
 
+  /* El cambio de nombre llega hasta la base.
+
+     La cuenta de la casa se creó el 4 de agosto con el nombre viejo:
+     usuario `principal@tuequipord.com`, organización «TuEquipoRD» con
+     el atajo `tuequipord`. El correo es además con lo que Victor entra
+     como administrador, y ese buzón deja de existir al mudar el
+     dominio, así que hay que cambiarlo aquí o se queda fuera.
+
+     La contraseña no se toca: vive en clave_hash y clave_sal, que esta
+     migración ni menciona. Se entra igual, solo cambia la dirección.
+
+     Va por igualdad exacta y no por LIKE: si algún día alguien registra
+     una empresa que se llame parecido, esto no debe rozarla. */
+  ['2026-09-cambio-de-marca', [
+    `UPDATE usuarios
+        SET correo = 'principal@mercamaquinarias.com',
+            nombre = 'Administración MercaMaquinarias'
+      WHERE correo = 'principal@tuequipord.com'`,
+    `UPDATE organizaciones
+        SET nombre = 'MercaMaquinarias',
+            slug   = 'mercamaquinarias',
+            correo = 'principal@mercamaquinarias.com'
+      WHERE slug = 'tuequipord'`,
+    `UPDATE solicitudes_dealer
+        SET encargado = 'Administración MercaMaquinarias'
+      WHERE encargado = 'Administración TuEquipoRD'`,
+  ]],
+
   /* Video en los anuncios.
 
+     Va DESPUÉS de '2026-09-cambio-de-marca' aunque se escribiera antes:
+     esa ya se aplicó en producción, y las migraciones se añaden al
+     final. Reordenarlas no rompería nada —cada una se anota por su
+     nombre y ninguna depende de la otra—, pero el día que dos sí
+     dependan, el orden del archivo es lo único que lo dice.
+
      Estándar 1, Destacado 2, Premium 3. El reparto no es arbitrario: a
-     unos 6 MB por video, con los 3 GB libres que tiene el disco del VPS
-     caben del orden de 500. Si se queda corto, el sitio empieza a
+     unos 6 MB por video, con los 3,5 GB libres que tiene el disco del
+     VPS caben del orden de 500. Si se queda corto, el sitio empieza a
      rechazar subidas —ver MINIMO_LIBRE en tools/videos.js— en vez de
      llenar el disco y dejar a SQLite sin poder escribir, que es la
      forma fea de quedarse sin espacio: se pierden publicaciones.
@@ -644,10 +678,10 @@ const cerrarSesion = (testigo) =>
 /* Secreto con el que se firman los códigos. En producción viene del
    entorno y es el mismo en todos los procesos; si se genera al azar
    en cada arranque, un reinicio invalida los códigos en vuelo. */
-const SECRETO = process.env.TUEQUIPO_SECRETO || crypto.randomBytes(32).toString('hex');
+const SECRETO = process.env.MERCA_SECRETO || crypto.randomBytes(32).toString('hex');
 
-if (!process.env.TUEQUIPO_SECRETO) {
-  console.warn('aviso: TUEQUIPO_SECRETO sin definir; los códigos en vuelo caducan al reiniciar.');
+if (!process.env.MERCA_SECRETO) {
+  console.warn('aviso: MERCA_SECRETO sin definir; los códigos en vuelo caducan al reiniciar.');
 }
 
 const firmarCodigo = (codigo, correo) =>

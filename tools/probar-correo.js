@@ -25,11 +25,12 @@ if (!destino) {
   process.exit(1);
 }
 
-const transporte = process.env.TUEQUIPO_CORREO || 'archivo';
+const transporte = process.env.MERCA_CORREO || 'archivo';
 
 console.log('\n── Configuración ──');
 console.log(`  Transporte:  ${transporte}`);
-console.log(`  Remitente:   ${process.env.TUEQUIPO_REMITENTE || '(sin definir, se usa el de por defecto)'}`);
+console.log(`  Remitente:   ${process.env.MERCA_REMITENTE || '(sin definir, se usa el de por defecto)'}`);
+console.log(`  Responder a: ${correo.RESPUESTAS}`);
 console.log(`  Revisión:    ${correo.REVISION}`);
 console.log(`  Sitio:       ${correo.SITIO}`);
 console.log(`  BREVO_API_KEY: ${process.env.BREVO_API_KEY ? 'definida' : 'SIN DEFINIR'}`);
@@ -38,7 +39,7 @@ console.log(`  Destino:     ${destino}\n`);
 if (transporte === 'archivo') {
   console.log('  Aviso: el transporte es "archivo". Los correos se escriben en');
   console.log(`  ${correo.BANDEJA} y NO salen a internet.`);
-  console.log('  Para probar Brevo de verdad: TUEQUIPO_CORREO=brevo en el .env\n');
+  console.log('  Para probar Brevo de verdad: MERCA_CORREO=brevo en el .env\n');
 }
 if (transporte === 'brevo' && !process.env.BREVO_API_KEY) {
   console.error('  Falta BREVO_API_KEY. Póngala en el .env y repita.\n');

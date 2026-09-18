@@ -1228,17 +1228,21 @@ const ESPACIOS_PUB = {
   'movil-lista':    { letra: 'H', ancho: 336,  alto: 336, sel: null },
 };
 
-/* El correo NO va escrito aquí: se lee del pie de la página.
+/* Quien pregunta por un espacio publicitario escribe a publicidad@.
  *
- * Escrito a mano, el día que el sitio pase a mercamaquinarias.com habría
- * que acordarse de cambiarlo justo en este renglón, y el recuadro
- * seguiría invitando a escribir a un buzón muerto. Leyéndolo del pie
- * —que sí cambia con el dominio— el espacio publicitario dice siempre la
- * dirección que de verdad se atiende. */
+ * El buzón va escrito, pero el DOMINIO no: se saca del correo del pie
+ * de la página. Escrito entero a mano, el día que el sitio cambiara de
+ * dominio habría que acordarse de este renglón, y el recuadro seguiría
+ * invitando a escribir a una dirección muerta. Ya pasó una vez —la
+ * mudanza de dominio— y este renglón fue de los pocos que no hubo que
+ * tocar; conviene que siga siendo así. */
+const BUZON_PUBLICIDAD = 'publicidad';
+
 function correoPublicidad() {
   const enlace = document.querySelector('.pie a[href^="mailto:"]');
   const correo = enlace && enlace.getAttribute('href').replace(/^mailto:/i, '').trim();
-  return correo || 'hola@tuequipord.com';
+  const dominio = (correo && correo.split('@')[1]) || 'mercamaquinarias.com';
+  return `${BUZON_PUBLICIDAD}@${dominio}`;
 }
 
 /* LOS ESPACIOS VACÍOS SE VEN.

@@ -39,7 +39,7 @@ const RAIZ = path.resolve(__dirname, '..');
 
 /* Fuera del proyecto, como las fotos: así un despliegue no las toca y
    se respaldan aparte. */
-const CARPETA = process.env.TUEQUIPO_VIDEOS || path.join(RAIZ, '.tmp', 'videos');
+const CARPETA = process.env.MERCA_VIDEOS || path.join(RAIZ, '.tmp', 'videos');
 
 const RUTA_PUBLICA = '/videos';
 

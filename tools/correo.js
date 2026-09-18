@@ -12,7 +12,7 @@
  *   · 'brevo' — producción. Correo transaccional por la API HTTPS de
  *     Brevo. Ni la API ni las pantallas se enteran del cambio.
  *
- * Elegir con TUEQUIPO_CORREO=brevo y definir BREVO_API_KEY.
+ * Elegir con MERCA_CORREO=brevo y definir BREVO_API_KEY.
  */
 
 const fs = require('fs');
@@ -21,14 +21,33 @@ const path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const BANDEJA = path.join(RAIZ, '.tmp', 'correos');
 
-const REMITENTE = process.env.TUEQUIPO_REMITENTE || 'MercaMaquinarias <no-responder@tuequipord.com>';
-const TRANSPORTE = process.env.TUEQUIPO_CORREO || 'archivo';
+const REMITENTE = process.env.MERCA_REMITENTE || 'MercaMaquinarias <no-reply@mercamaquinarias.com>';
+const TRANSPORTE = process.env.MERCA_CORREO || 'archivo';
 
 // Buzón interno que recibe las solicitudes de dealer para revisar.
-const REVISION = process.env.TUEQUIPO_REVISION || 'dealers@tuequipord.com';
+const REVISION = process.env.MERCA_REVISION || 'dealers@mercamaquinarias.com';
+
+/* A dónde va la respuesta si el destinatario le da a «Responder».
+ *
+ * El remitente es no-reply@ y ahí no hay nadie leyendo. Sin esta
+ * cabecera, quien conteste —y contesta gente, por muy «no-reply» que
+ * diga— escribe a un buzón que nadie mira. Se le manda a hola@, que sí
+ * se atiende.
+ *
+ * Va aparte del remitente a propósito: el remitente tiene que ser una
+ * dirección del dominio autenticado en Brevo para que el correo no
+ * acabe en spam, y esta no tiene por qué serlo. */
+const RESPUESTAS = process.env.MERCA_RESPUESTAS || 'hola@mercamaquinarias.com';
+
+/* Soporte. Es a donde se manda a quien tiene un problema, no una
+   pregunta: por ejemplo, a quien le acaban de cambiar la contraseña y
+   no fue él. Va aparte del buzón general a propósito, para que el día
+   que haya alguien atendiendo soporte no haya que buscar estos avisos
+   entre el correo de siempre. */
+const SOPORTE = process.env.MERCA_SOPORTE || 'ayuda@mercamaquinarias.com';
 
 // URL pública, para los enlaces que van dentro de los correos.
-const SITIO = process.env.TUEQUIPO_SITIO || 'https://tuequipord.com';
+const SITIO = process.env.MERCA_SITIO || 'https://mercamaquinarias.com';
 
 /* Escapa lo que venga del usuario antes de meterlo en el HTML del
    correo: un nombre con "<script>" no debe llegar a la bandeja de
@@ -128,7 +147,7 @@ function envoltura({ titulo, saludo, parrafos = [], extra = '', nota = '', accio
     <tr><td bgcolor="${AZUL}" style="padding:20px 26px">
       <p style="margin:0;font-family:${TIPO};font-size:12px;line-height:1.6;color:#8FA3B3">
         MercaMaquinarias · República Dominicana<br>
-        <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">tuequipord.com</a>
+        <a href="${SITIO}" style="color:${AMBAR};text-decoration:none">mercamaquinarias.com</a>
       </p>
     </td></tr>
 
@@ -194,7 +213,8 @@ function porArchivo({ para, asunto, texto, html }) {
   const sello = new Date().toISOString().replace(/[:.]/g, '-');
   const base = path.join(BANDEJA, `${sello}-${para.replace(/[^\w.@-]/g, '_')}`);
   const archivo = `${base}.txt`;
-  fs.writeFileSync(archivo, `Para: ${para}\nDe: ${REMITENTE}\nAsunto: ${asunto}\n\n${texto}\n`, 'utf8');
+  fs.writeFileSync(archivo,
+    `Para: ${para}\nDe: ${REMITENTE}\nResponder a: ${RESPUESTAS}\nAsunto: ${asunto}\n\n${texto}\n`, 'utf8');
 
   // La versión HTML se guarda aparte para poder abrirla en el navegador
   // y ver cómo va a llegar, sin gastar un envío real.
@@ -216,7 +236,7 @@ function porArchivo({ para, asunto, texto, html }) {
  * Sin `node:https` extra: viene con Node.
  *
  * Configuración:
- *   TUEQUIPO_CORREO=brevo
+ *   MERCA_CORREO=brevo
  *   BREVO_API_KEY=xkeysib-…
  *
  * El remitente debe estar verificado en Brevo y el dominio necesita
@@ -238,6 +258,7 @@ function porBrevo({ para, asunto, texto, html }) {
   const cuerpo = JSON.stringify({
     sender: partirRemitente(REMITENTE),
     to: [{ email: para }],
+    replyTo: partirRemitente(RESPUESTAS),
     subject: asunto,
     textContent: texto,
     ...(html ? { htmlContent: html } : {}),
@@ -320,7 +341,7 @@ function enviarAvisoCambioClave({ para, nombre }) {
       saludo, '',
       'La contraseña de su cuenta de MercaMaquinarias acaba de cambiar y se cerraron todas las sesiones abiertas.', '',
       'Si fue usted, no hay nada que hacer.',
-      'Si no fue usted, escriba de inmediato a hola@tuequipord.com.', '',
+      `Si no fue usted, escriba de inmediato a ${SOPORTE}.`, '',
       'MercaMaquinarias',
     ].join('\n'),
     html: envoltura({
@@ -331,7 +352,7 @@ function enviarAvisoCambioClave({ para, nombre }) {
         'Si fue usted, no hay nada que hacer.',
       ],
       nota: `Si <b style="color:${AZUL}">no</b> fue usted, escríbanos de inmediato a `
-        + `<a href="mailto:hola@tuequipord.com" style="color:${AMBAR}">hola@tuequipord.com</a>.`,
+        + `<a href="mailto:${esc(SOPORTE)}" style="color:${AMBAR}">${esc(SOPORTE)}</a>.`,
     }),
   });
 }
@@ -501,7 +522,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       `Revisamos los datos de ${empresa} y su cuenta de dealer quedó aprobada.`, '',
       'Ya puede publicar equipos y su página de empresa aparecerá en el directorio',
       'en cuanto contrate un plan que la incluya.',
-      slug ? `Su dirección será: https://tuequipord.com/dealer.html?d=${slug}` : null,
+      slug ? `Su dirección será: https://mercamaquinarias.com/dealer.html?d=${slug}` : null,
       '',
       'MercaMaquinarias',
     ]
@@ -510,7 +531,7 @@ function enviarResolucionDealer({ para, nombre, empresa, aprobada, motivo, slug 
       `Revisamos la solicitud de ${empresa} y por ahora no podemos aprobarla.`, '',
       motivo ? `Motivo: ${motivo}` : 'No pudimos confirmar los datos de la empresa.',
       '',
-      'Su cuenta sigue activa y puede escribirnos a dealers@tuequipord.com con la',
+      'Su cuenta sigue activa y puede escribirnos a dealers@mercamaquinarias.com con la',
       'documentación corregida para que la revisemos de nuevo.',
       '',
       'MercaMaquinarias',
@@ -753,5 +774,5 @@ module.exports = {
   enviarSolicitudDealer, enviarResolucionDealer, enviarSolicitudServicio,
   enviarAnuncioPublicado, enviarAnuncioPorVencer, enviarAnuncioVencido,
   enviarComprobante, enviarContactoRecibido, enviarBienvenida,
-  BANDEJA, REVISION, SITIO,
+  BANDEJA, REVISION, SITIO, RESPUESTAS, SOPORTE,
 };

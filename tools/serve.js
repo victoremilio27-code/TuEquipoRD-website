@@ -2,10 +2,11 @@
  * serve.js — servidor del sitio. Estáticos + API. Sin dependencias.
  *
  * Uso:
- *   npm start                        # http://localhost:8080
+ *   npm start                        # http://127.0.0.1:8080
  *   node tools/serve.js --port 3000
  *   node tools/serve.js --sin-api    # solo estáticos
- *   node tools/serve.js --root archive/v1-aterrizaje --port 8081
+ *   node tools/serve.js --root otra/carpeta --port 8081
+ *   node tools/serve.js --host 0.0.0.0   # visible en la red local
  *
  * Con la API montada, /api/* lo atiende tools/api.js contra la base
  * SQLite de db/. El resto son archivos del proyecto.
@@ -84,7 +85,7 @@ function cabecerasDe(extra = {}) {
   // HSTS solo con HTTPS activo. Enviarlo por HTTP no hace nada, y
   // enviarlo antes de tener certificado deja el dominio inaccesible en
   // los navegadores que ya lo hayan recordado.
-  if (PRODUCCION && process.env.TUEQUIPO_HTTPS === '1') {
+  if (PRODUCCION && process.env.MERCA_HTTPS === '1') {
     h['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
   }
   return h;
@@ -125,7 +126,7 @@ const etagDe = (est) => `W/"${est.size.toString(36)}-${est.mtimeMs.toString(36)}
  * la raíz del proyecto y eso dejaba a la vista:
  *
  *   /.env              la clave de Brevo y el secreto de sesión
- *   /db/tuequipord.db  la base entera: correos, hashes, RNC
+ *   /db/mercamaquinarias.db  la base entera: correos, hashes, RNC
  *   /.git/config       el repositorio
  *   /tools/db.js       el código del servidor
  *
@@ -153,10 +154,27 @@ const PUBLICO = [
 
 const esPublico = (ruta) => PUBLICO.some((p) => p.test(ruta));
 
+/* Se escucha SOLO en la interfaz local.
+ *
+ * Sin dirección, Node escucha en todas: en el servidor, el proceso
+ * quedaba expuesto en el puerto 8080 de la IP pública, y lo único que
+ * lo tapaba era el cortafuegos. La unidad de systemd llevaba escrito
+ * «el servidor escucha solo en local» desde el primer día y no era
+ * cierto; una regla de ufw mal tocada lo habría publicado entero, sin
+ * HTTPS y saltándose a nginx.
+ *
+ * `--host 0.0.0.0` lo abre a propósito, que es lo que hace falta para
+ * probar desde el teléfono en la misma red. */
 function leerArgs(argv) {
-  const args = { port: Number(process.env.PORT) || 8080, root: '.', api: true };
+  const args = {
+    port: Number(process.env.PORT) || 8080,
+    host: process.env.MERCA_HOST || '127.0.0.1',
+    root: '.',
+    api: true,
+  };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--port' || argv[i] === '-p') args.port = Number(argv[++i]);
+    else if (argv[i] === '--host' || argv[i] === '-h') args.host = argv[++i];
     else if (argv[i] === '--root' || argv[i] === '-r') args.root = argv[++i];
     else if (argv[i] === '--sin-api') args.api = false;
   }
@@ -385,8 +403,8 @@ servidor.on('error', (e) => {
   throw e;
 });
 
-servidor.listen(args.port, () => {
-  console.log(`MercaMaquinarias en http://localhost:${args.port}`);
+servidor.listen(args.port, args.host, () => {
+  console.log(`MercaMaquinarias en http://${args.host}:${args.port}`);
   console.log(`Sirviendo   ${RAIZ}`);
   console.log(`API         ${api ? 'activa en /api' : 'desactivada'}`);
   console.log('Ctrl+C para detener.\n');

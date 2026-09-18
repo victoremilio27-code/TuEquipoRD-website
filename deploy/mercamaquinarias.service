@@ -1,0 +1,41 @@
+# systemd unit para MercaMaquinarias.
+# Instalar en /etc/systemd/system/mercamaquinarias.service
+
+[Unit]
+Description=MercaMaquinarias — sitio y API
+After=network.target
+
+[Service]
+Type=simple
+User=mercamaquinarias
+Group=mercamaquinarias
+WorkingDirectory=/var/www/mercamaquinarias
+
+# El servidor escucha solo en local; nginx publica hacia fuera.
+# MERCA_HOST va escrito aunque sea el valor por defecto: esta línea es
+# la que hace cierta la frase de arriba, y conviene que se vea.
+Environment=NODE_ENV=production
+Environment=PORT=8080
+Environment=MERCA_HOST=127.0.0.1
+Environment=MERCA_HTTPS=1
+Environment=MERCA_DB=/var/lib/mercamaquinarias/mercamaquinarias.db
+Environment=MERCA_FOTOS=/var/lib/mercamaquinarias/fotos
+Environment=MERCA_VIDEOS=/var/lib/mercamaquinarias/videos
+
+# Secretos: NO ponerlos aquí. Van en /etc/mercamaquinarias.env, con
+# permisos 600 y propietario root. Ver deploy/README.md.
+EnvironmentFile=/etc/mercamaquinarias.env
+
+ExecStart=/usr/bin/node tools/serve.js
+Restart=always
+RestartSec=3
+
+# Endurecimiento: el proceso solo escribe donde guarda la base.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mercamaquinarias
+
+[Install]
+WantedBy=multi-user.target

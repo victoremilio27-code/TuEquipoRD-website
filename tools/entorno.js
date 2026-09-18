@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const RUTA = process.env.TUEQUIPO_ENV || path.resolve(__dirname, '..', '.env');
+const RUTA = process.env.MERCA_ENV || path.resolve(__dirname, '..', '.env');
 
 function cargar(ruta = RUTA) {
   let crudo;
@@ -66,7 +66,7 @@ function cargar(ruta = RUTA) {
    Así que si la unidad está instalada, se leen de ahí. La unidad es
    la autoridad sobre cómo corre el servicio; que la herramienta mire
    el mismo sitio es lo correcto, no un atajo. */
-const UNIDAD = '/etc/systemd/system/tuequipord.service';
+const UNIDAD = '/etc/systemd/system/mercamaquinarias.service';
 
 function cargarUnidad(ruta = UNIDAD) {
   let crudo;
@@ -77,8 +77,20 @@ function cargarUnidad(ruta = UNIDAD) {
   }
 
   let puestas = 0;
+  const archivos = [];
+
   for (const linea of crudo.split(/\r?\n/)) {
-    const m = linea.trim().match(/^Environment=(?:"(.*)"|(.*))$/);
+    const limpia = linea.trim();
+
+    /* Los secretos NO están en la unidad: están en el archivo que la
+       unidad señala, con permisos 600. Se anota para leerlo después.
+       Sin esto, `probar-correo.js` lanzado a mano en el servidor veía
+       el transporte pero no la clave de Brevo, y decía que faltaba
+       una clave que sí estaba puesta. */
+    const ef = limpia.match(/^EnvironmentFile=-?(.+)$/);
+    if (ef) { archivos.push(ef[1].trim()); continue; }
+
+    const m = limpia.match(/^Environment=(?:"(.*)"|(.*))$/);
     if (!m) continue;
 
     const par = m[1] || m[2] || '';
@@ -93,6 +105,8 @@ function cargarUnidad(ruta = UNIDAD) {
       puestas++;
     }
   }
+
+  for (const archivo of archivos) puestas += cargar(archivo);
   return puestas;
 }
 

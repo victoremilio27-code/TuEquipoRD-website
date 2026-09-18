@@ -92,7 +92,7 @@ function leerCookies(req) {
 /* `Secure` solo cuando el sitio corre sobre HTTPS: en desarrollo, por
    http://localhost, el navegador descartaría la cookie y no se podría
    iniciar sesión. */
-const SEGURA = process.env.TUEQUIPO_HTTPS === '1' ? '; Secure' : '';
+const SEGURA = process.env.MERCA_HTTPS === '1' ? '; Secure' : '';
 
 const cookieSesion = (testigo, dias = 30) =>
   `${COOKIE}=${testigo}; Path=/; HttpOnly; SameSite=Lax${SEGURA}; Max-Age=${dias * 24 * 3600}`;
@@ -184,7 +184,7 @@ function claveDebil(clave, correoUsuario) {
   if (usuarioCorreo.length >= 4 && v.toLowerCase().includes(usuarioCorreo)) {
     return 'La contraseña no puede contener su correo';
   }
-  const comunes = ['contrasena', 'password', '12345678', 'qwerty', 'tuequipord', 'administrador'];
+  const comunes = ['contrasena', 'password', '12345678', 'qwerty', 'mercamaquinarias', 'administrador'];
   if (comunes.some((p) => v.toLowerCase().includes(p))) return 'Esa contraseña es demasiado común';
   return null;
 }

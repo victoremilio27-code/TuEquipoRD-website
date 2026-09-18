@@ -21,7 +21,12 @@
   'use strict';
 
   const TELEFONO = '(809) 000-0000';   // PENDIENTE: número de relleno
-  const CORREO = 'hola@tuequipord.com';
+
+  /* ayuda@ y no hola@: cuando el asistente se queda corto, la persona
+     que escribe necesita soporte, no el buzón general. Hoy los dos
+     acaban en la misma bandeja, pero el día que haya alguien atendiendo
+     soporte el correo ya le llega sin tocar nada. */
+  const CORREO = 'ayuda@mercamaquinarias.com';
 
   /* Las preguntas de arranque no son decoración: enseñan de un
      vistazo qué sabe el asistente, que es la forma más barata de

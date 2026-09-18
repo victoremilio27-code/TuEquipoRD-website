@@ -43,7 +43,7 @@ const RAIZ = path.resolve(__dirname, '..');
 
 /* En el VPS conviene sacarlas del proyecto para que un `git pull` no
    las toque y para poder respaldarlas aparte. */
-const CARPETA = process.env.TUEQUIPO_FOTOS || path.join(RAIZ, '.tmp', 'fotos');
+const CARPETA = process.env.MERCA_FOTOS || path.join(RAIZ, '.tmp', 'fotos');
 
 /* Ruta pública. Es la que acaba en la base y en el HTML. */
 const RUTA_PUBLICA = '/fotos';

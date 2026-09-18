@@ -4,10 +4,43 @@
 
 const puppeteer = require('puppeteer');
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 
-const BASE = 'http://localhost:8080';
+const BASE = 'http://127.0.0.1:8080';
 const CLAVE = 'Retroexcavadora77RD';
 const BUZON = '.tmp/correos';
+
+/* Cada pasada estrena correos y RNC.
+   Antes eran fijos, y la segunda vez que se corría la auditoría el
+   registro moría con «Ya existe una cuenta con ese correo». A partir de
+   ahí todo lo que venía después fallaba por esa causa y no por la que
+   se estaba probando: cinco hallazgos de un solo motivo, ninguno real.
+   Se podrían borrar las cuentas de la pasada anterior, pero eso obliga
+   a tocar la base por debajo, que es justo lo que esta auditoría evita
+   para que el recorrido sea el de una persona de verdad. */
+const SELLO = Date.now().toString().slice(-6);
+const CORREO_PARTICULAR = `vendedor-${SELLO}@auditoria.do`;
+const CORREO_DEALER = `dealer-${SELLO}@auditoria.do`;
+const CORREO_ADMIN = `admin-${SELLO}@auditoria.do`;
+const EMPRESA_DEALER = `Auditoría Equipos ${SELLO} SRL`;
+const RNC_DEALER = `1${SELLO}909`.slice(0, 9).padEnd(9, '0');
+
+/* El administrador NO se crea desde el sitio: conceder ese permiso por
+   la API es justamente lo que la auditoría de permisos comprueba que es
+   imposible. Así que se crea por la herramienta de consola, igual que
+   se haría en el servidor, y a partir de ahí se entra por la pantalla
+   de acceso como cualquiera.
+
+   Hasta ahora esta parte entraba con una cuenta de dealer de
+   demostración y la llamaba «administrador». El sitio le negaba la cola
+   de revisión —correctamente— y la auditoría lo apuntaba como fallo del
+   sitio. El recorrido del administrador no se había probado nunca. */
+function crearAdministrador() {
+  execFileSync(process.execPath, [
+    'tools/admin.js', 'crear', CORREO_ADMIN, 'Auditoría Administración',
+    '--admin', '--clave', CLAVE,
+  ], { stdio: 'pipe' });
+}
 
 const fallos = [];
 const anota = (donde, tipo, detalle) => {
@@ -56,6 +89,13 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
   await escribir(p, '#new-telefono', extra.telefono || '8095551234');
   await escribir(p, '#new-correo', correo);
   await escribir(p, '#new-clave', CLAVE);
+  /* La confirmación de contraseña. Sin rellenarla, el registro se
+     detiene con «Las dos contraseñas no coinciden» y TODO lo que viene
+     después —verificar el correo, entrar al panel, publicar, la cola de
+     revisión del administrador— falla en cascada por un motivo que no
+     tiene nada que ver con lo que se estaba probando.
+     Pasó: cinco hallazgos de una sola causa. */
+  await escribir(p, '#new-clave2', CLAVE);
 
   if (tipo === 'dealer') {
     await escribir(p, '#new-empresa', extra.empresa);
@@ -88,39 +128,52 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
   console.log('\n═══ Vendedor particular ═══');
   vigilar(p, 'particular');
   const entro = await registrar(p, {
-    tipo: 'particular', correo: 'vendedor@auditoria.do', nombre: 'José Almonte',
+    tipo: 'particular', correo: CORREO_PARTICULAR, nombre: 'José Almonte',
   });
   console.log(`  registro + verificación → panel: ${entro ? 'sí' : 'NO'}`);
   if (!entro) anota('particular', 'flujo', 'no llegó al panel tras verificar el correo');
 
-  // Publicar un equipo
+  /* Publicar un equipo: primero la puerta de los cupos.
+     Quien acaba de registrarse no tiene ninguno, así que /publicar.html
+     no enseña el asistente: manda a contratar un plan. Lo que hay que
+     comprobar aquí es que esa puerta explique por qué y sepa volver.
+     (Esta parte daba por rota la publicación entera: se escribió antes
+     de que la puerta existiera y esperaba el asistente a secas.) */
   console.log('\n  ── Publicar un equipo ──');
   await p.goto(`${BASE}/publicar.html`, { waitUntil: 'networkidle0' });
   await esperar(1200);
-  const pasos = await p.$$eval('.paso, [data-paso], .asistente__paso', (n) => n.length).catch(() => 0);
-  console.log(`  asistente con ${pasos} paso(s) detectados`);
 
-  const campos = await p.evaluate(() => {
-    const v = [];
-    document.querySelectorAll('input,select,textarea').forEach((el) => {
-      if (el.offsetParent !== null && el.id) v.push(el.id);
-    });
-    return v;
-  });
-  console.log(`  campos visibles: ${campos.slice(0, 14).join(', ')}`);
+  const url = new URL(p.url());
+  console.log(`  sin cupos, /publicar.html acaba en: ${url.pathname}${url.search}`);
 
-  // Intentar avanzar en blanco: debe frenar y explicar
-  const avanzar = await p.$('#btnSiguiente, [data-siguiente], button[type="submit"]');
-  if (avanzar) {
-    await avanzar.click();
-    await esperar(700);
-    const textoErr = await p.$$eval('.campo-v__error, .paso__aviso, [role="alert"]',
-      (n) => n.filter((x) => x.offsetParent !== null).map((x) => x.textContent.trim()).join(' | '));
-    console.log(`  validación en vacío: ${textoErr ? 'frena ✓' : 'NO FRENA ⚠'}`);
-    if (!textoErr) anota('publicar', 'validación', 'el asistente avanza con el formulario vacío');
-    else ok(`avisa: ${textoErr.slice(0, 90)}`);
+  if (url.pathname.endsWith('/planes.html')) {
+    ok('sin cupos, manda a contratar un plan en vez de enseñar un asistente inservible');
+
+    /* Sin el destino, quien contrata acaba en la página de planes con
+       un cupo en la mano y sin camino de vuelta al asistente. */
+    const destino = url.searchParams.get('destino');
+    if (destino === 'publicar.html') ok('conserva el destino para volver al asistente');
+    else anota('publicar', 'ux', `manda a planes sin conservar el destino (destino=${destino})`);
+
+    const explica = await p.$eval('body', (b) => /cupo/i.test(b.innerText));
+    if (explica) ok('explica qué es un cupo');
+    else anota('publicar', 'ux', 'manda a contratar sin explicar por qué');
   } else {
-    anota('publicar', 'ux', 'no se encontró el botón para avanzar');
+    // Con cupos sí toca el asistente: que no avance con todo en blanco.
+    const pasos = await p.$$eval('.paso', (n) => n.length).catch(() => 0);
+    console.log(`  asistente con ${pasos} paso(s)`);
+
+    const avanzar = await p.$('#btnSiguiente');
+    if (!avanzar) {
+      anota('publicar', 'ux', 'no se encontró el botón para avanzar');
+    } else {
+      await avanzar.click();
+      await esperar(700);
+      const textoErr = await p.$$eval('.campo-v__error, .paso__aviso, [role="alert"]',
+        (n) => n.filter((x) => x.offsetParent !== null).map((x) => x.textContent.trim()).join(' | '));
+      if (!textoErr) anota('publicar', 'validación', 'el asistente avanza con el formulario vacío');
+      else ok(`frena en vacío y avisa: ${textoErr.slice(0, 90)}`);
+    }
   }
 
   // Panel del particular
@@ -146,8 +199,8 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
 
   vigilar(p, 'dealer');
   const entroD = await registrar(p, {
-    tipo: 'dealer', correo: 'dealer@auditoria.do', nombre: 'Carmen Objio',
-    extra: { empresa: 'Auditoría Equipos SRL', rnc: '131909090', provincia: 'La Vega' },
+    tipo: 'dealer', correo: CORREO_DEALER, nombre: 'Carmen Objio',
+    extra: { empresa: EMPRESA_DEALER, rnc: RNC_DEALER, provincia: 'La Vega' },
   });
   console.log(`  alta de dealer → panel: ${entroD ? 'sí' : 'NO'}`);
 
@@ -167,7 +220,7 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
   await p.goto(`${BASE}/dealers.html`, { waitUntil: 'networkidle0' });
   await esperar(800);
   const dir = await p.$eval('body', (b) => b.innerText);
-  if (dir.includes('Auditoría Equipos')) anota('dealer', 'LÓGICA', 'un dealer pendiente aparece en el directorio');
+  if (dir.includes(EMPRESA_DEALER)) anota('dealer', 'LÓGICA', 'un dealer pendiente aparece en el directorio');
   else ok('el dealer pendiente no sale en el directorio');
 
   /* ═══ ADMINISTRADOR ═══ */
@@ -176,14 +229,16 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
   await esperar(400);
 
   vigilar(p, 'admin');
+  crearAdministrador();
+
   await p.goto(`${BASE}/cuenta.html`, { waitUntil: 'networkidle0' });
-  await escribir(p, '#ent-correo', 'caribe@demo.tuequipord.do');
-  await escribir(p, '#ent-clave', 'demostracion2026');
+  await escribir(p, '#ent-correo', CORREO_ADMIN);
+  await escribir(p, '#ent-clave', CLAVE);
   await p.click('#formEntrar button[type="submit"]');
   await esperar(1200);
 
   if (await p.$eval('#formCodigo', (el) => !el.hidden).catch(() => false)) {
-    const c = codigoDe('caribe');
+    const c = codigoDe(CORREO_ADMIN.split('@')[0]);
     if (c) { await p.type('#cod-codigo', c); await esperar(1800); }
   }
   console.log(`  sesión de administrador: ${p.url().includes('panel') ? 'sí' : 'NO'}`);
@@ -201,8 +256,9 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
     await p.click('button[data-accion="ver"]');
     await esperar(800);
     const exp = await p.$eval('.sol__detalle', (el) => el.innerText).catch(() => '');
-    console.log(`  expediente muestra RNC: ${/131909090/.test(exp) ? 'sí ✓' : 'NO ⚠'}`);
-    if (!/131909090/.test(exp)) anota('admin', 'flujo', 'el expediente no muestra el RNC');
+    const veRnc = exp.includes(RNC_DEALER);
+    console.log(`  expediente muestra RNC: ${veRnc ? 'sí ✓' : 'NO ⚠'}`);
+    if (!veRnc) anota('admin', 'flujo', 'el expediente no muestra el RNC');
 
     await p.click('button[data-accion="aprobar"]');
     await esperar(1500);
@@ -215,8 +271,8 @@ async function registrar(p, { tipo, correo, nombre, extra = {} }) {
   await p.goto(`${BASE}/dealers.html`, { waitUntil: 'networkidle0' });
   await esperar(800);
   const dir2 = await p.$eval('body', (b) => b.innerText);
-  console.log(`  aprobado sin plan en el directorio: ${dir2.includes('Auditoría Equipos') ? 'SÍ ⚠' : 'no ✓'}`);
-  if (dir2.includes('Auditoría Equipos')) anota('admin', 'lógica', 'sale en el directorio sin plan contratado');
+  console.log(`  aprobado sin plan en el directorio: ${dir2.includes(EMPRESA_DEALER) ? 'SÍ ⚠' : 'no ✓'}`);
+  if (dir2.includes(EMPRESA_DEALER)) anota('admin', 'lógica', 'sale en el directorio sin plan contratado');
 
   await nav.close();
 
