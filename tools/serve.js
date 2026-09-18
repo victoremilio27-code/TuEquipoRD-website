@@ -21,6 +21,7 @@ const fs = require('fs');
 const path = require('path');
 
 const fotos = require('./fotos');
+const videos = require('./videos');
 
 const RAIZ_PROYECTO = path.resolve(__dirname, '..');
 
@@ -71,6 +72,19 @@ const CABECERAS_SEGURIDAD = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob:",
+    /* `blob:` hace falta para preparar el video ANTES de subirlo.
+     *
+     * Quien elige un video de su galería no manda el archivo tal cual:
+     * el navegador lo abre en un <video> a partir de una URL blob:, lo
+     * repinta a 720p sobre un canvas y graba el resultado. Sin esta
+     * línea, `media-src` cae en `default-src 'self'`, el navegador se
+     * niega a abrir ese blob: y la subida muere con un error de
+     * seguridad en la consola que no explica nada a quien lo sufre.
+     *
+     * Los videos ya publicados se sirven desde el propio dominio, así
+     * que para verlos basta con 'self'. El blob: es solo el paso
+     * intermedio, y nunca sale del navegador de quien sube. */
+    "media-src 'self' blob:",
     "connect-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -257,6 +271,77 @@ const servidor = http.createServer((req, res) => {
         'Cache-Control': PRODUCCION ? 'public, max-age=31536000, immutable' : 'no-store',
       });
       res.end(datos);
+    });
+    return;
+  }
+
+  /* Videos de los anuncios. Rama aparte de las fotos, y no por
+     ordenarlo bonito: un video NO se puede servir como se sirve una
+     foto.
+
+     Las fotos se leen enteras a memoria con readFile y se mandan de una
+     vez. Con un video eso trae dos problemas:
+
+       1. `<video>` pide por rangos. Sin `Accept-Ranges` y sin responder
+          206 no se puede adelantar, y iOS Safari directamente NO
+          reproduce: pide los primeros bytes, recibe un 200 con el
+          archivo entero y abandona.
+       2. Son 6 MB por archivo. Cargarlos enteros en RAM en un servidor
+          de 512 MB, con varias visitas a la vez, es quedarse sin
+          memoria.
+
+     Así que aquí se responde al rango pedido y se manda en streaming,
+     que además empieza a reproducir antes. */
+  if (ruta.startsWith('/videos/')) {
+    const archivo = videos.archivoDe(ruta);
+    if (!archivo) {
+      res.writeHead(404).end('No existe');
+      return;
+    }
+
+    fs.stat(archivo, (err, est) => {
+      if (err || !est.isFile()) {
+        res.writeHead(404).end('No existe');
+        return;
+      }
+
+      const total = est.size;
+      const comunes = {
+        'Content-Type': videos.tipoDe(archivo),
+        'Accept-Ranges': 'bytes',
+        // El nombre es aleatorio y el archivo nunca se reescribe.
+        'Cache-Control': PRODUCCION ? 'public, max-age=31536000, immutable' : 'no-store',
+      };
+
+      const pedido = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+
+      if (!pedido) {
+        res.writeHead(200, { ...comunes, 'Content-Length': total });
+        if (req.method === 'HEAD') { res.end(); return; }
+        fs.createReadStream(archivo).pipe(res);
+        return;
+      }
+
+      // `bytes=-500` son los ÚLTIMOS 500, no los primeros.
+      const sufijo = pedido[1] === '';
+      let desde = sufijo ? total - Number(pedido[2] || 0) : Number(pedido[1]);
+      let hasta = sufijo || pedido[2] === '' ? total - 1 : Number(pedido[2]);
+
+      desde = Math.max(0, desde);
+      hasta = Math.min(total - 1, hasta);
+
+      if (!Number.isFinite(desde) || !Number.isFinite(hasta) || desde > hasta || desde >= total) {
+        res.writeHead(416, { ...comunes, 'Content-Range': `bytes */${total}` }).end();
+        return;
+      }
+
+      res.writeHead(206, {
+        ...comunes,
+        'Content-Range': `bytes ${desde}-${hasta}/${total}`,
+        'Content-Length': hasta - desde + 1,
+      });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(archivo, { start: desde, end: hasta }).pipe(res);
     });
     return;
   }

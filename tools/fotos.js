@@ -73,12 +73,26 @@ const TIPOS_SERVIDOS = {
 };
 
 /* Convierte un data URI en bytes. Devuelve null si no lo es: quien
-   llama decide, aquí no se lanza por una entrada mal formada. */
+   llama decide, aquí no se lanza por una entrada mal formada.
+
+   Se busca `;base64,` y se toma lo de después. Lo de delante no se
+   mira: el tipo lo decide la firma binaria, no la etiqueta. Antes había
+   aquí una expresión regular que exigía un tipo MIME sin parámetros;
+   parecía más estricta y solo servía para rechazar entradas válidas.
+   Con las fotos nunca saltó —el canvas genera `data:image/webp;base64,`
+   a secas— pero con los videos rechazaba absolutamente todos. Mismo
+   código, mismo fallo latente; se arregla en los dos a la vez. */
+const MARCA_BASE64 = ';base64,';
+
 function bytesDeDataUri(cadena) {
-  const m = /^data:([\w/+.-]+);base64,(.+)$/s.exec(String(cadena || ''));
-  if (!m) return null;
+  const texto = String(cadena || '');
+  if (!texto.startsWith('data:')) return null;
+
+  const corte = texto.indexOf(MARCA_BASE64);
+  if (corte < 0) return null;
+
   try {
-    return Buffer.from(m[2], 'base64');
+    return Buffer.from(texto.slice(corte + MARCA_BASE64.length), 'base64');
   } catch {
     return null;
   }

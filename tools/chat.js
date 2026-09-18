@@ -100,6 +100,9 @@ function tarifas() {
       }
 
       return `- ${p.nombre}: ${precio}. Hasta ${p.fotos_maximas} fotos.`
+        + (p.videos_maximos
+          ? ` ${p.videos_maximos} ${p.videos_maximos === 1 ? 'video' : 'videos'} de hasta 30 segundos por equipo.`
+          : '')
         + (p.destacado ? ' Aparece destacado en el catálogo.' : '')
         + (p.perfil_publico ? ' Incluye página pública de la empresa.' : '');
     })

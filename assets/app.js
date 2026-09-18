@@ -817,6 +817,33 @@ function galeriaHTML(e) {
   </ul>`;
 }
 
+/* Videos del equipo, si el anunciante subió alguno.
+ *
+ * `preload="metadata"` y no `auto`: son unos 6 MB cada uno, y quien
+ * abre una ficha desde el teléfono con datos móviles no tiene por qué
+ * descargarlos sin haberlos pedido. Con el póster puesto, la ficha se
+ * ve completa sin haber bajado un solo byte del video.
+ *
+ * `controls` sin autoplay: un video que arranca solo con sonido en una
+ * ficha que alguien abrió para ver un precio es una forma rápida de que
+ * cierre la pestaña. */
+function videosHTML(e) {
+  const lista = (e.videos || []).filter((v) => v && v.url);
+  if (!lista.length) return '';
+
+  return `<div class="detalle__bloque">
+    <h2 class="panel__titulo"><em>Video</em> del equipo</h2>
+    <ul class="videos">
+      ${lista.map((v, i) => `<li class="videos__it">
+        <video class="videos__pieza" src="${esc(v.url)}"
+               ${v.poster ? `poster="${esc(v.poster)}"` : ''}
+               controls preload="metadata" playsinline
+               aria-label="Video ${i + 1} del equipo"></video>
+      </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
 /* Medios de contacto declarados al publicar.
 
    Cada número se ofrece por los canales que el anunciante habilitó, y
@@ -933,6 +960,7 @@ async function montarDetalle() {
           ${foto(e, 'fantasma fantasma--xl')}
         </div>
         ${galeriaHTML(e)}
+        ${videosHTML(e)}
         ${e.descripcion ? `<div class="detalle__bloque">
             <h2 class="panel__titulo"><em>Descripción</em> del anunciante</h2>
             <p class="panel__texto">${esc(e.descripcion)}</p>
@@ -2093,6 +2121,7 @@ function anuncioDeApi(a) {
     fotosTotal: a.fotos_total != null ? a.fotos_total : (a.fotos || []).length,
     descripcion: a.descripcion,
     fotos: a.fotos,
+    videos: a.videos || [],
     telefonos: a.telefonos,
     publicado: a.publicado,
   };

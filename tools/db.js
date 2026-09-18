@@ -437,6 +437,40 @@ const MIGRACIONES = [
         SET encargado = 'Administración MercaMaquinarias'
       WHERE encargado = 'Administración TuEquipoRD'`,
   ]],
+
+  /* Video en los anuncios.
+
+     Va DESPUÉS de '2026-09-cambio-de-marca' aunque se escribiera antes:
+     esa ya se aplicó en producción, y las migraciones se añaden al
+     final. Reordenarlas no rompería nada —cada una se anota por su
+     nombre y ninguna depende de la otra—, pero el día que dos sí
+     dependan, el orden del archivo es lo único que lo dice.
+
+     Estándar 1, Destacado 2, Premium 3. El reparto no es arbitrario: a
+     unos 6 MB por video, con los 3,5 GB libres que tiene el disco del
+     VPS caben del orden de 500. Si se queda corto, el sitio empieza a
+     rechazar subidas —ver MINIMO_LIBRE en tools/videos.js— en vez de
+     llenar el disco y dejar a SQLite sin poder escribir, que es la
+     forma fea de quedarse sin espacio: se pierden publicaciones.
+
+     Los planes que ya no se venden se quedan a 0, el valor por defecto
+     de la columna. */
+  ['2026-09-videos-por-plan', [
+    'ALTER TABLE planes ADD COLUMN videos_maximos INTEGER NOT NULL DEFAULT 0',
+    `CREATE TABLE IF NOT EXISTS anuncio_videos (
+       id         TEXT PRIMARY KEY,
+       anuncio_id TEXT NOT NULL REFERENCES anuncios(id) ON DELETE CASCADE,
+       url        TEXT NOT NULL,
+       poster     TEXT,
+       duracion   REAL,
+       orden      INTEGER NOT NULL DEFAULT 0,
+       creada     TEXT NOT NULL
+     )`,
+    'CREATE INDEX IF NOT EXISTS ix_videos_anuncio ON anuncio_videos (anuncio_id, orden)',
+    "UPDATE planes SET videos_maximos = 1 WHERE id = 'estandar'",
+    "UPDATE planes SET videos_maximos = 2 WHERE id = 'destacado'",
+    "UPDATE planes SET videos_maximos = 3 WHERE id = 'premium'",
+  ]],
 ];
 
 function migrar() {
@@ -1384,7 +1418,7 @@ const ESTADOS_QUE_OCUPAN = "('activo', 'pausado')";
 function suscripcionesDe(idOrg) {
   return abrir().prepare(`
     SELECT s.*, p.nombre AS plan_nombre, p.nivel, p.precio AS precio_unitario,
-           p.perfil_publico, p.fotos_maximas, p.destacado,
+           p.perfil_publico, p.fotos_maximas, p.videos_maximos, p.destacado,
            (SELECT COUNT(*) FROM anuncios a
              WHERE a.suscripcion_id = s.id
                AND a.estado IN ${ESTADOS_QUE_OCUPAN}) AS ocupados
@@ -1606,6 +1640,18 @@ function crearAnuncio(datos) {
       foto.run(id(), idAnuncio, url, mini, i, t);
     });
 
+    /* Los videos llegan ya subidos a disco por /api/videos, igual que
+       las fotos: aquí solo se guarda la ruta. El recorte al tope del
+       plan se hace en la API, que es quien sabe qué plan se contrató. */
+    const vid = d.prepare('INSERT INTO anuncio_videos (id, anuncio_id, url, poster, duracion, orden, creada) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    (datos.videos || []).forEach((v, i) => {
+      const url = typeof v === 'string' ? v : v.url;
+      if (!url) return;
+      const poster = typeof v === 'string' ? null : (v.poster || null);
+      const duracion = typeof v === 'string' ? null : (Number(v.duracion) || null);
+      vid.run(id(), idAnuncio, url, poster, duracion, i, t);
+    });
+
     const tel = d.prepare('INSERT INTO anuncio_contactos (id, anuncio_id, numero, tipo, nota, orden) VALUES (?, ?, ?, ?, ?, ?)');
     (datos.telefonos || []).forEach((c, i) => tel.run(id(), idAnuncio, c.numero, c.tipo || 'ambos', c.nota || null, i));
 
@@ -1660,6 +1706,8 @@ function anuncio(idAnuncio) {
   // reserva mientras carga la grande.
   a.fotos = d.prepare('SELECT url, miniatura FROM anuncio_fotos WHERE anuncio_id = ? ORDER BY orden')
     .all(idAnuncio).map((f) => f.url);
+  a.videos = d.prepare('SELECT url, poster, duracion FROM anuncio_videos WHERE anuncio_id = ? ORDER BY orden')
+    .all(idAnuncio);
   a.telefonos = d.prepare('SELECT numero, tipo, nota FROM anuncio_contactos WHERE anuncio_id = ? ORDER BY orden').all(idAnuncio);
   return conNombres(a);
 }
@@ -1881,10 +1929,12 @@ function borrarAnuncio(idAnuncio, idOrg) {
 
   const fotos = d.prepare('SELECT url, miniatura FROM anuncio_fotos WHERE anuncio_id = ?')
     .all(idAnuncio);
+  const videos = d.prepare('SELECT url, poster FROM anuncio_videos WHERE anuncio_id = ?')
+    .all(idAnuncio);
 
   d.prepare('BEGIN').run();
   try {
-    for (const t of ['anuncio_fotos', 'anuncio_contactos', 'eventos', 'metricas_diarias']) {
+    for (const t of ['anuncio_fotos', 'anuncio_videos', 'anuncio_contactos', 'eventos', 'metricas_diarias']) {
       try { d.prepare(`DELETE FROM ${t} WHERE anuncio_id = ?`).run(idAnuncio); } catch (_) { /* tabla sin esa columna */ }
     }
     d.prepare('DELETE FROM anuncios WHERE id = ? AND organizacion_id = ?').run(idAnuncio, idOrg);
@@ -1894,10 +1944,18 @@ function borrarAnuncio(idAnuncio, idOrg) {
     throw e;
   }
 
-  // Rutas únicas: la miniatura puede ser la misma que la completa.
-  const rutas = new Set();
-  fotos.forEach((f) => { if (f.url) rutas.add(f.url); if (f.miniatura) rutas.add(f.miniatura); });
-  return [...rutas];
+  /* Dos listas, porque las fotos y los videos viven en carpetas
+     distintas y los borra un módulo distinto. El póster de un video es
+     una foto normal, así que va con las fotos.
+
+     Rutas únicas: la miniatura puede ser la misma que la completa. */
+  const rutasFotos = new Set();
+  fotos.forEach((f) => { if (f.url) rutasFotos.add(f.url); if (f.miniatura) rutasFotos.add(f.miniatura); });
+  videos.forEach((v) => { if (v.poster) rutasFotos.add(v.poster); });
+
+  const rutasVideos = videos.map((v) => v.url).filter(Boolean);
+
+  return { fotos: [...rutasFotos], videos: rutasVideos };
 }
 
 /* Motor y transmisión de un anuncio ya publicado. La API valida las
