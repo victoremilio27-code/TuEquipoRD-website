@@ -123,6 +123,43 @@
 
     <p class="realce realce--regla" id="reglaCupos"></p>
 
+    <!-- Comprobante fiscal.
+         Se pregunta ANTES de cobrar y no después: pedir el RNC cuando el
+         cargo ya pasó obliga a anular con una nota de crédito por algo
+         que era una casilla. Los campos de una cuenta de empresa vienen
+         rellenos, que es el caso de quien más los necesita. -->
+    <div class="comprobante" id="bloqueComprobante" hidden>
+      <p class="comprobante__titulo">¿Necesita comprobante fiscal con RNC?</p>
+      <div class="comprobante__ops" role="radiogroup" aria-label="Tipo de comprobante">
+        <label class="opcion opcion--chica">
+          <input type="radio" name="tipoComprobante" value="no" checked>
+          <span class="opcion__cuerpo">
+            <b class="opcion__nombre">No</b>
+            <span class="opcion__detalle">Recibo a su nombre, como consumidor final</span>
+          </span>
+        </label>
+        <label class="opcion opcion--chica">
+          <input type="radio" name="tipoComprobante" value="si">
+          <span class="opcion__cuerpo">
+            <b class="opcion__nombre">Sí, con RNC</b>
+            <span class="opcion__detalle">Factura de crédito fiscal para su contabilidad</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="campos campos--uno" id="camposFiscales" hidden>
+        <label class="campo-v"><span>Razón social *</span>
+          <input type="text" id="fac-razon" autocomplete="organization" placeholder="Ej. Constructora del Este, SRL">
+        </label>
+        <label class="campo-v"><span>RNC *</span>
+          <input type="text" id="fac-rnc" inputmode="numeric" maxlength="11" placeholder="9 dígitos">
+        </label>
+        <label class="campo-v"><span>Dirección fiscal *</span>
+          <input type="text" id="fac-direccion" autocomplete="street-address" placeholder="Calle, número, sector, ciudad">
+        </label>
+      </div>
+    </div>
+
     <div class="acciones acciones--pie">
       <button class="btn btn--ambar btn--grande" type="button" id="btnContratar">Contratar</button>
       <a class="btn btn--linea btn--grande" href="publicar.html" id="btnVolverPublicar" hidden>Volver a mi anuncio</a>

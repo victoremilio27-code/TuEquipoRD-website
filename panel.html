@@ -114,6 +114,23 @@
       <p class="tabla-vacia" id="tablaVacia" hidden></p>
     </section>
 
+    <!-- Comprobantes del cliente. Se pinta desde JavaScript y se
+         esconde si no hay ninguno: una sección vacía que dice «aún no
+         tiene facturas» es ruido en el panel de quien nunca ha pagado. -->
+    <section class="panel" id="panelFacturas" aria-labelledby="t-facturas" hidden>
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-facturas"><em>Sus</em> comprobantes</h2>
+      </div>
+      <div class="tabla-envoltura">
+        <table class="tabla-legales">
+          <thead>
+            <tr><th>Fecha</th><th>Número</th><th>Concepto</th><th>Total</th><th></th></tr>
+          </thead>
+          <tbody id="listaFacturas"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="panel" id="panelEmpresa" aria-labelledby="t-empresa" hidden></section>
 
     <section class="panel" id="panelSucursales" aria-labelledby="t-sucursales" hidden>

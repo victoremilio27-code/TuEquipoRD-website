@@ -22,6 +22,7 @@ const path = require('path');
 
 const db = require('./db');
 const correo = require('./correo');
+const facturas = require('./facturas');
 
 const SECO = process.argv.includes('--seco');
 const DIAS_AVISO = Number(process.env.MERCA_DIAS_AVISO) || 5;
@@ -94,6 +95,65 @@ async function avisarVencidos() {
   anotar('vencidos', `${enviados} de ${pendientes.length} aviso(s) de corte`);
 }
 
+/* Comprobantes que no llegaron a enviarse.
+ *
+ * Emitir y notificar son cosas distintas: el comprobante queda emitido
+ * y guardado aunque el proveedor de correo esté caído. Esta tarea
+ * recoge lo que quedó pendiente.
+ *
+ * Se abandona a los 10 intentos. Un correo que ha fallado diez días
+ * seguidos no va a salir el undécimo —la dirección no existe, o el
+ * buzón está lleno— y seguir intentándolo solo gasta cuota de envío.
+ * Queda marcado en el panel para reenviarlo a mano. */
+const MAXIMO_REINTENTOS = 10;
+
+async function reenviarComprobantes() {
+  const pendientes = db.facturas({ pendientes: true, limite: 100 })
+    .filter((f) => f.intentos_envio < MAXIMO_REINTENTOS);
+
+  if (!pendientes.length) return anotar('comprobantes', 'sin comprobantes pendientes de enviar');
+  if (SECO) return anotar('comprobantes', `reintentaría ${pendientes.length} envío(s)`);
+
+  let salieron = 0;
+  for (const f of pendientes) {
+    const dueno = f.organizacion_id && db.propietarioDe(f.organizacion_id);
+    const r = await facturas.enviar(f, { correoCliente: dueno && dueno.correo });
+    if (r && r.enviada_cliente && r.enviada_interna) salieron++;
+  }
+  anotar('comprobantes', `${salieron} de ${pendientes.length} comprobante(s) completados`);
+}
+
+/* Aviso cuando una secuencia de NCF se está acabando.
+ *
+ * Sin NCF disponible no se puede emitir una factura fiscal, y pedir un
+ * rango nuevo a la DGII no es inmediato. El aviso tiene que llegar con
+ * margen, no el día que se agota. */
+async function avisarNcf() {
+  const bajas = facturas.secuenciasBajas();
+  if (!bajas.length) return anotar('ncf', 'todas las secuencias con margen');
+
+  const detalle = bajas.map((s) => `${s.tipo}: quedan ${s.quedan} de ${s.hasta - s.desde + 1}`).join(' · ');
+  if (SECO) return anotar('ncf', `avisaría: ${detalle}`);
+
+  correo.avisarInternamente({
+    buzon: 'facturacion',
+    asunto: `Se están acabando los comprobantes fiscales · ${bajas.map((s) => s.tipo).join(', ')}`,
+    texto: [
+      'Quedan pocos comprobantes autorizados en estas secuencias:',
+      '',
+      ...bajas.map((s) => `  ${s.tipo} (${s.nombre}): ${s.quedan} de ${s.hasta - s.desde + 1}`),
+      '',
+      'Sin NCF disponible no se puede emitir una factura fiscal: quien pida',
+      'comprobante con RNC recibirá un recibo no fiscal.',
+      '',
+      'Solicite un rango nuevo a la DGII a través del contador antes de que se agote.',
+      '',
+      'MercaMaquinarias',
+    ].join('\n'),
+  });
+  anotar('ncf', detalle);
+}
+
 /* Sesiones, códigos y contadores caducados. */
 function limpiar() {
   if (SECO) return anotar('limpiar', 'purgaría sesiones, códigos e intentos caducados');
@@ -162,6 +222,8 @@ const TAREAS = {
   caducar,
   'por-vencer': avisarPorVencer,
   vencidos: avisarVencidos,
+  comprobantes: reenviarComprobantes,
+  ncf: avisarNcf,
   limpiar,
   respaldo: respaldar,
   optimizar,

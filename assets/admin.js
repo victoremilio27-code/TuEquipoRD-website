@@ -763,6 +763,125 @@ async function montarHeroe() {
   });
 
   montarLegales();
+  montarFacturasAdmin();
+}
+
+/* ── Comprobantes ───────────────────────────────────────── */
+
+let MES_FACTURAS = null;
+
+const TIPO_CORTO = {
+  recibo: 'Recibo',
+  factura_consumo: 'Consumo',
+  factura_credito_fiscal: 'Crédito fiscal',
+  nota_credito: 'Nota de crédito',
+};
+
+function pintarFacturasAdmin(datos) {
+  const lista = datos.facturas || [];
+  $('#facturasVacio').hidden = lista.length > 0;
+
+  $('#listaFacturasAdmin').innerHTML = lista.map((f) => {
+    const cuando = new Date(f.fecha);
+    /* Los dos envíos, por separado: que el del cliente rebotara no
+       significa que la copia interna no saliera, y al revés. Verlos
+       juntos escondería justo el caso que hay que atender. */
+    const marca = (fechaEnvio, etiqueta) => (fechaEnvio
+      ? `<span class="envio envio--si">${etiqueta} ✓</span>`
+      : `<span class="envio envio--no">${etiqueta} ✗</span>`);
+
+    return `<tr>
+      <td class="num">${cuando.toLocaleDateString('es-DO', { day: '2-digit', month: 'short' })}
+        <span class="tabla-legales__hora">${cuando.getFullYear()}</span></td>
+      <td class="num">${esc(f.numero)}
+        <span class="tabla-legales__sub">${esc(TIPO_CORTO[f.tipo] || f.tipo)}${f.ncf ? ` · ${esc(f.ncf)}` : ''}</span>
+        ${f.anulado_por ? '<span class="pastilla pastilla--ambar">anulada</span>' : ''}</td>
+      <td>${esc(f.razon_social || 'Consumidor final')}
+        ${f.rnc ? `<span class="tabla-legales__sub">RNC ${esc(f.rnc)}</span>` : ''}</td>
+      <td class="num">RD$${Number(f.total).toLocaleString('en-US')}</td>
+      <td>${marca(f.enviada_cliente, 'cliente')} ${marca(f.enviada_interna, 'interna')}</td>
+      <td class="acciones-fila">
+        <a class="btn btn--linea btn--chico" href="/api/facturas/${esc(f.id)}.pdf" target="_blank" rel="noopener">PDF</a>
+        <button type="button" class="btn btn--linea btn--chico" data-factura="${esc(f.id)}" data-accion="reenviar">Reenviar</button>
+        ${f.tipo !== 'nota_credito' && !f.anulado_por
+    ? `<button type="button" class="btn btn--linea btn--chico" data-factura="${esc(f.id)}" data-accion="anular">Anular</button>`
+    : ''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  /* Estado de las secuencias, y el aviso si alguna se está acabando. */
+  $('#listaSecuencias').innerHTML = (datos.secuencias || []).map((s) => `<tr>
+      <td class="num">${esc(s.tipo)}<span class="tabla-legales__sub">${esc(s.nombre)}</span></td>
+      <td class="num">${esc(s.prefijo)}${String(s.desde).padStart(8, '0')} – ${String(s.hasta).padStart(8, '0')}</td>
+      <td class="num">${String(s.siguiente).padStart(8, '0')}</td>
+      <td class="num">${s.quedan}</td>
+      <td>${s.usa_sitio ? 'la usa el sitio' : 'solo contabilidad'}</td>
+    </tr>`).join('');
+
+  const bajas = datos.bajas || [];
+  $('#avisoNcf').innerHTML = bajas.length
+    ? `<div class="aviso-legal">
+         <p class="aviso-legal__titulo">Se están acabando los comprobantes</p>
+         <p class="aviso-legal__texto">Quedan pocos en ${bajas.map((b) => `<b>${esc(b.tipo)}</b> (${b.quedan})`).join(' y ')}.
+           Sin NCF disponible no se puede emitir una factura fiscal: pida un rango nuevo a la DGII antes de que se agote.</p>
+       </div>`
+    : '';
+}
+
+async function cargarFacturasAdmin() {
+  const datos = await api(`/admin/facturas${MES_FACTURAS ? `?mes=${MES_FACTURAS}` : ''}`,
+    { silencioso: true });
+  if (!datos) return null;
+  pintarFacturasAdmin(datos);
+  const csv = $('#btnCsv');
+  if (csv) csv.href = `/api/admin/facturas.csv${MES_FACTURAS ? `?mes=${MES_FACTURAS}` : ''}`;
+  return datos;
+}
+
+async function montarFacturasAdmin() {
+  if (!$('#listaFacturasAdmin')) return;
+  if (!await cargarFacturasAdmin()) return;
+
+  $('#mesFacturas').addEventListener('change', (ev) => {
+    MES_FACTURAS = ev.target.value || null;
+    cargarFacturasAdmin();
+  });
+
+  $('#listaFacturasAdmin').addEventListener('click', async (ev) => {
+    const boton = ev.target.closest('button[data-factura]');
+    if (!boton) return;
+    const { factura, accion } = boton.dataset;
+
+    if (accion === 'anular') {
+      /* Anular emite una nota de crédito con su NCF, y eso consume un
+         número autorizado que no se recupera. Por eso se pregunta. */
+      const motivo = prompt('¿Por qué se anula este comprobante?\n\n'
+        + 'Se emitirá una nota de crédito con su propio NCF. El comprobante original\n'
+        + 'NO se borra: queda marcado como anulado.');
+      if (motivo === null) return;
+
+      boton.disabled = true;
+      try {
+        const r = await api(`/admin/facturas/${factura}/anular`, {
+          metodo: 'POST', cuerpo: { motivo },
+        });
+        if (!r) throw new Error('No hay conexión con el servidor.');
+        aviso(`Nota de crédito ${r.nota.numero} emitida.`, true);
+        cargarFacturasAdmin();
+      } catch (e) { aviso(e.message); boton.disabled = false; }
+      return;
+    }
+
+    boton.disabled = true;
+    boton.textContent = 'Enviando…';
+    try {
+      const r = await api(`/admin/facturas/${factura}/reenviar`, { metodo: 'POST' });
+      if (!r) throw new Error('No hay conexión con el servidor.');
+      aviso('Reenviado.', true);
+      cargarFacturasAdmin();
+    } catch (e) { aviso(e.message); boton.disabled = false; boton.textContent = 'Reenviar'; }
+  });
 }
 
 /* ── Aceptaciones legales ─────────────────────────────────── */

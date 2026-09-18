@@ -91,6 +91,44 @@
       <p class="revision__vacio" id="colaVacia" hidden></p>
     </section>
 
+    <!-- Comprobantes emitidos, con el estado de las secuencias de NCF.
+         El aviso de secuencia baja va arriba del todo porque quedarse
+         sin NCF significa no poder facturar, y B01 arranca con quince. -->
+    <section class="panel" aria-labelledby="t-facturas">
+      <div class="panel__cabeza">
+        <h2 class="panel__titulo panel__titulo--limpio" id="t-facturas"><em>Comprobantes</em> emitidos</h2>
+      </div>
+
+      <div id="avisoNcf"></div>
+
+      <div class="revision__filtros">
+        <label class="campo-v campo-v--chico"><span>Mes</span>
+          <input type="month" id="mesFacturas">
+        </label>
+        <a class="btn btn--linea btn--chico" id="btnCsv" href="/api/admin/facturas.csv" download>Exportar CSV</a>
+      </div>
+
+      <div class="tabla-envoltura">
+        <table class="tabla-legales">
+          <thead>
+            <tr><th>Fecha</th><th>Número</th><th>Cliente</th><th>Total</th><th>Envíos</th><th></th></tr>
+          </thead>
+          <tbody id="listaFacturasAdmin"></tbody>
+        </table>
+      </div>
+      <p class="revision__vacio" id="facturasVacio" hidden>No hay comprobantes en ese periodo.</p>
+
+      <details class="secuencias">
+        <summary>Secuencias de NCF autorizadas</summary>
+        <div class="tabla-envoltura">
+          <table class="tabla-legales">
+            <thead><tr><th>Tipo</th><th>Rango</th><th>Siguiente</th><th>Quedan</th><th>Uso</th></tr></thead>
+            <tbody id="listaSecuencias"></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
     <!-- Quién aceptó qué condiciones y cuándo.
          Es la respuesta a «demuestre que esta persona aceptó esto», así
          que enseña la versión y la fecha, no un sí. -->

@@ -502,6 +502,105 @@ const MIGRACIONES = [
     'CREATE INDEX IF NOT EXISTS ix_aceptaciones_usuario ON aceptaciones_legales (usuario_id)',
     'CREATE INDEX IF NOT EXISTS ix_aceptaciones_doc ON aceptaciones_legales (documento, version)',
   ]],
+
+  /* Comprobantes.
+   *
+   * UN COMPROBANTE EMITIDO NO SE BORRA NI SE REESCRIBE. Si hay que
+   * anular, se emite una nota de crédito que lo referencia. Es la regla
+   * que hace que la contabilidad se sostenga, y por eso la tabla no
+   * tiene columna de «anulado» que alguien pueda poner a 1: tiene
+   * `anulado_por`, que apunta a otro comprobante de verdad.
+   *
+   * EL NÚMERO INTERNO Y EL NCF SON COSAS DISTINTAS.
+   *
+   *   · `numero` (MM-2026-000123) es nuestro, correlativo y sin huecos.
+   *     Lo lleva TODO comprobante, incluido el recibo no fiscal.
+   *   · `ncf` (B0100000016) lo autoriza la DGII y solo lo llevan las
+   *     facturas fiscales. Es único en toda la tabla: dos comprobantes
+   *     con el mismo NCF es un problema con la DGII, no un duplicado
+   *     cualquiera, así que lo impide el esquema y no el código.
+   *
+   * Los importes van en enteros, como en `pagos`: céntimos de peso en
+   * coma flotante es como aparecen los descuadres de un centavo. */
+  ['2026-09-comprobantes', [
+    `CREATE TABLE IF NOT EXISTS facturas (
+       id            TEXT PRIMARY KEY,
+       pago_id       TEXT REFERENCES pagos(id) ON DELETE SET NULL,
+       organizacion_id TEXT REFERENCES organizaciones(id) ON DELETE SET NULL,
+       numero        TEXT NOT NULL UNIQUE,
+       tipo          TEXT NOT NULL CHECK (tipo IN
+                       ('recibo', 'factura_consumo', 'factura_credito_fiscal', 'nota_credito')),
+       ncf           TEXT UNIQUE,
+       razon_social  TEXT,
+       rnc           TEXT,
+       direccion     TEXT,
+       concepto      TEXT,
+       subtotal      INTEGER NOT NULL,
+       itbis         INTEGER NOT NULL,
+       total         INTEGER NOT NULL,
+       moneda        TEXT NOT NULL DEFAULT 'DOP',
+       fecha         TEXT NOT NULL,
+       ruta_pdf      TEXT,
+       enviada_cliente TEXT,
+       enviada_interna TEXT,
+       intentos_envio  INTEGER NOT NULL DEFAULT 0,
+       anula_a       TEXT REFERENCES facturas(id) ON DELETE SET NULL,
+       anulado_por   TEXT REFERENCES facturas(id) ON DELETE SET NULL,
+       creada        TEXT NOT NULL
+     )`,
+    'CREATE INDEX IF NOT EXISTS ix_facturas_fecha ON facturas (fecha DESC)',
+    'CREATE INDEX IF NOT EXISTS ix_facturas_org ON facturas (organizacion_id, fecha DESC)',
+    'CREATE INDEX IF NOT EXISTS ix_facturas_pago ON facturas (pago_id)',
+    /* Para la tarea que reintenta lo que no salió. */
+    'CREATE INDEX IF NOT EXISTS ix_facturas_pendientes ON facturas (enviada_cliente, enviada_interna)',
+
+    /* Secuencias autorizadas por la DGII.
+     *
+     * `siguiente` es el próximo número a usar, no el último usado: así
+     * una secuencia recién cargada se describe con desde=siguiente y no
+     * hay que inventarse un «cero» que no existe.
+     *
+     * `activa` permite tener cargadas las secuencias que el contador usa
+     * por su cuenta —B11, B13, B14, B15— sin que el sitio las ofrezca al
+     * cobrar. Cargarlas sirve para que el aviso de agotamiento las
+     * vigile igual. */
+    `CREATE TABLE IF NOT EXISTS secuencias_ncf (
+       id         TEXT PRIMARY KEY,
+       tipo       TEXT NOT NULL,
+       nombre     TEXT NOT NULL,
+       prefijo    TEXT NOT NULL,
+       desde      INTEGER NOT NULL,
+       hasta      INTEGER NOT NULL,
+       siguiente  INTEGER NOT NULL,
+       vence      TEXT,
+       activa     INTEGER NOT NULL DEFAULT 0,
+       usa_sitio  INTEGER NOT NULL DEFAULT 0,
+       creada     TEXT NOT NULL,
+       UNIQUE (tipo, desde)
+     )`,
+
+    /* Las secuencias que la DGII aprobó el 28/08/2026.
+     *
+     * `usa_sitio` marca las tres que toca el flujo de compra: B01 para
+     * quien pide comprobante con RNC, B02 para consumidor final —que
+     * TODAVÍA NO EXISTE, hay que solicitarla— y B04 para las notas de
+     * crédito de una devolución. Las demás se cargan para que el aviso
+     * de agotamiento las vigile, pero el sitio no las emite.
+     *
+     * La fecha de vencimiento está pendiente de confirmar, así que se
+     * deja en NULL en vez de inventarse una: una fecha falsa haría que
+     * el sistema diera por caducada una secuencia buena, o al revés. */
+    `INSERT OR IGNORE INTO secuencias_ncf
+       (id, tipo, nombre, prefijo, desde, hasta, siguiente, vence, activa, usa_sitio, creada)
+     VALUES
+       ('ncf-b01', 'B01', 'Crédito fiscal',          'B01', 16,  30,  16,  NULL, 1, 1, '2026-09-18'),
+       ('ncf-b04', 'B04', 'Notas de crédito',        'B04', 1,   10,  1,   NULL, 1, 1, '2026-09-18'),
+       ('ncf-b03', 'B03', 'Notas de débito',         'B03', 1,   5,   1,   NULL, 1, 0, '2026-09-18'),
+       ('ncf-b11', 'B11', 'Comprobante de compras',  'B11', 18,  22,  18,  NULL, 1, 0, '2026-09-18'),
+       ('ncf-b13', 'B13', 'Gastos menores',          'B13', 107, 111, 107, NULL, 1, 0, '2026-09-18'),
+       ('ncf-b14', 'B14', 'Regímenes especiales',    'B14', 1,   5,   1,   NULL, 1, 0, '2026-09-18'),
+       ('ncf-b15', 'B15', 'Gubernamental',           'B15', 101, 150, 101, NULL, 1, 0, '2026-09-18')`,
+  ]],
 ];
 
 function migrar() {
@@ -2205,8 +2304,173 @@ function historialAceptaciones({ documento, limite = 200 } = {}) {
      LIMIT ?`).all(...args);
 }
 
+/* ── Comprobantes ───────────────────────────────────────── */
+
+/* Toma el siguiente NCF de una secuencia y lo marca como consumido.
+ *
+ * VA EN UNA TRANSACCIÓN, y no es paranoia: dos pagos que entren en el
+ * mismo instante leerían el mismo `siguiente` y acabarían con el MISMO
+ * NCF. Dos comprobantes con el mismo número autorizado no es un
+ * duplicado cualquiera: es un problema con la DGII.
+ *
+ * El UPDATE lleva la condición `siguiente = ?` con el valor que se
+ * acaba de leer. Si otro proceso se adelantó, `changes` es 0 y se
+ * reintenta. Es la forma de hacerlo sin bloquear la base entera.
+ *
+ * Devuelve null si la secuencia se agotó o no existe. Quien llama
+ * decide: para una factura fiscal, eso significa que no se puede
+ * emitir; para un recibo no fiscal, ni se pregunta. */
+function tomarNcf(tipo) {
+  const d = abrir();
+
+  for (let intento = 0; intento < 5; intento++) {
+    const s = d.prepare('SELECT * FROM secuencias_ncf WHERE tipo = ? AND activa = 1').get(tipo);
+    if (!s) return null;
+    if (s.siguiente > s.hasta) return null;          // agotada
+
+    const r = d.prepare(`
+      UPDATE secuencias_ncf SET siguiente = siguiente + 1
+       WHERE id = ? AND siguiente = ?`).run(s.id, s.siguiente);
+
+    if (r.changes === 1) {
+      return {
+        ncf: `${s.prefijo}${String(s.siguiente).padStart(8, '0')}`,
+        quedan: s.hasta - s.siguiente,
+      };
+    }
+  }
+  return null;
+}
+
+/* Cuántos comprobantes quedan en cada secuencia. Lo usa el aviso de
+   agotamiento y la pantalla de administración. */
+const secuenciasNcf = () => abrir().prepare(`
+  SELECT *, (hasta - siguiente + 1) AS quedan
+    FROM secuencias_ncf ORDER BY usa_sitio DESC, tipo`).all();
+
+/* El siguiente número interno, correlativo y sin huecos.
+ *
+ * Se cuenta sobre la propia tabla y no con un contador aparte: un
+ * contador puede desincronizarse de las filas que dice contar, y
+ * entonces hay que decidir cuál de los dos tiene razón. Aquí la
+ * respuesta siempre es la tabla.
+ *
+ * Por año, que es como se archivan: MM-2026-000001 vuelve a empezar en
+ * MM-2027-000001. */
+function siguienteNumero(fecha) {
+  const anio = String(fecha || ahora()).slice(0, 4);
+  const ultimo = abrir().prepare(`
+    SELECT numero FROM facturas WHERE numero LIKE ?
+     ORDER BY numero DESC LIMIT 1`).get(`MM-${anio}-%`);
+
+  const n = ultimo ? Number(String(ultimo.numero).split('-')[2]) + 1 : 1;
+  return `MM-${anio}-${String(n).padStart(6, '0')}`;
+}
+
+/* Guarda un comprobante. El número y el NCF se toman aquí dentro, en la
+   misma transacción que la inserción: pedirlos fuera y luego insertar
+   deja una ventana en la que otro pago se cuela y toma el mismo. */
+function crearFactura(datos) {
+  const d = abrir();
+  const hecho = d.prepare(`
+    INSERT INTO facturas
+      (id, pago_id, organizacion_id, numero, tipo, ncf, razon_social, rnc, direccion,
+       concepto, subtotal, itbis, total, moneda, fecha, ruta_pdf, anula_a, creada)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+  const idFactura = id();
+  const fecha = datos.fecha || ahora();
+
+  /* El número se calcula y se inserta dentro de la misma transacción.
+     Si dos pagos coinciden, el segundo choca con el UNIQUE de `numero`
+     —no se pierde ni se duplica— y se reintenta con el siguiente. */
+  for (let intento = 0; intento < 5; intento++) {
+    const numero = siguienteNumero(fecha);
+    try {
+      hecho.run(
+        idFactura, datos.pagoId || null, datos.organizacionId || null, numero,
+        datos.tipo, datos.ncf || null,
+        datos.razonSocial || null, datos.rnc || null, datos.direccion || null,
+        datos.concepto || null,
+        Math.round(datos.subtotal), Math.round(datos.itbis), Math.round(datos.total),
+        datos.moneda || 'DOP', fecha, datos.rutaPdf || null, datos.anulaA || null, ahora(),
+      );
+      return { id: idFactura, numero };
+    } catch (e) {
+      if (!/UNIQUE/i.test(e.message) || !/numero/i.test(e.message)) throw e;
+    }
+  }
+  throw new Error('no se pudo asignar un número de comprobante');
+}
+
+/* El pago por su referencia.
+ *
+ * Se busca así y no como «el último pago de esta organización»: son
+ * equivalentes hoy, con un solo proceso y la llamada inmediatamente
+ * después, pero «el último» deja de ser cierto en cuanto haya dos
+ * peticiones a la vez, y el error sería emitirle a un cliente el
+ * comprobante del pago de otro. La referencia es única por cobro. */
+const pagoPorReferencia = (ref) => abrir().prepare(
+  'SELECT * FROM pagos WHERE referencia = ? ORDER BY creado DESC LIMIT 1').get(ref);
+
+const pagoPorId = (idPago) => abrir().prepare('SELECT * FROM pagos WHERE id = ?').get(idPago);
+
+/* Quién recibe el comprobante de una organización: su propietario. */
+const propietarioDe = (idOrg) => abrir().prepare(`
+  SELECT u.id, u.correo, u.nombre
+    FROM miembros m JOIN usuarios u ON u.id = m.usuario_id
+   WHERE m.organizacion_id = ? AND m.rol = 'propietario'
+   ORDER BY m.creado LIMIT 1`).get(idOrg);
+
+/* Un pago devuelto. No se borra: cambia de estado, y la nota de crédito
+   queda enlazada al comprobante original. */
+const marcarPagoDevuelto = (idPago) => abrir().prepare(
+  "UPDATE pagos SET estado = 'devuelto' WHERE id = ?").run(idPago);
+
+const facturaPorId = (idFactura) => abrir().prepare('SELECT * FROM facturas WHERE id = ?').get(idFactura);
+const facturaDePago = (idPago) => abrir().prepare(
+  "SELECT * FROM facturas WHERE pago_id = ? AND tipo <> 'nota_credito'").get(idPago);
+
+const facturasDe = (idOrg) => abrir().prepare(
+  'SELECT * FROM facturas WHERE organizacion_id = ? ORDER BY fecha DESC').all(idOrg);
+
+/* Para administración: por mes y, si se pide, por estado de envío. */
+function facturas({ mes, pendientes = false, limite = 500 } = {}) {
+  const donde = [];
+  const args = [];
+  if (mes) { donde.push("substr(f.fecha, 1, 7) = ?"); args.push(mes); }
+  if (pendientes) donde.push('(f.enviada_cliente IS NULL OR f.enviada_interna IS NULL)');
+
+  args.push(limite);
+  return abrir().prepare(`
+    SELECT f.*, o.nombre AS empresa, u.correo AS correo_cliente
+      FROM facturas f
+      LEFT JOIN organizaciones o ON o.id = f.organizacion_id
+      LEFT JOIN miembros m ON m.organizacion_id = o.id AND m.rol = 'propietario'
+      LEFT JOIN usuarios u ON u.id = m.usuario_id
+     ${donde.length ? `WHERE ${donde.join(' AND ')}` : ''}
+     ORDER BY f.fecha DESC
+     LIMIT ?`).all(...args);
+}
+
+const marcarEnviada = (idFactura, cual) => abrir().prepare(
+  `UPDATE facturas SET ${cual === 'interna' ? 'enviada_interna' : 'enviada_cliente'} = ? WHERE id = ?`)
+  .run(ahora(), idFactura);
+
+const sumarIntentoEnvio = (idFactura) => abrir().prepare(
+  'UPDATE facturas SET intentos_envio = intentos_envio + 1 WHERE id = ?').run(idFactura);
+
+const anotarPdf = (idFactura, ruta) => abrir().prepare(
+  'UPDATE facturas SET ruta_pdf = ? WHERE id = ?').run(ruta, idFactura);
+
+const marcarAnulada = (idFactura, idNota) => abrir().prepare(
+  'UPDATE facturas SET anulado_por = ? WHERE id = ?').run(idNota, idFactura);
+
 module.exports = {
   registrarAceptacion, aceptacionesDe, historialAceptaciones,
+  tomarNcf, secuenciasNcf, siguienteNumero, crearFactura, facturaPorId, facturaDePago,
+  pagoPorReferencia, pagoPorId, propietarioDe, marcarPagoDevuelto,
+  facturasDe, facturas, marcarEnviada, sumarIntentoEnvio, anotarPdf, marcarAnulada,
   abrir, id, ahora, hoy, sumarDias, sumarMeses, aSlug, huella, purgar,
   cifrarClave, claveCorrecta, cambiarClave,
   usuarioPorCorreo, usuarioPorId, crearCuenta, organizacionDe, sucursalPrincipal,

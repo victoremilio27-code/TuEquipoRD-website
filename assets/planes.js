@@ -260,10 +260,9 @@ async function contratar() {
   btn.textContent = 'Contratando…';
 
   try {
-    const r = await api('/membresias', {
-      metodo: 'POST',
-      cuerpo: { plan: ped.nivel.id, cupo: CUPOS_PEDIDOS, dias: DIAS_PLAN },
-    });
+    const cuerpo = { plan: ped.nivel.id, cupo: CUPOS_PEDIDOS, dias: DIAS_PLAN, ...datosFiscales() };
+
+    const r = await api('/membresias', { metodo: 'POST', cuerpo });
     if (!r) throw new Error('No hay conexión con el servidor.');
 
     /* Con destino se vuelve solo: el anunciante venía de su borrador y
@@ -281,6 +280,54 @@ async function contratar() {
     btn.classList.remove('btn--ocupado');
     btn.textContent = antes;
   }
+}
+
+/* ── Comprobante fiscal ─────────────────────────────────── */
+
+/* Lo que se manda al servidor sobre el comprobante.
+ *
+ * Si no pide RNC no se manda nada: el servidor emite a nombre del
+ * titular como consumidor final. Mandar campos vacíos haría que la
+ * petición contara cosas que no existen. */
+function datosFiscales() {
+  const elegido = document.querySelector('input[name="tipoComprobante"]:checked');
+  if (!elegido || elegido.value !== 'si') return {};
+  return {
+    conRnc: true,
+    razonSocial: ($('#fac-razon') || {}).value || '',
+    rnc: ($('#fac-rnc') || {}).value || '',
+    direccionFiscal: ($('#fac-direccion') || {}).value || '',
+  };
+}
+
+/* Enseña el bloque y, si la cuenta es de empresa, rellena lo que ya
+   sabemos. Quien más necesita la factura es justo quien ya nos dio
+   estos datos al darse de alta: volvérselos a pedir es hacerle
+   teclear lo que tenemos. */
+function montarComprobante() {
+  const bloque = $('#bloqueComprobante');
+  if (!bloque) return;
+
+  // Sin sesión no hay a quién facturar todavía.
+  if (!haySesion()) return;
+  bloque.hidden = false;
+
+  const org = SESION.organizacion;
+  if (org && org.tipo === 'dealer') {
+    if ($('#fac-razon')) $('#fac-razon').value = org.nombre || '';
+    /* El RNC NO se rellena: la sesión solo trae la versión
+       enmascarada, y poner «1-31-***75-9» en un campo que se envía
+       sería mandar asteriscos al servidor. Lo escribe quien factura,
+       que lo tiene a mano. */
+  }
+
+  const campos = $('#camposFiscales');
+  bloque.querySelectorAll('input[name="tipoComprobante"]').forEach((r) => {
+    r.addEventListener('change', () => {
+      campos.hidden = r.value !== 'si' || !r.checked;
+      if (!campos.hidden && $('#fac-razon')) $('#fac-razon').focus();
+    });
+  });
 }
 
 /* Ampliar lo que ya tiene, prorrateado. Es el caso de quien se quedó
@@ -331,6 +378,7 @@ async function montarPlanes() {
 
   await cargarSesion();
   montarAvisoLegal('pagar');
+  montarComprobante();
 
   const catalogo = await api('/planes', { silencioso: true });
   NIVELES_PLAN = (catalogo && catalogo.planes) || [];

@@ -278,7 +278,7 @@ function plantillaCodigo({ codigo, tipo, nombre, minutos }) {
  * decía «12 de 12 entregados» y en la bandeja había diez. */
 let secuencia = 0;
 
-function porArchivo({ para, asunto, texto, html, responderA = BUZONES.general }) {
+function porArchivo({ para, asunto, texto, html, responderA = BUZONES.general, adjuntos = [] }) {
   fs.mkdirSync(BANDEJA, { recursive: true });
   const sello = new Date().toISOString().replace(/[:.]/g, '-');
   const n = String(++secuencia).padStart(3, '0');
@@ -290,6 +290,17 @@ function porArchivo({ para, asunto, texto, html, responderA = BUZONES.general })
   // La versión HTML se guarda aparte para poder abrirla en el navegador
   // y ver cómo va a llegar, sin gastar un envío real.
   if (html) fs.writeFileSync(`${base}.html`, html, 'utf8');
+
+  /* Los adjuntos también se escriben. Con el transporte de archivo no
+     hay envío que inspeccionar, y un comprobante que «se mandó» pero
+     cuyo PDF nadie ha abierto es exactamente el que sale mal el día que
+     lo abre un cliente. */
+  for (const a of adjuntos) {
+    try {
+      fs.writeFileSync(path.join(BANDEJA, `${sello}-${n}-${a.name}`),
+        Buffer.from(a.content, 'base64'));
+    } catch (_) { /* un adjunto ilegible no debe tumbar el envío */ }
+  }
 
   // En desarrollo el código se lee aquí, en la consola del servidor.
   const codigo = /Código: (\d+)/.exec(texto);
@@ -322,7 +333,7 @@ function partirRemitente(cadena) {
   return m ? { name: m[1] || undefined, email: m[2] } : { email: String(cadena).trim() };
 }
 
-function porBrevo({ para, asunto, texto, html, responderA = BUZONES.general }) {
+function porBrevo({ para, asunto, texto, html, responderA = BUZONES.general, adjuntos = [] }) {
   const clave = process.env.BREVO_API_KEY;
   if (!clave) throw new Error('Falta BREVO_API_KEY');
 
@@ -333,6 +344,11 @@ function porBrevo({ para, asunto, texto, html, responderA = BUZONES.general }) {
     subject: asunto,
     textContent: texto,
     ...(html ? { htmlContent: html } : {}),
+    /* Brevo los quiere en base64 con su nombre. Van dentro del JSON,
+       así que el cuerpo crece un 33 % sobre el peso real del archivo:
+       un comprobante son 3 KB, no hay problema, pero conviene saberlo
+       antes de adjuntar algo grande. */
+    ...(adjuntos.length ? { attachment: adjuntos.map((a) => ({ content: a.content, name: a.name })) } : {}),
   });
 
   return new Promise((resolver) => {
