@@ -102,11 +102,39 @@ function bytesLibres() {
   }
 }
 
+/* Convierte un data URI en bytes. Devuelve null si no lo es.
+ *
+ * SE BUSCA `;base64,` Y SE TOMA LO QUE VENGA DESPUÉS. Lo de delante no
+ * se mira: el tipo lo decide la firma binaria unas líneas más abajo, no
+ * lo que diga quien sube.
+ *
+ * Aquí había una expresión regular, y rechazaba TODOS los videos. Lo
+ * que manda el navegador es:
+ *
+ *   data:video/mp4;codecs=avc1.42001e,mp4a.40.2;base64,…
+ *
+ * Con DOS códecs separados por COMA. Cualquier intento de describir esa
+ * cabecera con una expresión acaba tropezando: si se para en la primera
+ * coma, corta por la mitad del parámetro; si no, hay que empezar a
+ * contemplar comillas y parámetros que nadie usa. Y el precio de
+ * equivocarse era un «El video no llegó en el formato esperado» que no
+ * dice nada: el video estaba perfecto, lo que no encajaba era su
+ * etiqueta.
+ *
+ * Buscar el separador y cortar ahí no tiene ese problema. El alfabeto
+ * de base64 no incluye `;`, así que la primera aparición de `;base64,`
+ * es siempre la de verdad y nunca una del contenido. */
+const MARCA_BASE64 = ';base64,';
+
 function bytesDeDataUri(cadena) {
-  const m = /^data:([\w/+.-]+);base64,(.+)$/s.exec(String(cadena || ''));
-  if (!m) return null;
+  const texto = String(cadena || '');
+  if (!texto.startsWith('data:')) return null;
+
+  const corte = texto.indexOf(MARCA_BASE64);
+  if (corte < 0) return null;
+
   try {
-    return Buffer.from(m[2], 'base64');
+    return Buffer.from(texto.slice(corte + MARCA_BASE64.length), 'base64');
   } catch {
     return null;
   }

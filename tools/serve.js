@@ -72,6 +72,19 @@ const CABECERAS_SEGURIDAD = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob:",
+    /* `blob:` hace falta para preparar el video ANTES de subirlo.
+     *
+     * Quien elige un video de su galería no manda el archivo tal cual:
+     * el navegador lo abre en un <video> a partir de una URL blob:, lo
+     * repinta a 720p sobre un canvas y graba el resultado. Sin esta
+     * línea, `media-src` cae en `default-src 'self'`, el navegador se
+     * niega a abrir ese blob: y la subida muere con un error de
+     * seguridad en la consola que no explica nada a quien lo sufre.
+     *
+     * Los videos ya publicados se sirven desde el propio dominio, así
+     * que para verlos basta con 'self'. El blob: es solo el paso
+     * intermedio, y nunca sale del navegador de quien sube. */
+    "media-src 'self' blob:",
     "connect-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
