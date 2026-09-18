@@ -245,12 +245,19 @@ una cuenta. Es el paso que más se olvida y el que más rápido se nota.
    no enviarlo.
 3. Genera la clave en **SMTP & API → API Keys** y ponla en
    `/etc/mercamaquinarias.env` como `BREVO_API_KEY`.
-4. Comprueba que sale de verdad:
+4. Comprueba que sale de verdad. **Como root**, que es quien puede leer
+   el archivo de secretos; la herramienta saca la configuración de la
+   misma unidad de systemd que usa el sitio, así que no hay que
+   repetirle nada:
 
    ```bash
-   sudo -u mercamaquinarias MERCA_CORREO=brevo \
-     node -e "require('./tools/correo').enviarBienvenida({para:'tucorreo@gmail.com',nombre:'Prueba'})"
+   cd /var/www/mercamaquinarias
+   node tools/probar-correo.js tucorreo@gmail.com
    ```
+
+   Antes de enviar imprime qué transporte, qué remitente y si encuentra
+   la clave. Si dice `archivo` en vez de `brevo`, el correo se queda en
+   el servidor y no sale a internet.
 
 El plan gratuito son 300 correos al día. Con el volumen inicial sobra;
 si se queda corto, se nota porque la API empieza a devolver 402 y el

@@ -77,8 +77,20 @@ function cargarUnidad(ruta = UNIDAD) {
   }
 
   let puestas = 0;
+  const archivos = [];
+
   for (const linea of crudo.split(/\r?\n/)) {
-    const m = linea.trim().match(/^Environment=(?:"(.*)"|(.*))$/);
+    const limpia = linea.trim();
+
+    /* Los secretos NO están en la unidad: están en el archivo que la
+       unidad señala, con permisos 600. Se anota para leerlo después.
+       Sin esto, `probar-correo.js` lanzado a mano en el servidor veía
+       el transporte pero no la clave de Brevo, y decía que faltaba
+       una clave que sí estaba puesta. */
+    const ef = limpia.match(/^EnvironmentFile=-?(.+)$/);
+    if (ef) { archivos.push(ef[1].trim()); continue; }
+
+    const m = limpia.match(/^Environment=(?:"(.*)"|(.*))$/);
     if (!m) continue;
 
     const par = m[1] || m[2] || '';
@@ -93,6 +105,8 @@ function cargarUnidad(ruta = UNIDAD) {
       puestas++;
     }
   }
+
+  for (const archivo of archivos) puestas += cargar(archivo);
   return puestas;
 }
 
